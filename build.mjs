@@ -47,9 +47,12 @@ export function build() {
   mkdirSync(dist, { recursive: true });
   writeFileSync(resolve(dist, 'index.html'), html);
   // Photos stay separate files so index.html stays small; the service worker precaches them.
-  rmSync(resolve(dist, 'photos'), { recursive: true, force: true });
-  cpSync(ui('photos'), resolve(dist, 'photos'), { recursive: true });
-  const photoList = PHOTOS.map((p) => `'./${p}'`).join(', ');
+  for (const dir of ['photos', 'icons']) {
+    rmSync(resolve(dist, dir), { recursive: true, force: true });
+    cpSync(ui(dir), resolve(dist, dir), { recursive: true });
+  }
+  const icons = ['icons/logo.svg', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+  const photoList = [...PHOTOS, ...icons].map((p) => `'./${p}'`).join(', ');
   writeFileSync(resolve(dist, 'sw.js'), readFileSync(ui('sw.js'), 'utf8').replace('/* PHOTOS */', () => photoList));
   copyFileSync(ui('manifest.webmanifest'), resolve(dist, 'manifest.webmanifest'));
   console.log(`Built dist/index.html (${Math.round(html.length / 1024)} KB)`);

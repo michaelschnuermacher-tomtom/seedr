@@ -1,4 +1,5 @@
 import { h, formatSigned, slugify } from './dom.js';
+import { logoDataUrl } from './logo.js';
 import { revealNext, redraw, setResult, hasResults } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
@@ -27,7 +28,7 @@ export function tournamentScreen(ctx) {
   return h('main', { class: 'screen' },
     photoHero(
       h('button', { class: 'back', onclick: () => ctx.go('home') }, '‹ Home'),
-      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, 'Seedr'), h('h1', {}, t.name))),
+      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'), h('h1', {}, t.name))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
       h('button', { class: view.tab === key ? 'current' : '', onclick: () => { view.tab = key; ctx.render(); } }, label))),
     drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning' }, w)),

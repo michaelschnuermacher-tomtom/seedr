@@ -1,4 +1,5 @@
 import { h } from './dom.js';
+import { logoDataUrl } from './logo.js';
 import { validateTournament } from '../engine/validate.js';
 
 export function homeScreen(ctx) {
@@ -6,7 +7,7 @@ export function homeScreen(ctx) {
   return h('main', { class: 'screen' },
     h('header', { class: 'top' }, h('div', { class: 'titles' },
       h('span', { class: 'eyebrow' }, 'Balanced doubles'),
-      h('h1', {}, 'Seedr'))),
+      h('h1', { class: 'brand' }, h('img', { src: logoDataUrl(), alt: '' }), 'seedr'))),
     ctx.store.available ? null : h('p', { class: 'warning' }, 'This browser cannot save data. Use Export to keep your tournaments.'),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => ctx.go('setup') }, 'New tournament'),

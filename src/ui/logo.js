@@ -1,0 +1,18 @@
+// Seedr logo: a tennis ball in the four Grand Slam colors — Australian Open blue and
+// Wimbledon green outside the seam, US Open blue and Roland Garros clay in the middle.
+// tools/make-icons.mjs renders the app icons from this.
+export const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><clipPath id="seedr-ball"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+  <g clip-path="url(#seedr-ball)"><g transform="rotate(-30 50 50)">
+    <rect x="-20" y="-20" width="140" height="70" fill="#1f3c88"/>
+    <rect x="-20" y="50" width="140" height="70" fill="#c8553d"/>
+    <path d="M-20 50H120" stroke="#fff" stroke-width="3.5"/>
+    <path d="M16 -8C38 22 38 78 16 108H-30V-8Z" fill="#2596be"/>
+    <path d="M84 -8C62 22 62 78 84 108H130V-8Z" fill="#006633"/>
+    <path d="M16 -8C38 22 38 78 16 108M84 -8C62 22 62 78 84 108" fill="none" stroke="#fff" stroke-width="5"/>
+  </g></g>
+</svg>`;
+
+export function logoDataUrl() {
+  return `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}`;
+}

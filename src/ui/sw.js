@@ -2,7 +2,7 @@
 // captive Wi-Fi. Redirected responses (e.g. Wi-Fi login pages) and other sites are
 // never cached.
 const CACHE = 'seedr-v2';
-// The build fills in the photo list.
+// The build fills in the photos and icons.
 const PHOTOS = [/* PHOTOS */];
 const FILES = ['./', './index.html', './manifest.webmanifest', ...PHOTOS];
 

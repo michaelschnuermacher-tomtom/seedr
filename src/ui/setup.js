@@ -1,4 +1,5 @@
 import { h, newId } from './dom.js';
+import { logoDataUrl } from './logo.js';
 import { parsePlayers, createTournament } from '../engine/tournament.js';
 import { recommendOptions, gamesPerPlayer } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
@@ -118,7 +119,7 @@ export function setupScreen(ctx) {
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
       h('button', { class: 'back', onclick: () => { ctx.state.draft = null; ctx.go('home'); } }, '‹ Home'),
-      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, 'Seedr'), h('h1', {}, 'New tournament'))),
+      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'), h('h1', {}, 'New tournament'))),
     form,
     preview);
 }

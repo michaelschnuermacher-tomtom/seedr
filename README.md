@@ -13,8 +13,7 @@ Open `dist/index.html` in a browser (double-click works). Data is saved in that 
 
 ## Use on an iPad
 
-1. Run `npm run build`, then upload the three files in `dist/` (`index.html`, `sw.js`,
-   `manifest.webmanifest`) to a static host, e.g. drag the `dist` folder onto
+1. Run `npm run build`, then upload the whole `dist/` folder to a static host, e.g. drag the `dist` folder onto
    https://app.netlify.com/drop or push it to GitHub Pages.
 2. Open the URL in Safari, tap **Share → Add to Home Screen**.
 3. Start Seedr from the home screen. After the first start it also works offline.
@@ -41,6 +40,22 @@ or paste players in the same format.
 Browser storage can be lost (clearing Safari data, a new device). Use **Manage → Export**
 to save a `.seedr.json` file (e.g. to Dropbox or iCloud Drive) and **Import** to load it
 on any device.
+
+## Photos and logo
+
+The tournament screen shows a rotating photo banner. The originals live in `img/`
+(not committed); after adding or changing photos run
+
+```bash
+python3 tools/optimize-photos.py   # needs Pillow; writes src/ui/photos and the photo list
+```
+
+It shrinks them to 1200 px and removes all metadata, including GPS locations. Photo 13 is
+the first banner image. The logo lives in `src/ui/logo.js`; after changing it run
+`node tools/make-icons.mjs` (needs Google Chrome) to render the app icons.
+
+The build writes `dist/index.html`, `sw.js`, `manifest.webmanifest`, `photos/` and `icons/`.
+Keep the `dist` folder together, and upload all of it when hosting.
 
 ## Development
 
