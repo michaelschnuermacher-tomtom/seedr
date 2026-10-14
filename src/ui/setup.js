@@ -7,10 +7,10 @@ export function newDraft() {
   return {
     name: '',
     playersText: '',
-    courts: 3,
+    courts: 2,
     planning: 'recommended',
-    totalMinutes: 120,
-    breakMinutes: 2,
+    totalMinutes: 240,
+    breakMinutes: 5,
     selectedRounds: null,
     rounds: 6,
     matchMinutes: 15,

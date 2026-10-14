@@ -52,7 +52,7 @@ Derived values:
 
 ## 4. Time planning
 
-Inputs: total time `T` (minutes), break between rounds `b` (default 2 min), courts `C`, players `N`.
+Inputs: total time `T` (minutes, default 240), break between rounds `b` (default 5 min), courts `C` (default 2), players `N`.
 
 For each round count `R = 1, 2, …`:
 
