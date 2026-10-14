@@ -4,7 +4,9 @@ import { validateTournament } from '../engine/validate.js';
 export function homeScreen(ctx) {
   const tournaments = ctx.store.list();
   return h('main', { class: 'screen' },
-    h('header', { class: 'top' }, h('h1', {}, 'Seedr')),
+    h('header', { class: 'top' }, h('div', { class: 'titles' },
+      h('span', { class: 'eyebrow' }, 'Balanced doubles'),
+      h('h1', {}, 'Seedr'))),
     ctx.store.available ? null : h('p', { class: 'warning' }, 'This browser cannot save data. Use Export to keep your tournaments.'),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => ctx.go('setup') }, 'New tournament'),

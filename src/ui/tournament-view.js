@@ -25,8 +25,8 @@ export function tournamentScreen(ctx) {
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
-      h('button', { onclick: () => ctx.go('home') }, '‹ Home'),
-      h('h1', {}, t.name)),
+      h('button', { class: 'back', onclick: () => ctx.go('home') }, '‹ Home'),
+      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, 'Seedr'), h('h1', {}, t.name))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
       h('button', { class: view.tab === key ? 'current' : '', onclick: () => { view.tab = key; ctx.render(); } }, label))),
     drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning' }, w)),
@@ -72,6 +72,9 @@ function roundsTab(ctx, t, view) {
   const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
     h('button', { class: layout === key ? 'current' : '', onclick: () => { view.layout = key; ctx.render(); } }, label)));
   const hint = h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear. Σ = sum of skills (lower = stronger).');
+  const done = t.schedule.filter((r) => roundComplete(t, r)).length;
+  const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
+    h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
 
   const hidden = t.settings.rounds - t.revealedRounds;
   const step = t.settings.revealBatch === 'all' ? hidden : Math.min(t.settings.revealBatch, hidden);
@@ -88,6 +91,7 @@ function roundsTab(ctx, t, view) {
   if (layout === 'all') {
     return [
       layoutSwitch,
+      progress,
       hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
         h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
@@ -111,6 +115,7 @@ function roundsTab(ctx, t, view) {
     layoutSwitch,
     nav,
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
+    progress,
     hint,
     h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: 'match' },
       h('div', { class: 'court' }, `Court ${m.court}`),
@@ -128,8 +133,8 @@ function standingsTab(t) {
   return [
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
       h('thead', {}, h('tr', {}, headers.map((x) => h('th', {}, x)))),
-      h('tbody', {}, rows.map((r) => h('tr', {},
-        h('td', {}, r.rank),
+      h('tbody', {}, rows.map((r) => h('tr', { class: r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
+        h('td', { class: 'rank' }, h('span', { class: 'rank-badge' }, r.rank)),
         h('td', {}, r.name),
         h('td', {}, r.skill),
         h('td', {}, r.games),
@@ -155,13 +160,13 @@ function manageTab(ctx, t) {
   const s = t.settings;
   const locked = hasResults(t);
   return [
-    h('dl', { class: 'facts' },
+    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
       fact('Players', t.players.length),
       fact('Courts', s.courts),
       fact('Rounds', s.rounds),
       fact('Match length', `${s.matchMinutes} min`),
       fact('Break', `${s.breakMinutes} min`),
-      fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)),
+      fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)), h('div', { style: 'height: 12px' })),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => exportTournament(t) }, 'Export (.seedr.json)'),
       h('button', {
