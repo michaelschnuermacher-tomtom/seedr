@@ -1,20 +1,27 @@
 /* Seedr — calm & clean. System fonts only, so the app works offline. */
+/* Grand Slam colors: Australian Open "Curious Blue", US Open blue, Roland Garros clay,
+   Wimbledon green. Curious Blue is too light for white text, so buttons use US Open blue. */
 :root {
-  --bg: #f4f5f2;
+  --ao: #2596be;
+  --uso: #1f3c88;
+  --rg: #c8553d;
+  --wim: #006633;
+  --bg: #f4f6f8;
   --surface: #ffffff;
-  --surface-2: #f0f1ed;
-  --text: #1f2421;
-  --muted: #6b716c;
-  --line: #e2e4df;
-  --accent: #2f6f62;
-  --accent-soft: #e3efeb;
-  --accent-text: #ffffff;
-  --win: #2f7d4f;
-  --win-soft: #e2f2e7;
-  --warn: #7a5a12;
-  --warn-soft: #fbf3dc;
-  --danger: #b4423a;
-  --shadow: 0 1px 2px rgba(20, 30, 25, .05), 0 4px 16px rgba(20, 30, 25, .06);
+  --surface-2: #eef1f4;
+  --text: #17202b;
+  --muted: #5f6b78;
+  --line: #dfe4ea;
+  --accent: var(--ao);
+  --accent-soft: #e2f2f8;
+  --strong: var(--uso);
+  --strong-text: #ffffff;
+  --win: var(--wim);
+  --win-soft: #e0f0e6;
+  --warn: #8f3522;
+  --warn-soft: #fbebe6;
+  --danger: var(--rg);
+  --shadow: 0 1px 2px rgba(16, 28, 45, .05), 0 4px 16px rgba(16, 28, 45, .07);
   --radius: 16px;
   --radius-sm: 10px;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -22,20 +29,21 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #141715;
-    --surface: #1c201e;
-    --surface-2: #232825;
-    --text: #e8ebe8;
-    --muted: #9aa29d;
-    --line: #2e3431;
-    --accent: #6fb8a6;
-    --accent-soft: #1f3530;
-    --accent-text: #0f1a17;
-    --win: #74c995;
-    --win-soft: #1d3326;
-    --warn: #e5c46b;
-    --warn-soft: #34301f;
-    --danger: #ec8a80;
+    --ao: #4fb3db;
+    --uso: #8aa6ee;
+    --rg: #ea8a74;
+    --wim: #5cc58a;
+    --bg: #11161c;
+    --surface: #19202a;
+    --surface-2: #212a35;
+    --text: #e7ecf2;
+    --muted: #97a3b1;
+    --line: #2c3643;
+    --accent-soft: #173341;
+    --strong-text: #0d1422;
+    --win-soft: #16301f;
+    --warn: #f0a593;
+    --warn-soft: #3a2420;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
     color-scheme: dark;
   }
@@ -75,8 +83,8 @@ button, .button {
 button:hover, .button:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 button:focus-visible, .button:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: default; }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-button.primary:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+button.primary { background: var(--strong); border-color: var(--strong); color: var(--strong-text); }
+button.primary:hover { background: color-mix(in srgb, var(--strong) 85%, black); }
 button.danger { color: var(--danger); }
 button.small { min-height: 36px; padding: 4px 12px; font-size: .875rem; }
 button.back { border: none; background: transparent; color: var(--muted); padding: 8px 10px 8px 4px; }
@@ -121,7 +129,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 /* Segmented controls */
 .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--surface-2); border-radius: 12px; }
 .tabs button { border: none; background: transparent; min-height: 40px; color: var(--muted); }
-.tabs button.current { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.tabs button.current { background: var(--surface); color: var(--strong); box-shadow: var(--shadow); }
 .tabs.layout { display: flex; width: max-content; max-width: 100%; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .toolbar .tabs.layout { margin-left: 0; }
@@ -130,7 +138,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .round-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .round-nav button { min-width: 44px; padding: 8px 0; border-radius: 999px; }
 .round-nav button.complete { background: var(--win-soft); border-color: transparent; color: var(--win); }
-.round-nav button.current { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.round-nav button.current { background: var(--strong); border-color: var(--strong); color: var(--strong-text); }
 .progress { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 6px 0 14px; }
 .progress > span { display: block; height: 100%; background: var(--win); border-radius: inherit; transition: width .3s; }
 
