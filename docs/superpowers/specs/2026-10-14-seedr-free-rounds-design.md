@@ -23,14 +23,13 @@ implements only what is described here.
 - Draw optimization: even sit-outs, no repeated partners, balanced matches,
   balanced across the tournament, varied opponents.
 - Draw visibility: reveal rounds in batches of k (k = all → in advance, k = 1 → surprise).
-- Round timer.
 - Results: win/loss only, entered with one tap.
 - Standings per player: wins + 0.5 per missing game, shared ranks on ties.
 - Autosave on the device; JSON export and import.
 
 ### Out of scope (v1)
 
-Fixed teams, other formats (round robin, knockout, groups, Swiss), scores or sets,
+A round timer (timing is handled outside the app), fixed teams, other formats (round robin, knockout, groups, Swiss), scores or sets,
 draws (tied results), other rating modes, late arrivals or players leaving
 mid-tournament, manual schedule edits, printing, multiple devices or live sync.
 
@@ -105,12 +104,16 @@ The weights are constants in the engine (for example 10 000 / 10 / 3 / 1). They 
 tuned in tests so that priority holds in practice.
 
 Search: simulated annealing over the full schedule. One move = swapping two active
-players within the same round (between teams or matches). It starts from a greedy
-draw, runs for a fixed time budget (~1.5 s), and keeps the best schedule found.
+players within the same round (between teams or matches). It starts from a random
+draw, runs a fixed number of iterations (100 000, about 0.3 s on a laptop) so that the
+same seed gives the same schedule on every device, and keeps the best schedule found.
 Skill pairing within a team is not restricted: a 1 and a 9 is just as valid as two 5s.
 
 If partner repeats remain (too few players for the number of games), the app shows a
-warning with the number of repeats.
+warning with the number of repeats. If any match has a team skill gap of 3 or more, the
+app warns that some matches are unbalanced. This happens with few players (avoiding
+repeated partners then forces uneven matches, e.g. 8 players, 2 courts, 7 rounds) or with
+very different skill levels.
 
 ### 5.3 Redraw
 
@@ -128,9 +131,6 @@ hidden in the UI.
 
 - **Round screen:** for each court, both teams (names + team strength shown as the
   skill sum on the 1–10 scale), and the list of sit-outs.
-- **Timer:** a countdown of `m` minutes per round with start, pause and reset. When it
-  runs out, a visual signal is shown (and a sound, if the browser allows it). The timer
-  doesn't advance rounds on its own.
 - **Result:** tap the winning team. Tapping again changes or clears the result.
 - Navigation between visible rounds; finished rounds are marked.
 
@@ -196,7 +196,9 @@ src/
     validate.js    import validation
   ui/
     index.html, styles.css, app.js   screens: home, setup, rounds, standings
-build.mjs       → dist/seedr.html (single file, inline JS/CSS)
+build.mjs       → dist/index.html (single file, inline JS/CSS)
+                  + dist/sw.js, dist/manifest.webmanifest (only used when hosted over
+                    https: offline start from the iPad home screen)
 test/           node --test unit tests for the engine
 ```
 
