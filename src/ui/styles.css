@@ -183,8 +183,8 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .facts dd { margin: 0; font-weight: 550; }
 
 /* Tournament photo banner */
-.hero { position: relative; height: 230px; margin: 0 0 20px; border-radius: var(--radius); overflow: hidden; background: #1d2a26; box-shadow: var(--shadow); }
-.hero-photo { position: absolute; inset: 0; background-size: cover; background-position: center 40%; opacity: 0; transition: opacity 1.4s ease; }
+.hero { position: relative; height: 260px; margin: 0 0 20px; border-radius: var(--radius); overflow: hidden; background: #1d2a26; box-shadow: var(--shadow); }
+.hero-photo { position: absolute; inset: 0; background-size: cover; background-position: 50% 40%; opacity: 0; transition: opacity 1.4s ease; }
 .hero-photo.visible { opacity: 1; }
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,.05) 55%, rgba(0,0,0,.65) 100%); pointer-events: none; }
 .hero-content { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 12px 20px 18px; }
@@ -200,16 +200,13 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .eyebrow { display: inline-flex; align-items: center; gap: 6px; }
 .eyebrow img { width: 16px; height: 16px; }
 
-/* Grand Slam colors across the page */
-body {
-  min-height: 100vh;
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--ao) 9%, var(--bg)) 0,
-      var(--bg) 420px,
-      var(--bg) calc(100% - 420px),
-      color-mix(in srgb, var(--wim) 7%, var(--bg)) 100%);
-}
+/* Grand Slam colors across the page: a top-down court in the four surfaces behind
+   everything, under a veil so text stays readable. */
+body { min-height: 100vh; background: var(--bg); }
+.court-bg { position: fixed; inset: 0; z-index: -1; background: var(--court-portrait) center / cover no-repeat; }
+.court-bg::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 78%, transparent); }
+@media (orientation: landscape) { .court-bg { background-image: var(--court-landscape); } }
+#app { position: relative; }
 :root { --slam-stripe: linear-gradient(90deg, var(--ao) 0 25%, var(--uso) 25% 50%, var(--rg) 50% 75%, var(--wim) 75% 100%); }
 body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-index: 20; background: var(--slam-stripe); }
 .hero::before { content: ""; position: absolute; inset: auto 0 0 0; height: 5px; z-index: 2; background: var(--slam-stripe); }

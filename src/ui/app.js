@@ -2,6 +2,7 @@ import { h } from './dom.js';
 import { createStore, STORAGE_PREFIX } from './store.js';
 import { validateTournament } from '../engine/validate.js';
 import { homeScreen } from './home.js';
+import { installCourtBackground } from './court.js';
 import { setupScreen } from './setup.js';
 import { tournamentScreen } from './tournament-view.js';
 
@@ -78,4 +79,5 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.protocol 
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+installCourtBackground();
 render();
