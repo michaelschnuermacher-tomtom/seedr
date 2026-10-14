@@ -3,8 +3,8 @@ import { resultKey } from './standings.js';
 
 export const FORMAT_VERSION = 1;
 
-const PLAYER_LINE = /^(.*?)[\s,;]+(\d+)$/;
-
+// One player per line: "Name: skill". The last ":" separates, so names may contain
+// spaces, commas and other punctuation.
 export function parsePlayers(text) {
   const players = [];
   const errors = [];
@@ -13,15 +13,16 @@ export function parsePlayers(text) {
     const line = raw.trim();
     if (!line) return;
     const n = index + 1;
-    const match = PLAYER_LINE.exec(line);
-    if (!match || !match[1].trim()) {
-      errors.push(`Line ${n}: expected a name and a skill, e.g. "Anna 3"`);
+    const colon = line.lastIndexOf(':');
+    const name = colon > 0 ? line.slice(0, colon).trim() : '';
+    if (!name) {
+      errors.push(`Line ${n}: expected "Name: skill", e.g. "Anna: 3"`);
       return;
     }
-    const name = match[1].trim();
-    const skill = Number(match[2]);
-    if (skill < 1 || skill > 10) {
-      errors.push(`Line ${n}: skill must be 1–10 ("${line}")`);
+    const skillText = line.slice(colon + 1).trim();
+    const skill = Number(skillText);
+    if (!/^\d+$/.test(skillText) || skill < 1 || skill > 10) {
+      errors.push(`Line ${n}: skill must be a whole number from 1 to 10 ("${line}")`);
       return;
     }
     if (names.has(name.toLowerCase())) {

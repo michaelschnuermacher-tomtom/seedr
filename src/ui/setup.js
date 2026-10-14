@@ -79,12 +79,23 @@ export function setupScreen(ctx) {
   };
   showPlanning();
 
+  const playersBox = h('textarea', {
+    rows: 10, value: d.playersText, placeholder: 'Anna: 3\nBen Miller: 7\nCarla: 1\nDavid: 5',
+    oninput: (e) => { d.playersText = e.target.value; refresh(); },
+  });
+  const loadPlayers = async (file) => {
+    if (!file) return;
+    d.playersText = await file.text();
+    playersBox.value = d.playersText;
+    refresh();
+  };
+
   const form = h('section', { class: 'form' },
     field('Tournament name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; } })),
-    field('Players: one per line, name and skill 1–10 (1 = best)', h('textarea', {
-      rows: 10, value: d.playersText, placeholder: 'Anna 3\nBen 7\nCarla 1\nDavid 5',
-      oninput: (e) => { d.playersText = e.target.value; refresh(); },
-    })),
+    h('div', { class: 'actions' },
+      h('label', { class: 'button' }, 'Load players file',
+        h('input', { type: 'file', accept: '.txt,text/plain', hidden: true, onchange: (e) => { loadPlayers(e.target.files[0]); e.target.value = ''; } }))),
+    field('Players: one per line as "Name: skill" (skill 1–10, 1 = best)', playersBox),
     field('Courts', numberInput('courts', 1)),
     field('Break between rounds (minutes)', numberInput('breakMinutes', 0)),
     field('Rounds revealed at a time', selectInput(d.revealBatch,

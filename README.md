@@ -21,6 +21,21 @@ Open `dist/index.html` in a browser (double-click works). Data is saved in that 
 
 Tournament data stays on the device. The host only serves the empty app.
 
+## Players file
+
+On the setup screen, **Load players file** reads a plain text file (e.g. from Dropbox or
+iCloud Drive) with one player per line, name and skill (1 = best, 10 = weakest)
+separated by a colon:
+
+```
+Anna: 3
+Ben Miller: 7
+Müller, Jörg: 1
+```
+
+The players appear in the text box, where they can still be edited. You can also type
+or paste players in the same format.
+
 ## Keeping data safe
 
 Browser storage can be lost (clearing Safari data, a new device). Use **Manage → Export**

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { newDraft, evaluateDraft } from '../src/ui/setup.js';
 
 const SKILLS_18 = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10];
-const text18 = SKILLS_18.map((s, i) => `P${i + 1} ${s}`).join('\n');
+const text18 = SKILLS_18.map((s, i) => `P${i + 1}: ${s}`).join('\n');
 
 test('recommended planning requires choosing an option', () => {
   const ev = evaluateDraft({ ...newDraft(), playersText: text18 });
@@ -27,7 +27,7 @@ test('manual planning reports uneven games', () => {
 });
 
 test('problems: too few players, invalid courts, parse errors', () => {
-  assert.ok(evaluateDraft({ ...newDraft(), playersText: 'A 1\nB 2\nC 3' }).problems.some((p) => /at least 4 players/.test(p)));
+  assert.ok(evaluateDraft({ ...newDraft(), playersText: 'A: 1\nB: 2\nC: 3' }).problems.some((p) => /at least 4 players/.test(p)));
   assert.ok(evaluateDraft({ ...newDraft(), playersText: text18, courts: NaN }).problems.some((p) => /Courts/.test(p)));
   assert.ok(evaluateDraft({ ...newDraft(), playersText: `${text18}\nBroken` }).problems.some((p) => /^Line 19/.test(p)));
 });

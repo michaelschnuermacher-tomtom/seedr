@@ -40,7 +40,7 @@ The organizer enters:
 | Field | Rules |
 |---|---|
 | Tournament name | free text |
-| Players | name + skill 1–10; at least 4 players; names must be unique |
+| Players | name + skill 1–10; at least 4 players; names must be unique (case-insensitive). Entered as lines `Name: skill` (the last `:` separates), typed or loaded from a text file ("Load players file") into an editable box |
 | Courts | integer ≥ 1 |
 | Rounds revealed at a time (k) | integer ≥ 1 or "all"; default "all" |
 | Time planning | either **recommended** (see §4) or **manual** (number of rounds + match length) |

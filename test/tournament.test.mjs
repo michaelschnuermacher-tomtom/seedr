@@ -2,25 +2,28 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult } from '../src/engine/tournament.js';
 
-test('parsePlayers accepts names with spaces and several separators', () => {
-  const { players, errors } = parsePlayers('Anna 3\nBen,7\n\n  Carla Maria ; 1 \nDavid\t10\n');
+test('parsePlayers reads "Name: skill" lines', () => {
+  const { players, errors } = parsePlayers('Anna: 3\nBen Miller: 7\n\n  Müller, Jörg : 1 \r\nDavid:10\n');
   assert.deepEqual(errors, []);
   assert.deepEqual(players, [
     { name: 'Anna', skill: 3 },
-    { name: 'Ben', skill: 7 },
-    { name: 'Carla Maria', skill: 1 },
+    { name: 'Ben Miller', skill: 7 },
+    { name: 'Müller, Jörg', skill: 1 },
     { name: 'David', skill: 10 },
   ]);
 });
 
 test('parsePlayers reports bad lines and keeps the good ones', () => {
-  const { players, errors } = parsePlayers('Anna 0\nBen 11\nCarla\nanna 4\nAnna 5');
+  const { players, errors } = parsePlayers('Anna: 0\nBen: 11\nCarla 3\nanna: 4\nAnna: 5\n: 4\nHans: 3.5\nIda:');
   assert.deepEqual(players, [{ name: 'anna', skill: 4 }]);
-  assert.equal(errors.length, 4);
-  assert.match(errors[0], /^Line 1: skill must be 1–10/);
-  assert.match(errors[1], /^Line 2: skill must be 1–10/);
-  assert.match(errors[2], /^Line 3: expected a name and a skill/);
+  assert.equal(errors.length, 7);
+  assert.match(errors[0], /^Line 1: skill must be a whole number from 1 to 10/);
+  assert.match(errors[1], /^Line 2: skill must be a whole number from 1 to 10/);
+  assert.match(errors[2], /^Line 3: expected "Name: skill"/);
   assert.match(errors[3], /^Line 5: duplicate name "Anna"/);
+  assert.match(errors[4], /^Line 6: expected "Name: skill"/);
+  assert.match(errors[5], /^Line 7: skill must be a whole number from 1 to 10/);
+  assert.match(errors[6], /^Line 8: skill must be a whole number from 1 to 10/);
 });
 
 const SETTINGS = { courts: 2, rounds: 6, matchMinutes: 12, breakMinutes: 2, revealBatch: 2 };
