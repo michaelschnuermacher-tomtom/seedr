@@ -1,5 +1,5 @@
 import { h } from './dom.js';
-import { createStore } from './store.js';
+import { createStore, STORAGE_PREFIX } from './store.js';
 import { validateTournament } from '../engine/validate.js';
 import { homeScreen } from './home.js';
 import { setupScreen } from './setup.js';
@@ -57,6 +57,22 @@ function render() {
     : null;
   appRoot.replaceChildren(...[banner, screen(ctx)].filter(Boolean));
 }
+
+// Another tab changed a tournament: show the stored version instead of a stale copy.
+window.addEventListener('storage', (event) => {
+  if (event.key !== null && !event.key.startsWith(STORAGE_PREFIX)) return;
+  if (state.tournament) {
+    const fresh = store.get(state.tournament.id);
+    if (fresh) {
+      state.tournament = fresh;
+    } else {
+      state.tournament = null;
+      state.screen = 'home';
+      state.message = 'This tournament was deleted in another window.';
+    }
+  }
+  if (state.screen !== 'setup') render(); // re-rendering setup would drop typed input focus
+});
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});

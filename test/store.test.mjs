@@ -4,9 +4,16 @@ import { createStore } from '../src/ui/store.js';
 
 function memoryBackend(initial = {}) {
   const data = new Map(Object.entries(initial));
-  return { data, getItem: (k) => (data.has(k) ? data.get(k) : null), setItem: (k, v) => { data.set(k, String(v)); } };
+  return {
+    data,
+    get length() { return data.size; },
+    key: (i) => [...data.keys()][i] ?? null,
+    getItem: (k) => (data.has(k) ? data.get(k) : null),
+    setItem: (k, v) => { data.set(k, String(v)); },
+    removeItem: (k) => { data.delete(k); },
+  };
 }
-const t = (id, createdAt) => ({ id, name: id, createdAt });
+const t = (id, createdAt, extra = {}) => ({ id, name: id, createdAt, ...extra });
 
 test('saved tournaments survive a new store on the same backend', () => {
   const backend = memoryBackend();
@@ -27,24 +34,48 @@ test('remove deletes a tournament', () => {
   assert.equal(createStore(backend).get('a'), null);
 });
 
+test('two tabs do not overwrite each other\'s tournaments', () => {
+  const backend = memoryBackend();
+  const setup = createStore(backend);
+  setup.save(t('a', '2026-01-01'));
+  setup.save(t('old', '2025-01-01'));
+  const tabA = createStore(backend);
+  const tabB = createStore(backend);
+  tabA.save(t('a', '2026-01-01', { results: { '1-1': 1 } }));
+  tabB.remove('old');
+  const fresh = createStore(backend);
+  assert.deepEqual(fresh.get('a').results, { '1-1': 1 });
+  assert.equal(fresh.get('old'), null);
+  assert.deepEqual(tabB.get('a').results, { '1-1': 1 }, 'tab B sees tab A\'s change');
+});
+
 test('without a backend it works in memory and reports unavailable', () => {
   const store = createStore(null);
   assert.equal(store.available, false);
   assert.equal(store.save(t('a', '2026-01-01')), false);
   assert.deepEqual(store.get('a'), t('a', '2026-01-01'));
+  assert.deepEqual(store.list().map((x) => x.id), ['a']);
 });
 
-test('a failing setItem (e.g. storage full) marks storage unavailable', () => {
-  const store = createStore({ getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } });
+test('a failing setItem (e.g. storage full) keeps the tournament in memory', () => {
+  const backend = memoryBackend();
+  backend.setItem = () => { throw new Error('QuotaExceeded'); };
+  const store = createStore(backend);
   assert.equal(store.save(t('a', '2026-01-01')), false);
   assert.equal(store.available, false);
+  assert.deepEqual(store.get('a'), t('a', '2026-01-01'));
 });
 
-test('corrupt stored data is backed up and the store starts empty', () => {
-  const backend = memoryBackend({ 'seedr.v1': '{not json' });
+test('a corrupt stored entry is skipped and left untouched', () => {
+  const backend = memoryBackend({ 'seedr.v1.t.bad': '{not json', 'seedr.v1.t.null': 'null' });
   const store = createStore(backend);
-  assert.deepEqual(store.list(), []);
-  const backups = [...backend.data.keys()].filter((k) => k.startsWith('seedr.v1.corrupt-'));
-  assert.equal(backups.length, 1);
-  assert.equal(backend.data.get(backups[0]), '{not json');
+  store.save(t('a', '2026-01-01'));
+  assert.deepEqual(store.list().map((x) => x.id), ['a']);
+  assert.equal(store.get('bad'), null);
+  assert.equal(backend.data.get('seedr.v1.t.bad'), '{not json');
+});
+
+test('ids like "constructor" are not mistaken for saved tournaments', () => {
+  assert.equal(createStore(memoryBackend()).get('constructor'), null);
+  assert.equal(createStore(null).get('constructor'), null);
 });
