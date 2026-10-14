@@ -125,3 +125,18 @@ test('drawWarnings', () => {
   assert.match(drawWarnings({ ...base, partnerRepeats: 2 })[0], /repeated partners: 2/);
   assert.match(drawWarnings({ ...base, maxAbsDiff: 3 })[0], /unbalanced.*up to 3/);
 });
+
+test('small groups stay reasonably balanced (no stuck draw)', () => {
+  const cases = [
+    { skills: [1, 2, 3, 4, 5, 6, 7, 8], courts: 2, rounds: 7, maxGap: 6 },
+    { skills: [6, 3, 10, 3, 9, 2, 2, 2, 3, 6], courts: 2, rounds: 10, maxGap: 6 },
+    { skills: [8, 1, 10, 6, 7, 7, 10, 7, 10, 9, 1, 2], courts: 3, rounds: 10, maxGap: 7 },
+  ];
+  for (const { skills, courts, rounds, maxGap } of cases) {
+    for (const seed of [1, 2, 3]) {
+      const { stats } = generateSchedule({ players: makePlayers(skills), courts, rounds, seed });
+      assert.equal(stats.partnerRepeats, 0, `${skills.length} players, seed ${seed}: partner repeats`);
+      assert.ok(stats.maxAbsDiff <= maxGap, `${skills.length} players, seed ${seed}: max gap ${stats.maxAbsDiff} > ${maxGap}`);
+    }
+  }
+});

@@ -103,9 +103,10 @@ Cost function over the whole schedule, in decreasing priority:
 The weights are constants in the engine (for example 10 000 / 10 / 3 / 1). They are
 tuned in tests so that priority holds in practice.
 
-Search: simulated annealing over the full schedule. One move = swapping two active
-players within the same round (between teams or matches). It starts from a random
-draw, runs a fixed number of iterations (100 000, about 0.3 s on a laptop) so that the
+Search: simulated annealing over the full schedule. A move swaps either two active
+players or two whole teams (partners stay together, only opponents change) within the
+same round. The start temperature is high enough to pass through partner repeats, and
+the search runs 4 restarts from random draws. It runs a fixed number of iterations (100 000, about 0.3 s on a laptop) so that the
 same seed gives the same schedule on every device, and keeps the best schedule found.
 Skill pairing within a team is not restricted: a 1 and a 9 is just as valid as two 5s.
 
