@@ -1,6 +1,9 @@
-import { shuffle } from './rng.js';
+import { createRng, shuffle } from './rng.js';
+import { playersPerRound } from './timeplan.js';
 
 export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1 };
+export const DEFAULT_ITERATIONS = 100000;
+export const UNBALANCED_GAP = 3;
 
 export function strengthOf(skill) {
   return 11 - skill;
@@ -54,4 +57,74 @@ export function evaluate(slots, strength, n) {
   const cost = WEIGHTS.partner * partnerRepeats + WEIGHTS.match * sumDiffSq
     + WEIGHTS.balance * sumBalanceSq + WEIGHTS.opponent * opponentRepeats;
   return { cost, partnerRepeats, opponentRepeats, sumDiffSq, maxAbsDiff, maxAbsBalance };
+}
+
+// Simulated annealing. A move swaps two active players of one round who are not
+// already partners. Iteration count (not time) keeps results deterministic.
+function optimize(slots, strength, n, rng, iterations) {
+  const current = slots.map((s) => s.slice());
+  let currentCost = evaluate(current, strength, n).cost;
+  let best = current.map((s) => s.slice());
+  let bestCost = currentCost;
+  const startTemp = 50;
+  const endTemp = 0.01;
+  for (let it = 0; it < iterations; it++) {
+    const temp = startTemp * Math.pow(endTemp / startTemp, it / iterations);
+    const s = current[Math.floor(rng() * current.length)];
+    const i = Math.floor(rng() * s.length);
+    let j = Math.floor(rng() * (s.length - 1));
+    if (j >= i) j++;
+    if (i >> 1 === j >> 1) continue; // same team: swapping changes nothing
+    [s[i], s[j]] = [s[j], s[i]];
+    const cost = evaluate(current, strength, n).cost;
+    const delta = cost - currentCost;
+    if (delta <= 0 || rng() < Math.exp(-delta / temp)) {
+      currentCost = cost;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = current.map((x) => x.slice());
+      }
+    } else {
+      [s[i], s[j]] = [s[j], s[i]];
+    }
+  }
+  return best;
+}
+
+export function generateSchedule({ players, courts, rounds, seed, iterations = DEFAULT_ITERATIONS }) {
+  const n = players.length;
+  const rng = createRng(seed);
+  const strength = players.map((p) => strengthOf(p.skill));
+  const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng);
+  const slots = sitOuts.map((sitting) => shuffle(rng, [...Array(n).keys()].filter((i) => !sitting.includes(i))));
+  const best = optimize(slots, strength, n, rng, iterations);
+  const id = (i) => players[i].id;
+  const schedule = best.map((s, r) => ({
+    round: r + 1,
+    matches: Array.from({ length: s.length / 4 }, (_, k) => ({
+      court: k + 1,
+      team1: [id(s[4 * k]), id(s[4 * k + 1])],
+      team2: [id(s[4 * k + 2]), id(s[4 * k + 3])],
+    })),
+    sitOuts: sitOuts[r].map(id),
+  }));
+  return { schedule, stats: evaluate(best, strength, n) };
+}
+
+export function scheduleStats(players, schedule) {
+  const index = new Map(players.map((p, i) => [p.id, i]));
+  const strength = players.map((p) => strengthOf(p.skill));
+  const slots = schedule.map((r) => r.matches.flatMap((m) => [...m.team1, ...m.team2].map((pid) => index.get(pid))));
+  return evaluate(slots, strength, players.length);
+}
+
+export function drawWarnings(stats) {
+  const warnings = [];
+  if (stats.partnerRepeats > 0) {
+    warnings.push(`Not enough players to avoid repeated partners: ${stats.partnerRepeats} repeated pairing(s).`);
+  }
+  if (stats.maxAbsDiff >= UNBALANCED_GAP) {
+    warnings.push(`Some matches are unbalanced (team skill gap up to ${stats.maxAbsDiff}). This happens with few players or very different skill levels.`);
+  }
+  return warnings;
 }
