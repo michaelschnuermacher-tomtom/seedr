@@ -17,3 +17,21 @@ export const PHOTOS = [
 ];
 
 export const TOURNAMENT_PHOTO = 'photos/13-sunset-court-group.jpg';
+
+// Focus point (x, y as fractions) and size in pixels of each photo.
+export const PHOTO_INFO = {
+  'photos/01-terrace-pair-night.jpg': [0.5, 0.28, 900, 1200],
+  'photos/02-terrace-woman-and-girl.jpg': [0.45, 0.33, 900, 1200],
+  'photos/03-sunset-terrace.jpg': [0.5, 0.5, 1200, 900],
+  'photos/04-terrace-relaxing.jpg': [0.45, 0.36, 900, 1200],
+  'photos/05-paddling-pool-by-court.jpg': [0.63, 0.42, 1200, 900],
+  'photos/06-lounge-group.jpg': [0.5, 0.35, 1200, 900],
+  'photos/07-court-group-palms.jpg': [0.5, 0.45, 1200, 900],
+  'photos/08-cocktails-selfie.jpg': [0.4, 0.35, 1200, 900],
+  'photos/09-terrace-drinks-night.jpg': [0.47, 0.27, 900, 1200],
+  'photos/10-court-two-players-cheering.jpg': [0.47, 0.2, 1200, 900],
+  'photos/11-court-from-above.jpg': [0.5, 0.45, 1200, 675],
+  'photos/12-court-selfie-beers.jpg': [0.55, 0.45, 1200, 675],
+  'photos/13-sunset-court-group.jpg': [0.5, 0.42, 588, 640],
+  'photos/14-terrace-group-with-racket.jpg': [0.5, 0.26, 1200, 900],
+};
