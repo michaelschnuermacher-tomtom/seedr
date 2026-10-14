@@ -1,0 +1,38 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { newDraft, evaluateDraft } from '../src/ui/setup.js';
+
+const SKILLS_18 = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10];
+const text18 = SKILLS_18.map((s, i) => `P${i + 1} ${s}`).join('\n');
+
+test('recommended planning requires choosing an option', () => {
+  const ev = evaluateDraft({ ...newDraft(), playersText: text18 });
+  assert.equal(ev.players.length, 18);
+  assert.ok(ev.options.length > 0);
+  assert.equal(ev.plan, null);
+  assert.ok(ev.problems.some((p) => /Choose one of the options/.test(p)));
+});
+
+test('a chosen option becomes the plan', () => {
+  const ev = evaluateDraft({ ...newDraft(), playersText: text18, selectedRounds: 9 });
+  assert.deepEqual(ev.problems, []);
+  assert.deepEqual(ev.plan, { rounds: 9, matchMinutes: 11 });
+  assert.deepEqual(ev.games, { min: 6, max: 6, even: true });
+});
+
+test('manual planning reports uneven games', () => {
+  const ev = evaluateDraft({ ...newDraft(), playersText: text18, planning: 'manual', rounds: 8, matchMinutes: 13 });
+  assert.deepEqual(ev.problems, []);
+  assert.deepEqual(ev.games, { min: 5, max: 6, even: false });
+});
+
+test('problems: too few players, invalid courts, parse errors', () => {
+  assert.ok(evaluateDraft({ ...newDraft(), playersText: 'A 1\nB 2\nC 3' }).problems.some((p) => /at least 4 players/.test(p)));
+  assert.ok(evaluateDraft({ ...newDraft(), playersText: text18, courts: NaN }).problems.some((p) => /Courts/.test(p)));
+  assert.ok(evaluateDraft({ ...newDraft(), playersText: `${text18}\nBroken` }).problems.some((p) => /^Line 19/.test(p)));
+});
+
+test('not enough time for one round', () => {
+  const ev = evaluateDraft({ ...newDraft(), playersText: text18, totalMinutes: 6 });
+  assert.ok(ev.problems.some((p) => /Not enough time/.test(p)));
+});

@@ -2,8 +2,9 @@ import { h } from './dom.js';
 import { createStore } from './store.js';
 import { validateTournament } from '../engine/validate.js';
 import { homeScreen } from './home.js';
+import { setupScreen } from './setup.js';
 
-const SCREENS = { home: homeScreen };
+const SCREENS = { home: homeScreen, setup: setupScreen };
 
 const appRoot = document.getElementById('app');
 const store = createStore(safeLocalStorage());
