@@ -166,3 +166,32 @@ test('teams in a match have similar skill spreads (no 1+9 vs 5+5)', () => {
     assert.equal(stats.partnerRepeats, 0);
   }
 });
+
+test('sit-out groups mix: 16 players on 2 courts are not split into two fixed groups', () => {
+  for (const seed of [1, 2, 3]) {
+    const rounds = assignSitOuts(16, 8, 12, createRng(seed));
+    const key = (r) => [...r].sort((a, b) => a - b).join(',');
+    const distinct = new Set(rounds.map(key));
+    assert.ok(distinct.size > 2, `seed ${seed}: only ${distinct.size} different sit-out groups`);
+  }
+});
+
+test('nobody sits out in two consecutive rounds when it can be avoided (18 players, 12 on court)', () => {
+  for (const seed of [1, 2, 3]) {
+    const rounds = assignSitOuts(18, 12, 12, createRng(seed));
+    for (let r = 1; r < rounds.length; r++) {
+      const before = new Set(rounds[r - 1]);
+      assert.ok(rounds[r].every((i) => !before.has(i)), `seed ${seed}: someone sat out in rounds ${r} and ${r + 1}`);
+    }
+  }
+});
+
+test('16 players, 2 courts, 12 rounds: balanced matches', () => {
+  const players = makePlayers([5, 6, 4, 1, 7, 3, 5, 4, 6, 1, 3, 3, 1, 3, 3, 4]);
+  for (const seed of [1, 2, 3]) {
+    const { schedule, stats } = generateSchedule({ players, courts: 2, rounds: 12, seed });
+    assertValidSchedule(players, 2, 12, schedule);
+    assert.equal(stats.partnerRepeats, 0);
+    assert.ok(stats.maxAbsDiff <= 2, `seed ${seed}: max gap ${stats.maxAbsDiff}`);
+  }
+});

@@ -80,9 +80,12 @@ with the tournament (so the same schedule comes back after reloading).
 
 ### 5.1 Sit-outs (hard rule)
 
-All players are shuffled once into a cyclic order. Round `r` takes the next `S`
-players in that cycle as its sit-outs. This means nobody sits out a second time
-until everyone has sat out once, and the gaps between sit-outs are even.
+Each round, the players who have sat out least so far sit out, so nobody sits out a
+second time until everyone has sat out once. Within a tie, players who sat out in the
+previous round are avoided when there is a real choice; the rest is random. This keeps
+the groups on court mixing: a fixed cycle would split e.g. 16 players on 2 courts into
+two groups of 8 that never meet. Only when avoiding back-to-back sit-outs would freeze
+the groups (exactly as many fresh candidates as places) the pick within the tie is random.
 
 ### 5.2 Matches (optimization)
 
@@ -110,7 +113,7 @@ tuned in tests so that priority holds in practice.
 Search: simulated annealing over the full schedule. A move swaps either two active
 players or two whole teams (partners stay together, only opponents change) within the
 same round. The start temperature is high enough to pass through partner repeats, and
-the search runs 4 restarts from random draws. It runs a fixed number of iterations (100 000, about 0.3 s on a laptop) so that the
+the search runs 4 restarts from random draws. It runs a fixed number of iterations (100 000, or 200 000 below 14 players; about 0.3 s on a laptop) so that the
 same seed gives the same schedule on every device, and keeps the best schedule found.
 Skill pairing within a team is not restricted: a 1 and a 9 is just as valid as two 5s.
 

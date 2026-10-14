@@ -3,6 +3,8 @@ import { playersPerRound } from './timeplan.js';
 
 export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, spread: 3 };
 export const DEFAULT_ITERATIONS = 100000;
+// Small groups are cheap to evaluate but hard to balance, so they get more search.
+export const SMALL_GROUP_ITERATIONS = 200000;
 export const UNBALANCED_GAP = 3;
 // Below this, avoiding repeated partners leaves too little room: the spread rule
 // would cost sum balance without making spreads much more similar.
@@ -13,13 +15,36 @@ export function strengthOf(skill) {
   return 11 - skill;
 }
 
-// Cyclic rotation: round r sits out the next S players of one shuffled order,
-// so nobody sits out twice before everyone has sat out once.
+// Each round sits out the players who have sat out least so far, so nobody sits out
+// twice before everyone has sat out once. Within a tie, players who sat out last round
+// are avoided when there is a real choice, and the rest is random, so the groups on
+// court mix. Only when avoiding back-to-back sit-outs would freeze the groups (exactly
+// as many fresh candidates as places, e.g. 16 players on 2 courts) the pick is random.
+// Each round's list is in selection order (fewest sit-outs first).
 export function assignSitOuts(playerCount, perRound, rounds, rng) {
   const sitting = playerCount - perRound;
-  const order = shuffle(rng, [...Array(playerCount).keys()]);
-  return Array.from({ length: rounds }, (_, r) =>
-    Array.from({ length: sitting }, (_, i) => order[(r * sitting + i) % playerCount]));
+  const count = new Array(playerCount).fill(0);
+  let previous = new Set();
+  return Array.from({ length: rounds }, () => {
+    const order = shuffle(rng, [...Array(playerCount).keys()]);
+    const levels = [...new Set(count)].sort((a, b) => a - b).map((c) => order.filter((i) => count[i] === c));
+    const chosen = [];
+    for (const level of levels) {
+      const need = sitting - chosen.length;
+      if (need === 0) break;
+      if (level.length <= need) {
+        chosen.push(...level);
+        continue;
+      }
+      const fresh = level.filter((i) => !previous.has(i));
+      if (fresh.length > need) chosen.push(...fresh.slice(0, need));
+      else if (fresh.length === need) chosen.push(...level.slice(0, need));
+      else chosen.push(...fresh, ...level.filter((i) => previous.has(i)).slice(0, need - fresh.length));
+    }
+    chosen.forEach((i) => count[i]++);
+    previous = new Set(chosen);
+    return chosen;
+  });
 }
 
 // Counts one meeting of x and y; returns 1 if they had met before.
@@ -126,8 +151,9 @@ function anneal(slots, strength, n, rng, iterations) {
   return { best, cost: bestCost };
 }
 
-export function generateSchedule({ players, courts, rounds, seed, iterations = DEFAULT_ITERATIONS }) {
+export function generateSchedule({ players, courts, rounds, seed, iterations }) {
   const n = players.length;
+  iterations ??= n < SPREAD_MIN_PLAYERS ? SMALL_GROUP_ITERATIONS : DEFAULT_ITERATIONS;
   const rng = createRng(seed);
   const strength = players.map((p) => strengthOf(p.skill));
   const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng);
