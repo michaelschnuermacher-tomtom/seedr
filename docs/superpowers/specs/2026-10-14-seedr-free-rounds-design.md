@@ -98,9 +98,13 @@ Cost function over the whole schedule, in decreasing priority:
 1. **Partner repeats** (hard where possible): each repeated partner pairing adds a very large penalty.
 2. **Match balance:** `Σ diff²` over all matches.
 3. **Tournament balance:** `Σ balance²` over all players.
-4. **Opponent variety:** `Σ (times faced − 1)` over every pair of players who faced each other more than once.
+4. **Similar team spreads:** `Σ (spread(team 1) − spread(team 2))²` over all matches, where
+   spread = strength difference of the two partners. Both teams in a match should be mixed
+   alike: 1+9 vs 2+8 is fine, 1+9 vs 5+5 is not. Weight 3, applied from 14 players only;
+   in smaller groups it would cost sum balance without making spreads much more similar.
+5. **Opponent variety:** `Σ (times faced − 1)` over every pair of players who faced each other more than once.
 
-The weights are constants in the engine (for example 10 000 / 10 / 3 / 1). They are
+The weights are constants in the engine: 10 000 / 10 / 3 / 3 / 1. They are
 tuned in tests so that priority holds in practice.
 
 Search: simulated annealing over the full schedule. A move swaps either two active

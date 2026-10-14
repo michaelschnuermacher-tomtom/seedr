@@ -1,9 +1,12 @@
 import { createRng, shuffle } from './rng.js';
 import { playersPerRound } from './timeplan.js';
 
-export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1 };
+export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, spread: 3 };
 export const DEFAULT_ITERATIONS = 100000;
 export const UNBALANCED_GAP = 3;
+// Below this, avoiding repeated partners leaves too little room: the spread rule
+// would cost sum balance without making spreads much more similar.
+export const SPREAD_MIN_PLAYERS = 14;
 const RESTARTS = 4;
 
 export function strengthOf(skill) {
@@ -34,12 +37,18 @@ export function evaluate(slots, strength, n) {
   let opponentRepeats = 0;
   let sumDiffSq = 0;
   let maxAbsDiff = 0;
+  let sumSpreadGapSq = 0;
+  let maxSpreadGap = 0;
   for (const s of slots) {
     for (let m = 0; m < s.length; m += 4) {
       const [a, b, c, d] = [s[m], s[m + 1], s[m + 2], s[m + 3]];
       const diff = strength[a] + strength[b] - strength[c] - strength[d];
       sumDiffSq += diff * diff;
       maxAbsDiff = Math.max(maxAbsDiff, Math.abs(diff));
+      // Both teams should be mixed alike: 1+9 vs 2+8 is fine, 1+9 vs 5+5 is not.
+      const spreadGap = Math.abs(strength[a] - strength[b]) - Math.abs(strength[c] - strength[d]);
+      sumSpreadGapSq += spreadGap * spreadGap;
+      maxSpreadGap = Math.max(maxSpreadGap, Math.abs(spreadGap));
       balance[a] += diff;
       balance[b] += diff;
       balance[c] -= diff;
@@ -56,8 +65,9 @@ export function evaluate(slots, strength, n) {
     maxAbsBalance = Math.max(maxAbsBalance, Math.abs(balance[i]));
   }
   const cost = WEIGHTS.partner * partnerRepeats + WEIGHTS.match * sumDiffSq
-    + WEIGHTS.balance * sumBalanceSq + WEIGHTS.opponent * opponentRepeats;
-  return { cost, partnerRepeats, opponentRepeats, sumDiffSq, maxAbsDiff, maxAbsBalance };
+    + WEIGHTS.balance * sumBalanceSq + WEIGHTS.opponent * opponentRepeats
+    + (n >= SPREAD_MIN_PLAYERS ? WEIGHTS.spread * sumSpreadGapSq : 0);
+  return { cost, partnerRepeats, opponentRepeats, sumDiffSq, maxAbsDiff, maxAbsBalance, sumSpreadGapSq, maxSpreadGap };
 }
 
 // Swaps two whole teams between matches of one round: partners stay together,
