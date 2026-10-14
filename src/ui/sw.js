@@ -1,4 +1,7 @@
-const CACHE = 'seedr-v1';
+// Cache first, refresh in the background: the app starts at once even on slow or
+// captive Wi-Fi. Redirected responses (e.g. Wi-Fi login pages) and other sites are
+// never cached.
+const CACHE = 'seedr-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -12,16 +15,20 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+  const network = fetch(request).then(async (response) => {
+    if (response.ok && !response.redirected) {
+      const cache = await caches.open(CACHE);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  });
+  event.waitUntil(network.then(() => {}, () => {}));
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html'))),
+    caches.match(request, { ignoreSearch: true })
+      .then((cached) => cached || network)
+      .catch(() => (request.mode === 'navigate' ? caches.match('./index.html') : undefined))
+      .then((response) => response || Response.error()),
   );
 });

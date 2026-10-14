@@ -74,7 +74,7 @@ window.addEventListener('storage', (event) => {
   if (state.screen !== 'setup') render(); // re-rendering setup would drop typed input focus
 });
 
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+if ('serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
