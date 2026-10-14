@@ -33,52 +33,92 @@ export function tournamentScreen(ctx) {
     body);
 }
 
-function roundsTab(ctx, t, view) {
+// Display data for all revealed rounds; hidden rounds are never included.
+export function roundsOverview(t) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
-  const names = (ids) => ids.map((id) => byId.get(id).name).join(' + ');
-  const skillSum = (ids) => ids.reduce((sum, id) => sum + byId.get(id).skill, 0);
-  const round = t.schedule[view.round - 1];
-
-  const nav = h('nav', { class: 'round-nav' }, t.schedule.slice(0, t.revealedRounds).map((r) => h('button', {
-    class: [r.round === view.round ? 'current' : '', roundComplete(t, r) ? 'complete' : ''].join(' ').trim(),
-    onclick: () => { view.round = r.round; ctx.render(); },
-  }, String(r.round))));
-
-  const matches = round.matches.map((m) => {
-    const winner = t.results[resultKey(round.round, m.court)];
-    const side = (n, team) => h('button', {
-      class: ['team', winner === n ? 'winner' : '', winner && winner !== n ? 'loser' : ''].join(' ').trim(),
-      onclick: () => {
-        ctx.save(setResult(t, round.round, m.court, winner === n ? null : n));
-        ctx.render();
-      },
-    }, h('span', { class: 'names' }, names(team)), h('span', { class: 'sum' }, `Σ ${skillSum(team)}`));
-    return h('div', { class: 'match' },
-      h('div', { class: 'court' }, `Court ${m.court}`),
-      side(1, m.team1),
-      h('div', { class: 'vs' }, 'vs'),
-      side(2, m.team2));
+  const team = (ids) => ({
+    names: ids.map((id) => byId.get(id).name).join(' + '),
+    sum: ids.reduce((sum, id) => sum + byId.get(id).skill, 0),
   });
+  return t.schedule.slice(0, t.revealedRounds).map((r) => ({
+    round: r.round,
+    complete: roundComplete(t, r),
+    matches: r.matches.map((m) => ({
+      court: m.court,
+      team1: team(m.team1),
+      team2: team(m.team2),
+      winner: t.results[resultKey(r.round, m.court)],
+    })),
+    sitOuts: r.sitOuts.map((id) => byId.get(id).name),
+  }));
+}
+
+function teamButton(ctx, t, round, match, n) {
+  const team = n === 1 ? match.team1 : match.team2;
+  const { winner } = match;
+  return h('button', {
+    class: ['team', winner === n ? 'winner' : '', winner && winner !== n ? 'loser' : ''].join(' ').trim(),
+    onclick: () => {
+      ctx.save(setResult(t, round, match.court, winner === n ? null : n));
+      ctx.render();
+    },
+  }, h('span', { class: 'names' }, team.names), h('span', { class: 'sum' }, `Σ ${team.sum}`));
+}
+
+function roundsTab(ctx, t, view) {
+  const rounds = roundsOverview(t);
+  const layout = view.layout ?? 'one';
+
+  const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
+    h('button', { class: layout === key ? 'current' : '', onclick: () => { view.layout = key; ctx.render(); } }, label)));
+  const hint = h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear. Σ = sum of skills (lower = stronger).');
 
   const hidden = t.settings.rounds - t.revealedRounds;
   const step = t.settings.revealBatch === 'all' ? hidden : Math.min(t.settings.revealBatch, hidden);
   const from = t.revealedRounds + 1;
-  const revealLabel = step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`;
+  const revealButton = hidden > 0 ? h('button', {
+    class: 'reveal primary',
+    onclick: () => {
+      ctx.save(revealNext(t));
+      view.round = from;
+      ctx.render();
+    },
+  }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
+
+  if (layout === 'all') {
+    return [
+      layoutSwitch,
+      hint,
+      h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
+        h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
+        r.matches.map((m) => h('div', { class: 'mini-match' },
+          h('span', { class: 'court' }, `Court ${m.court}`),
+          teamButton(ctx, t, r.round, m, 1),
+          h('span', { class: 'vs' }, 'vs'),
+          teamButton(ctx, t, r.round, m, 2))),
+        r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null))),
+      revealButton,
+    ];
+  }
+
+  const round = rounds[view.round - 1];
+  const nav = h('nav', { class: 'round-nav' }, rounds.map((r) => h('button', {
+    class: [r.round === view.round ? 'current' : '', r.complete ? 'complete' : ''].join(' ').trim(),
+    onclick: () => { view.round = r.round; ctx.render(); },
+  }, String(r.round))));
 
   return [
+    layoutSwitch,
     nav,
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
-    h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear. Σ = sum of skills (lower = stronger).'),
-    h('div', { class: 'matches' }, matches),
-    round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.map((id) => byId.get(id).name).join(', ')}`) : null,
-    hidden > 0 ? h('button', {
-      class: 'reveal primary',
-      onclick: () => {
-        ctx.save(revealNext(t));
-        view.round = from;
-        ctx.render();
-      },
-    }, revealLabel) : null,
+    hint,
+    h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: 'match' },
+      h('div', { class: 'court' }, `Court ${m.court}`),
+      teamButton(ctx, t, round.round, m, 1),
+      h('div', { class: 'vs' }, 'vs'),
+      teamButton(ctx, t, round.round, m, 2)))),
+    round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
+    revealButton,
   ];
 }
 
