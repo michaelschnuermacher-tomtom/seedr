@@ -3,6 +3,7 @@ import { revealNext, redraw, setResult, hasResults } from '../engine/tournament.
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
+import { saveFile, downloadFile } from './export.js';
 
 const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['manage', 'Manage']];
 
@@ -103,13 +104,7 @@ function standingsTab(t) {
 }
 
 function exportTournament(t) {
-  const blob = new Blob([JSON.stringify(t, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = h('a', { href: url, download: `${slugify(t.name)}.seedr.json` });
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile(`${slugify(t.name)}.seedr.json`, JSON.stringify(t, null, 2), { nav: navigator, download: downloadFile });
 }
 
 function fact(label, value) {
