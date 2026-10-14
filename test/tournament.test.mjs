@@ -1,0 +1,68 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult } from '../src/engine/tournament.js';
+
+test('parsePlayers accepts names with spaces and several separators', () => {
+  const { players, errors } = parsePlayers('Anna 3\nBen,7\n\n  Carla Maria ; 1 \nDavid\t10\n');
+  assert.deepEqual(errors, []);
+  assert.deepEqual(players, [
+    { name: 'Anna', skill: 3 },
+    { name: 'Ben', skill: 7 },
+    { name: 'Carla Maria', skill: 1 },
+    { name: 'David', skill: 10 },
+  ]);
+});
+
+test('parsePlayers reports bad lines and keeps the good ones', () => {
+  const { players, errors } = parsePlayers('Anna 0\nBen 11\nCarla\nanna 4\nAnna 5');
+  assert.deepEqual(players, [{ name: 'anna', skill: 4 }]);
+  assert.equal(errors.length, 4);
+  assert.match(errors[0], /^Line 1: skill must be 1–10/);
+  assert.match(errors[1], /^Line 2: skill must be 1–10/);
+  assert.match(errors[2], /^Line 3: expected a name and a skill/);
+  assert.match(errors[3], /^Line 5: duplicate name "Anna"/);
+});
+
+const SETTINGS = { courts: 2, rounds: 6, matchMinutes: 12, breakMinutes: 2, revealBatch: 2 };
+const PLAYERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((skill, i) => ({ name: `P${i + 1}`, skill }));
+const make = (settings = SETTINGS) => createTournament({
+  id: 't1', name: 'Club night', players: PLAYERS, settings, seed: 11, now: new Date('2026-10-14T18:00:00Z'),
+});
+
+test('createTournament builds a complete tournament', () => {
+  const t = make();
+  assert.equal(t.version, 1);
+  assert.equal(t.id, 't1');
+  assert.equal(t.createdAt, '2026-10-14T18:00:00.000Z');
+  assert.deepEqual(t.players[0], { id: 'p1', name: 'P1', skill: 1 });
+  assert.equal(t.schedule.length, 6);
+  assert.equal(t.revealedRounds, 2);
+  assert.deepEqual(t.results, {});
+  assert.equal(t.seed, 11);
+});
+
+test('revealNext reveals batches until all rounds are visible', () => {
+  let t = make();
+  t = revealNext(t); assert.equal(t.revealedRounds, 4);
+  t = revealNext(t); assert.equal(t.revealedRounds, 6);
+  t = revealNext(t); assert.equal(t.revealedRounds, 6);
+  assert.equal(make({ ...SETTINGS, revealBatch: 'all' }).revealedRounds, 6);
+});
+
+test('setResult sets, changes and clears a result without changing the input', () => {
+  const t = make();
+  const a = setResult(t, 1, 1, 2);
+  assert.deepEqual(a.results, { '1-1': 2 });
+  assert.deepEqual(t.results, {});
+  assert.equal(hasResults(a), true);
+  assert.deepEqual(setResult(a, 1, 1, null).results, {});
+  assert.throws(() => setResult(t, 1, 9, 1), /Unknown match/);
+});
+
+test('redraw creates a new schedule, but not after results were entered', () => {
+  const t = make();
+  const r = redraw(t, 99);
+  assert.equal(r.seed, 99);
+  assert.notDeepEqual(r.schedule, t.schedule);
+  assert.throws(() => redraw(setResult(t, 1, 1, 1), 5), /results/);
+});
