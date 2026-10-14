@@ -3,8 +3,9 @@ import { createStore } from './store.js';
 import { validateTournament } from '../engine/validate.js';
 import { homeScreen } from './home.js';
 import { setupScreen } from './setup.js';
+import { tournamentScreen } from './tournament-view.js';
 
-const SCREENS = { home: homeScreen, setup: setupScreen };
+const SCREENS = { home: homeScreen, setup: setupScreen, tournament: tournamentScreen };
 
 const appRoot = document.getElementById('app');
 const store = createStore(safeLocalStorage());
