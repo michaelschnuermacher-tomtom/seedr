@@ -1,6 +1,6 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { parsePlayers, createTournament } from '../engine/tournament.js';
+import { parsePlayers, createTournament, updateSettings } from '../engine/tournament.js';
 import { recommendOptions, gamesPerPlayer } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
@@ -16,6 +16,26 @@ export function newDraft() {
     rounds: 6,
     matchMinutes: 15,
     revealBatch: 'all',
+  };
+}
+
+// Setup form for changing a tournament that has not started. The total time is set so
+// that the tournament's current rounds × match length is one of the offered options.
+export function draftFromTournament(t) {
+  const s = t.settings;
+  return {
+    ...newDraft(),
+    editingId: t.id,
+    name: t.name,
+    playersText: t.players.map((p) => `${p.name}: ${p.skill}`).join('\n'),
+    courts: s.courts,
+    breakMinutes: s.breakMinutes,
+    planning: 'recommended',
+    totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
+    selectedRounds: s.rounds,
+    rounds: s.rounds,
+    matchMinutes: s.matchMinutes,
+    revealBatch: s.revealBatch,
   };
 }
 
@@ -118,8 +138,9 @@ export function setupScreen(ctx) {
   refresh();
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
-      h('button', { class: 'back', onclick: () => { ctx.state.draft = null; ctx.go('home'); } }, '‹ Home'),
-      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'), h('h1', {}, 'New tournament'))),
+      h('button', { class: 'back', onclick: () => cancelSetup(ctx) }, d.editingId ? '‹ Back' : '‹ Home'),
+      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
+        h('h1', {}, d.editingId ? 'Edit tournament' : 'New tournament'))),
     form,
     preview);
 }
@@ -140,7 +161,7 @@ function setupPreview(ctx, d, refresh) {
   }
   if (ev.problems.length) out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));
   out.push(h('div', { class: 'actions' },
-    h('button', { onclick: () => { ctx.state.draft = null; ctx.go('home'); } }, 'Cancel'),
+    h('button', { onclick: () => cancelSetup(ctx) }, 'Cancel'),
     h('button', {
       class: 'primary',
       disabled: ev.problems.length > 0,
@@ -149,19 +170,31 @@ function setupPreview(ctx, d, refresh) {
         e.currentTarget.textContent = 'Drawing…';
         setTimeout(() => createFromDraft(ctx, d, ev), 20); // let the browser paint "Drawing…" first
       },
-    }, 'Draw schedule')));
+    }, d.editingId ? 'Save and redraw' : 'Draw schedule')));
   return out;
 }
 
+function cancelSetup(ctx) {
+  const editing = ctx.state.draft?.editingId && ctx.store.get(ctx.state.draft.editingId);
+  ctx.state.draft = null;
+  if (editing) ctx.open(editing);
+  else ctx.go('home');
+}
+
 function createFromDraft(ctx, d, ev) {
-  const t = createTournament({
-    id: newId(),
-    name: d.name.trim() || 'Tournament',
-    players: ev.players,
-    settings: { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch },
-    seed: newSeed(),
-    now: new Date(),
-  });
+  const name = d.name.trim() || 'Tournament';
+  const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch };
+  const editing = d.editingId && ctx.store.get(d.editingId);
+  let t;
+  try {
+    t = editing
+      ? updateSettings(editing, { name, players: ev.players, settings }, newSeed())
+      : createTournament({ id: newId(), name, players: ev.players, settings, seed: newSeed(), now: new Date() });
+  } catch (e) {
+    ctx.state.draft = null;
+    ctx.flash(e.message); // e.g. a result was entered in another tab meanwhile
+    return;
+  }
   ctx.state.draft = null;
   ctx.save(t);
   ctx.open(t);

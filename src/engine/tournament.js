@@ -74,6 +74,23 @@ export function redraw(t, seed) {
   return { ...t, seed, schedule: drawSchedule(t.players, t.settings, seed), revealedRounds: initialReveal(t.settings) };
 }
 
+// New name, players or settings for a tournament that has not started: draws a new
+// schedule and keeps id and creation date.
+export function updateSettings(t, { name, players, settings }, seed) {
+  if (hasResults(t)) throw new Error('Cannot change settings after results have been entered');
+  const withIds = players.map((p, i) => ({ id: `p${i + 1}`, name: p.name, skill: p.skill }));
+  return {
+    ...t,
+    name,
+    settings: { ...settings },
+    players: withIds,
+    seed,
+    schedule: drawSchedule(withIds, settings, seed),
+    revealedRounds: initialReveal(settings),
+    results: {},
+  };
+}
+
 export function setResult(t, round, court, winner) {
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
   if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult } from '../src/engine/tournament.js';
+import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings } from '../src/engine/tournament.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
   const { players, errors } = parsePlayers('Anna: 3\nBen Miller: 7\n\n  Müller, Jörg : 1 \r\nDavid:10\n');
@@ -68,4 +68,26 @@ test('redraw creates a new schedule, but not after results were entered', () => 
   assert.equal(r.seed, 99);
   assert.notDeepEqual(r.schedule, t.schedule);
   assert.throws(() => redraw(setResult(t, 1, 1, 1), 5), /results/);
+});
+
+test('updateSettings changes a tournament that has not started and draws a new schedule', () => {
+  const t = make();
+  const players = [...PLAYERS.slice(0, 8), { name: 'New Player', skill: 2 }];
+  const u = updateSettings(t, { name: 'Renamed', players, settings: { ...SETTINGS, courts: 1, rounds: 4, revealBatch: 'all' } }, 77);
+  assert.equal(u.id, t.id);
+  assert.equal(u.createdAt, t.createdAt);
+  assert.equal(u.name, 'Renamed');
+  assert.equal(u.seed, 77);
+  assert.deepEqual(u.players.map((p) => p.id), ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9']);
+  assert.equal(u.players[8].name, 'New Player');
+  assert.equal(u.schedule.length, 4);
+  u.schedule.forEach((r) => assert.equal(r.matches.length, 1));
+  assert.equal(u.revealedRounds, 4);
+  assert.deepEqual(u.results, {});
+  assert.equal(t.name, 'Club night', 'input unchanged');
+});
+
+test('updateSettings is refused once a result has been entered', () => {
+  const started = setResult(make(), 1, 1, 1);
+  assert.throws(() => updateSettings(started, { name: 'x', players: PLAYERS, settings: SETTINGS }, 1), /results/);
 });

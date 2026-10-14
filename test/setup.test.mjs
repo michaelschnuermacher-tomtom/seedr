@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newDraft, evaluateDraft } from '../src/ui/setup.js';
+import { newDraft, evaluateDraft, draftFromTournament } from '../src/ui/setup.js';
+import { createTournament } from '../src/engine/tournament.js';
 
 const SKILLS_18 = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10];
 const text18 = SKILLS_18.map((s, i) => `P${i + 1}: ${s}`).join('\n');
@@ -42,4 +43,20 @@ test('problems: too few players, invalid courts, parse errors', () => {
 test('not enough time for one round', () => {
   const ev = evaluateDraft({ ...example(), playersText: text18, totalMinutes: 6 });
   assert.ok(ev.problems.some((p) => /Not enough time/.test(p)));
+});
+
+test('draftFromTournament pre-fills the setup form with the current settings', () => {
+  const t = createTournament({
+    id: 't9', name: 'Tenerife Cup', seed: 5, now: new Date('2026-10-14T18:00:00Z'),
+    players: SKILLS_18.map((skill, i) => ({ name: `P${i + 1}`, skill })),
+    settings: { courts: 3, rounds: 9, matchMinutes: 11, breakMinutes: 2, revealBatch: 3 },
+  });
+  const d = draftFromTournament(t);
+  assert.equal(d.editingId, 't9');
+  assert.equal(d.name, 'Tenerife Cup');
+  assert.equal(d.playersText.split('\n')[0], 'P1: 1');
+  assert.deepEqual([d.courts, d.breakMinutes, d.revealBatch, d.planning], [3, 2, 3, 'recommended']);
+  const ev = evaluateDraft(d);
+  assert.deepEqual(ev.problems, []);
+  assert.deepEqual(ev.plan, { rounds: 9, matchMinutes: 11 }, 'the current option is selected');
 });

@@ -5,6 +5,7 @@ import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { saveFile, downloadFile } from './export.js';
+import { draftFromTournament } from './setup.js';
 import { photoHero } from './hero.js';
 
 const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['manage', 'Manage']];
@@ -174,6 +175,13 @@ function manageTab(ctx, t) {
       h('button', {
         disabled: locked,
         onclick: () => {
+          ctx.state.draft = draftFromTournament(t);
+          ctx.go('setup');
+        },
+      }, 'Edit settings'),
+      h('button', {
+        disabled: locked,
+        onclick: () => {
           if (!confirm('Draw a completely new schedule?')) return;
           ctx.save(redraw(t, newSeed()));
           ctx.state.view.round = 1;
@@ -189,6 +197,6 @@ function manageTab(ctx, t) {
           ctx.go('home');
         },
       }, 'Delete tournament')),
-    locked ? h('p', { class: 'muted' }, 'Redraw is only possible before the first result is entered.') : null,
+    locked ? h('p', { class: 'muted' }, 'Settings and the draw can only be changed before the first result is entered.') : null,
   ];
 }

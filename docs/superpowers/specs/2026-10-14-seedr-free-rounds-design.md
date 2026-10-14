@@ -124,7 +124,14 @@ app warns that some matches are unbalanced. This happens with few players (avoid
 repeated partners then forces uneven matches, e.g. 8 players, 2 courts, 7 rounds) or with
 very different skill levels.
 
-### 5.3 Redraw
+### 5.3 Edit settings
+
+Before the first result is entered, "Edit settings" (Manage tab) reopens the setup form
+pre-filled with the tournament's name, players, courts, break, planning and reveal
+setting. "Save and redraw" keeps the tournament's id and creation date and draws a new
+schedule. Once a result exists, editing is locked.
+
+### 5.4 Redraw
 
 "Redraw" generates a new schedule from a new seed. It is only allowed before any
 result has been entered.
