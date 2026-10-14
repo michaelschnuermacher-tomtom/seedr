@@ -195,3 +195,14 @@ test('16 players, 2 courts, 12 rounds: balanced matches', () => {
     assert.ok(stats.maxAbsDiff <= 2, `seed ${seed}: max gap ${stats.maxAbsDiff}`);
   }
 });
+
+test('16 players on 2 courts: at most 2 back-to-back sit-outs per round', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const rounds = assignSitOuts(16, 8, 12, createRng(seed));
+    for (let r = 1; r < rounds.length; r++) {
+      const before = new Set(rounds[r - 1]);
+      const repeated = rounds[r].filter((i) => before.has(i)).length;
+      assert.ok(repeated <= 2, `seed ${seed}, round ${r + 1}: ${repeated} players sat out twice in a row`);
+    }
+  }
+});

@@ -85,7 +85,8 @@ second time until everyone has sat out once. Within a tie, players who sat out i
 previous round are avoided when there is a real choice; the rest is random. This keeps
 the groups on court mixing: a fixed cycle would split e.g. 16 players on 2 courts into
 two groups of 8 that never meet. Only when avoiding back-to-back sit-outs would freeze
-the groups (exactly as many fresh candidates as places) the pick within the tie is random.
+the groups (exactly as many fresh candidates as places), about a quarter of the places
+go to players who just sat out (e.g. 2 of 8), which is enough for the groups to mix.
 
 ### 5.2 Matches (optimization)
 

@@ -19,7 +19,8 @@ export function strengthOf(skill) {
 // twice before everyone has sat out once. Within a tie, players who sat out last round
 // are avoided when there is a real choice, and the rest is random, so the groups on
 // court mix. Only when avoiding back-to-back sit-outs would freeze the groups (exactly
-// as many fresh candidates as places, e.g. 16 players on 2 courts) the pick is random.
+// as many fresh candidates as places, e.g. 16 players on 2 courts) about a quarter of
+// the places go to players who just sat out.
 // Each round's list is in selection order (fewest sit-outs first).
 export function assignSitOuts(playerCount, perRound, rounds, rng) {
   const sitting = playerCount - perRound;
@@ -38,7 +39,12 @@ export function assignSitOuts(playerCount, perRound, rounds, rng) {
       }
       const fresh = level.filter((i) => !previous.has(i));
       if (fresh.length > need) chosen.push(...fresh.slice(0, need));
-      else if (fresh.length === need) chosen.push(...level.slice(0, need));
+      else if (fresh.length === need) {
+        // Taking exactly the fresh players would freeze the groups: let about a
+        // quarter of the places go to players who just sat out, so the groups mix.
+        const repeat = Math.max(1, Math.round(need / 4));
+        chosen.push(...level.filter((i) => previous.has(i)).slice(0, repeat), ...fresh.slice(0, need - repeat));
+      }
       else chosen.push(...fresh, ...level.filter((i) => previous.has(i)).slice(0, need - fresh.length));
     }
     chosen.forEach((i) => count[i]++);
