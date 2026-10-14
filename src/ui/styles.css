@@ -199,3 +199,38 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .brand img { width: 52px; height: 52px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 6px; }
 .eyebrow img { width: 16px; height: 16px; }
+
+/* Grand Slam colors across the page */
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ao) 9%, var(--bg)) 0,
+      var(--bg) 420px,
+      var(--bg) calc(100% - 420px),
+      color-mix(in srgb, var(--wim) 7%, var(--bg)) 100%);
+}
+:root { --slam-stripe: linear-gradient(90deg, var(--ao) 0 25%, var(--uso) 25% 50%, var(--rg) 50% 75%, var(--wim) 75% 100%); }
+body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-index: 20; background: var(--slam-stripe); }
+.hero::before { content: ""; position: absolute; inset: auto 0 0 0; height: 5px; z-index: 2; background: var(--slam-stripe); }
+
+.court-color-0 { --court: var(--ao); }
+.court-color-1 { --court: var(--rg); }
+.court-color-2 { --court: var(--wim); }
+.court-color-3 { --court: var(--uso); }
+.match[class*="court-color"] { border-top: 5px solid var(--court); }
+[class*="court-color"] .court { color: var(--court); }
+.mini-match .court::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--court); vertical-align: 1px; }
+
+.card.accent-ao { border-left: 5px solid var(--ao); }
+.card.accent-wim { border-left: 5px solid var(--wim); }
+.card.accent-rg { border-left: 5px solid var(--rg); }
+.card.accent-uso { border-left: 5px solid var(--uso); }
+.card.accent-ao .card-title { color: var(--ao); }
+.card.accent-wim .card-title { color: var(--wim); }
+.card.accent-rg .card-title { color: var(--rg); }
+.card.accent-uso .card-title { color: var(--uso); }
+
+.standings tr.rank-1 td { background: color-mix(in srgb, #e9c75b 16%, transparent); }
+.standings tr.rank-2 td { background: color-mix(in srgb, #aab4bd 16%, transparent); }
+.standings tr.rank-3 td { background: color-mix(in srgb, #dcae85 18%, transparent); }

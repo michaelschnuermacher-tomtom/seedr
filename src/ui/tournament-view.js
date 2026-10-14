@@ -56,6 +56,11 @@ export function roundsOverview(t) {
   }));
 }
 
+// Each court has its own Grand Slam color: AO blue, Roland Garros clay, Wimbledon green, US Open blue.
+function courtColor(court) {
+  return `court-color-${(court - 1) % 4}`;
+}
+
 function teamButton(ctx, t, round, match, n) {
   const team = n === 1 ? match.team1 : match.team2;
   const { winner } = match;
@@ -98,7 +103,7 @@ function roundsTab(ctx, t, view) {
       hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
         h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
-        r.matches.map((m) => h('div', { class: 'mini-match' },
+        r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
           h('span', { class: 'court' }, `Court ${m.court}`),
           teamButton(ctx, t, r.round, m, 1),
           h('span', { class: 'vs' }, 'vs'),
@@ -120,7 +125,7 @@ function roundsTab(ctx, t, view) {
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
     progress,
     hint,
-    h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: 'match' },
+    h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
       h('div', { class: 'court' }, `Court ${m.court}`),
       teamButton(ctx, t, round.round, m, 1),
       h('div', { class: 'vs' }, 'vs'),

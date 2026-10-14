@@ -111,16 +111,16 @@ export function setupScreen(ctx) {
     refresh();
   };
 
-  const card = (title, ...children) => h('section', { class: 'card' }, h('h2', { class: 'card-title' }, title), ...children);
+  const card = (title, color, ...children) => h('section', { class: `card accent-${color}` }, h('h2', { class: 'card-title' }, title), ...children);
   const form = h('div', { class: 'form' },
-    card('Tournament',
+    card('Tournament', 'ao',
       field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; } }))),
-    card('Players',
+    card('Players', 'wim',
       field('One per line as "Name: skill" (skill 1–10, 1 = best)', playersBox),
       h('div', { class: 'actions' },
         h('label', { class: 'button' }, 'Load players file',
           h('input', { type: 'file', accept: '.txt,text/plain', hidden: true, onchange: (e) => { loadPlayers(e.target.files[0]); e.target.value = ''; } })))),
-    card('Courts & time',
+    card('Courts & time', 'rg',
       h('div', { class: 'row' },
         field('Courts', numberInput('courts', 1)),
         field('Break between rounds (min)', numberInput('breakMinutes', 0))),
@@ -129,7 +129,7 @@ export function setupScreen(ctx) {
         (e) => { d.planning = e.target.value; showPlanning(); refresh(); })),
       recommendedBox,
       manualBox),
-    card('Draw',
+    card('Draw', 'uso',
       field('Rounds revealed at a time', selectInput(d.revealBatch,
         [['all', 'All (whole schedule in advance)'], ['1', '1 (surprise)'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']],
         (e) => { d.revealBatch = e.target.value === 'all' ? 'all' : Number(e.target.value); }))),
