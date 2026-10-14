@@ -1,0 +1,53 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createTournament, setResult } from '../src/engine/tournament.js';
+import { validateTournament } from '../src/engine/validate.js';
+
+const base = () => {
+  const t = createTournament({
+    id: 't1', name: 'Club night', seed: 3, now: new Date('2026-10-14T18:00:00Z'),
+    players: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((skill, i) => ({ name: `P${i + 1}`, skill })),
+    settings: { courts: 2, rounds: 4, matchMinutes: 12, breakMinutes: 2, revealBatch: 'all' },
+  });
+  return JSON.parse(JSON.stringify(setResult(t, 1, 1, 2)));
+};
+
+const broken = (mutate) => {
+  const t = base();
+  mutate(t);
+  return validateTournament(t);
+};
+
+test('a created tournament survives a JSON round trip', () => {
+  const t = base();
+  const result = validateTournament(JSON.parse(JSON.stringify(t)));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.tournament, t);
+});
+
+test('rejects things that are not tournaments', () => {
+  for (const value of [null, [], 'text', 42, {}]) assert.equal(validateTournament(value).ok, false);
+});
+
+const cases = {
+  'unsupported version': [(t) => { t.version = 2; }, /version/],
+  'too few players': [(t) => { t.players = t.players.slice(0, 3); }, /4 players/],
+  'skill out of range': [(t) => { t.players[0].skill = 11; }, /skill/],
+  'duplicate name (case-insensitive)': [(t) => { t.players[1].name = t.players[0].name.toLowerCase(); }, /Duplicate player name/],
+  'schedule length differs from rounds': [(t) => { t.schedule.pop(); }, /Schedule/],
+  'player missing from a round': [(t) => { t.schedule[0].sitOuts = []; }, /every player/],
+  'unknown player in a round': [(t) => { t.schedule[0].matches[0].team1[0] = 'ghost'; }, /Unknown player/],
+  'invalid court number': [(t) => { t.schedule[0].matches[0].court = 7; }, /court/],
+  'result for an unknown match': [(t) => { t.results['9-1'] = 1; }, /unknown match/],
+  'invalid result value': [(t) => { t.results['1-1'] = 3; }, /Invalid result/],
+  'revealed rounds out of range': [(t) => { t.revealedRounds = 5; }, /revealed/],
+  'invalid reveal batch': [(t) => { t.settings.revealBatch = 0; }, /reveal batch/],
+};
+
+for (const [name, [mutate, message]] of Object.entries(cases)) {
+  test(`rejects: ${name}`, () => {
+    const result = broken(mutate);
+    assert.equal(result.ok, false);
+    assert.match(result.error, message);
+  });
+}
