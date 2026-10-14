@@ -4,6 +4,7 @@ import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { saveFile, downloadFile } from './export.js';
+import { photoHero } from './hero.js';
 
 const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['manage', 'Manage']];
 
@@ -24,7 +25,7 @@ export function tournamentScreen(ctx) {
     : view.tab === 'manage' ? manageTab(ctx, t)
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
-    h('header', { class: 'top' },
+    photoHero(
       h('button', { class: 'back', onclick: () => ctx.go('home') }, '‹ Home'),
       h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, 'Seedr'), h('h1', {}, t.name))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>

@@ -173,3 +173,15 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 550; }
+
+/* Tournament photo banner */
+.hero { position: relative; height: 230px; margin: 0 0 20px; border-radius: var(--radius); overflow: hidden; background: #1d2a26; box-shadow: var(--shadow); }
+.hero-photo { position: absolute; inset: 0; background-size: cover; background-position: center 40%; opacity: 0; transition: opacity 1.4s ease; }
+.hero-photo.visible { opacity: 1; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,.05) 55%, rgba(0,0,0,.65) 100%); pointer-events: none; }
+.hero-content { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 12px 20px 18px; }
+.hero .back { color: #fff; background: rgba(0,0,0,.28); border-radius: 999px; padding: 6px 14px; min-height: 36px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.hero .eyebrow { color: rgba(255,255,255,.85); }
+.hero h1 { color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.35); font-size: 2rem; }
+@media (max-width: 600px) { .hero { height: 180px; } .hero h1 { font-size: 1.6rem; } }
+@media (prefers-reduced-motion: reduce) { .hero-photo { transition: none; } }

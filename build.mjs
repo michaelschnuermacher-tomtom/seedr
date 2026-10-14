@@ -1,6 +1,7 @@
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, cpSync, rmSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PHOTOS } from './src/ui/photo-list.js';
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const IMPORT_RE = /^import\s+[^;]*?from\s+['"](.+?)['"];?[ \t]*$/gm;
@@ -45,7 +46,11 @@ export function build() {
   const dist = resolve(projectRoot, 'dist');
   mkdirSync(dist, { recursive: true });
   writeFileSync(resolve(dist, 'index.html'), html);
-  copyFileSync(ui('sw.js'), resolve(dist, 'sw.js'));
+  // Photos stay separate files so index.html stays small; the service worker precaches them.
+  rmSync(resolve(dist, 'photos'), { recursive: true, force: true });
+  cpSync(ui('photos'), resolve(dist, 'photos'), { recursive: true });
+  const photoList = PHOTOS.map((p) => `'./${p}'`).join(', ');
+  writeFileSync(resolve(dist, 'sw.js'), readFileSync(ui('sw.js'), 'utf8').replace('/* PHOTOS */', () => photoList));
   copyFileSync(ui('manifest.webmanifest'), resolve(dist, 'manifest.webmanifest'));
   console.log(`Built dist/index.html (${Math.round(html.length / 1024)} KB)`);
 }

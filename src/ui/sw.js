@@ -2,7 +2,9 @@
 // captive Wi-Fi. Redirected responses (e.g. Wi-Fi login pages) and other sites are
 // never cached.
 const CACHE = 'seedr-v2';
-const FILES = ['./', './index.html', './manifest.webmanifest'];
+// The build fills in the photo list.
+const PHOTOS = [/* PHOTOS */];
+const FILES = ['./', './index.html', './manifest.webmanifest', ...PHOTOS];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
