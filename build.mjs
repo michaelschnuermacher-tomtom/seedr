@@ -36,14 +36,15 @@ export function bundle(entry) {
   return `(() => {\n'use strict';\n${parts.join('\n')}\n})();\n`;
 }
 
-export function build() {
+// Writes the app to `dist` (default: ./dist). Tests pass their own folder so parallel
+// test files never overwrite each other's output.
+export function build(dist = resolve(projectRoot, 'dist')) {
   const ui = (f) => resolve(projectRoot, 'src/ui', f);
   const js = bundle(ui('app.js'));
   if (/<\/script/i.test(js)) throw new Error('Bundle contains "</script", which would break the HTML file');
   const html = readFileSync(ui('index.html'), 'utf8')
     .replace('/* STYLES */', () => readFileSync(ui('styles.css'), 'utf8'))
     .replace('/* SCRIPT */', () => js);
-  const dist = resolve(projectRoot, 'dist');
   mkdirSync(dist, { recursive: true });
   writeFileSync(resolve(dist, 'index.html'), html);
   // Photos stay separate files so index.html stays small; the service worker precaches them.

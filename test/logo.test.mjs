@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { LOGO_SVG, logoDataUrl } from '../src/ui/logo.js';
 import { build } from '../build.mjs';
+import { mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 test('the logo uses the four Grand Slam colors', () => {
   for (const color of ['#2596be', '#1f3c88', '#c8553d', '#006633']) assert.ok(LOGO_SVG.includes(color), color);
@@ -10,8 +13,9 @@ test('the logo uses the four Grand Slam colors', () => {
 });
 
 test('the build ships the app icons and links them', () => {
-  build();
-  const dist = (p) => new URL(`../dist/${p}`, import.meta.url);
+  const out = mkdtempSync(join(tmpdir(), 'seedr-dist-'));
+  build(out);
+  const dist = (p) => join(out, p);
   const html = readFileSync(dist('index.html'), 'utf8');
   assert.match(html, /<link rel="apple-touch-icon" href="icons\/apple-touch-icon.png">/);
   assert.match(html, /<link rel="icon" href="icons\/logo.svg"/);

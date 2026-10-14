@@ -39,8 +39,9 @@ test('the app bundle compiles', () => {
 });
 
 test('the build copies the photos and lets the service worker precache them', () => {
-  build();
-  const dist = (p) => new URL(`../dist/${p}`, import.meta.url);
+  const out = mkdtempSync(join(tmpdir(), 'seedr-dist-'));
+  build(out);
+  const dist = (p) => join(out, p);
   for (const p of PHOTOS) assert.ok(existsSync(dist(p)), `dist/${p} is missing`);
   const sw = readDist(dist('sw.js'), 'utf8');
   for (const p of PHOTOS) assert.ok(sw.includes(`'./${p}'`), `sw.js does not precache ${p}`);
