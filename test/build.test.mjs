@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { bundle, build } from '../build.mjs';
 import { readFileSync as readDist, existsSync } from 'node:fs';
 import { PHOTOS } from '../src/ui/photo-list.js';
@@ -33,7 +34,7 @@ test('bundle rejects the same top-level name in two modules', () => {
 });
 
 test('the app bundle compiles', () => {
-  const code = bundle(new URL('../src/ui/app.js', import.meta.url).pathname);
+  const code = bundle(fileURLToPath(new URL('../src/ui/app.js', import.meta.url)));
   assert.doesNotThrow(() => new Function(code));
   assert.doesNotMatch(code, /<\/script/i);
 });
