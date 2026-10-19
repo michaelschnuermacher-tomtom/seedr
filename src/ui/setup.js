@@ -1,6 +1,6 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { parsePlayers, createTournament, updateSettings } from '../engine/tournament.js';
+import { parsePlayers, createTournament, updateSettings, isActive } from '../engine/tournament.js';
 import { recommendOptions, gamesPerPlayer } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
@@ -9,12 +9,9 @@ export function newDraft() {
     name: '',
     playersText: '',
     courts: 2,
-    planning: 'recommended',
     totalMinutes: 240,
     breakMinutes: 5,
     selectedRounds: null,
-    rounds: 6,
-    matchMinutes: 15,
     revealBatch: 'all',
   };
 }
@@ -27,14 +24,11 @@ export function draftFromTournament(t) {
     ...newDraft(),
     editingId: t.id,
     name: t.name,
-    playersText: t.players.map((p) => `${p.name}: ${p.skill}`).join('\n'),
+    playersText: t.players.filter(isActive).map((p) => `${p.name}: ${p.skill}`).join('\n'),
     courts: s.courts,
     breakMinutes: s.breakMinutes,
-    planning: 'recommended',
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
     selectedRounds: s.rounds,
-    rounds: s.rounds,
-    matchMinutes: s.matchMinutes,
     revealBatch: s.revealBatch,
   };
 }
@@ -50,20 +44,14 @@ export function evaluateDraft(d) {
   let options = [];
   let plan = null;
   if (problems.length === 0) {
-    if (d.planning === 'recommended') {
-      if (!isWhole(d.totalMinutes, 1)) {
-        problems.push('Total time must be a whole number of minutes.');
-      } else {
-        options = recommendOptions({ players: players.length, courts: d.courts, totalMinutes: d.totalMinutes, breakMinutes: d.breakMinutes });
-        const chosen = options.find((o) => o.rounds === d.selectedRounds);
-        if (options.length === 0) problems.push('Not enough time for even one round of at least 5 minutes.');
-        else if (!chosen) problems.push('Choose one of the options below.');
-        else plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes };
-      }
-    } else if (!isWhole(d.rounds, 1) || !isWhole(d.matchMinutes, 1)) {
-      problems.push('Rounds and match length must be whole numbers of at least 1.');
+    if (!isWhole(d.totalMinutes, 1)) {
+      problems.push('Total time must be a whole number of minutes.');
     } else {
-      plan = { rounds: d.rounds, matchMinutes: d.matchMinutes };
+      options = recommendOptions({ players: players.length, courts: d.courts, totalMinutes: d.totalMinutes, breakMinutes: d.breakMinutes });
+      const chosen = options.find((o) => o.rounds === d.selectedRounds);
+      if (options.length === 0) problems.push('Not enough time for even one round of at least 5 minutes.');
+      else if (!chosen) problems.push('Choose rounds and match length.');
+      else plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes };
     }
   }
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds) : null;
@@ -83,22 +71,16 @@ function selectInput(value, choices, onchange) {
 export function setupScreen(ctx) {
   const d = (ctx.state.draft ??= newDraft());
   const preview = h('section', { class: 'preview' });
-  const refresh = () => preview.replaceChildren(...setupPreview(ctx, d, refresh));
+  const planBox = h('div', {});
+  const refresh = () => {
+    const ev = evaluateDraft(d);
+    planBox.replaceChildren(planField(d, ev, refresh));
+    preview.replaceChildren(...setupPreview(ctx, d, ev));
+  };
   const numberInput = (key, min) => h('input', {
     type: 'number', min, step: 1, inputmode: 'numeric', value: d[key],
     oninput: (e) => { d[key] = e.target.value === '' ? NaN : Number(e.target.value); refresh(); },
   });
-
-  const recommendedBox = h('div', {},
-    field('Total tournament time (min)', numberInput('totalMinutes', 1)));
-  const manualBox = h('div', { class: 'row' },
-    field('Number of rounds', numberInput('rounds', 1)),
-    field('Match length (min)', numberInput('matchMinutes', 1)));
-  const showPlanning = () => {
-    recommendedBox.hidden = d.planning !== 'recommended';
-    manualBox.hidden = d.planning !== 'manual';
-  };
-  showPlanning();
 
   const playersBox = h('textarea', {
     rows: 10, value: d.playersText, placeholder: 'Anna: 3\nBen Miller: 7\nCarla: 1\nDavid: 5',
@@ -124,11 +106,8 @@ export function setupScreen(ctx) {
       h('div', { class: 'row' },
         field('Courts', numberInput('courts', 1)),
         field('Break between rounds (min)', numberInput('breakMinutes', 0))),
-      field('Planning', selectInput(d.planning,
-        [['recommended', 'Recommend from total time'], ['manual', 'Enter rounds and match length']],
-        (e) => { d.planning = e.target.value; showPlanning(); refresh(); })),
-      recommendedBox,
-      manualBox),
+      field('Total tournament time (min)', numberInput('totalMinutes', 1)),
+      planBox),
     card('Draw', 'uso',
       field('Rounds revealed at a time', selectInput(d.revealBatch,
         [['all', 'All (whole schedule in advance)'], ['1', '1 (surprise)'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']],
@@ -145,15 +124,21 @@ export function setupScreen(ctx) {
     preview);
 }
 
-function setupPreview(ctx, d, refresh) {
-  const ev = evaluateDraft(d);
+// Rounds and match length come only from the options that fit the total time, best first.
+function planField(d, ev, refresh) {
+  const label = (o) => `${o.rounds} rounds × ${o.matchMinutes} min + ${o.breakMinutes} min break = ${o.totalMinutes} min · `
+    + (o.even ? `everyone plays ${o.gamesMin} games` : `${o.gamesMin}–${o.gamesMax} games per player (uneven)`);
+  const choices = [['', ev.options.length ? 'Choose…' : 'Enter players, courts and time first'], ...ev.options.map((o) => [o.rounds, label(o)])];
+  const select = selectInput(ev.plan ? d.selectedRounds : '', choices, (e) => {
+    d.selectedRounds = e.target.value === '' ? null : Number(e.target.value);
+    refresh();
+  });
+  select.disabled = ev.options.length === 0;
+  return field('Rounds and match length', select);
+}
+
+function setupPreview(ctx, d, ev) {
   const out = [h('p', { class: 'muted' }, `${ev.players.length} players entered`)];
-  if (d.planning === 'recommended' && ev.options.length) {
-    out.push(h('div', { class: 'options' }, ev.options.map((o) => h('label', { class: `option${o.even ? '' : ' uneven'}` },
-      h('input', { type: 'radio', name: 'plan', checked: o.rounds === d.selectedRounds, onchange: () => { d.selectedRounds = o.rounds; refresh(); } }),
-      h('span', {}, `${o.rounds} rounds × ${o.matchMinutes} min + ${o.breakMinutes} min break = ${o.totalMinutes} min · `,
-        o.even ? `everyone plays ${o.gamesMin} games` : `${o.gamesMin}–${o.gamesMax} games per player (uneven)`)))));
-  }
   if (ev.games) {
     out.push(ev.games.even
       ? h('p', { class: 'ok' }, `Everyone plays ${ev.games.min} games.`)

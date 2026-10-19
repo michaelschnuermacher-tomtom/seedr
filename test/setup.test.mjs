@@ -13,12 +13,12 @@ test('defaults: 2 courts, 5-minute break, 240 minutes', () => {
   assert.deepEqual([d.courts, d.breakMinutes, d.totalMinutes], [2, 5, 240]);
 });
 
-test('recommended planning requires choosing an option', () => {
+test('rounds and match length must be chosen from the options', () => {
   const ev = evaluateDraft({ ...example(), playersText: text18 });
   assert.equal(ev.players.length, 18);
   assert.ok(ev.options.length > 0);
   assert.equal(ev.plan, null);
-  assert.ok(ev.problems.some((p) => /Choose one of the options/.test(p)));
+  assert.ok(ev.problems.some((p) => /Choose rounds and match length/.test(p)));
 });
 
 test('a chosen option becomes the plan', () => {
@@ -28,10 +28,17 @@ test('a chosen option becomes the plan', () => {
   assert.deepEqual(ev.games, { min: 6, max: 6, even: true });
 });
 
-test('manual planning reports uneven games', () => {
-  const ev = evaluateDraft({ ...example(), playersText: text18, planning: 'manual', rounds: 8, matchMinutes: 13 });
+test('an uneven option reports uneven games', () => {
+  const ev = evaluateDraft({ ...example(), playersText: text18, selectedRounds: 8 });
   assert.deepEqual(ev.problems, []);
+  assert.deepEqual(ev.plan, { rounds: 8, matchMinutes: 13 });
   assert.deepEqual(ev.games, { min: 5, max: 6, even: false });
+});
+
+test('a number of rounds that does not fit the total time is not accepted', () => {
+  const ev = evaluateDraft({ ...example(), playersText: text18, selectedRounds: 30 });
+  assert.equal(ev.plan, null);
+  assert.ok(ev.problems.some((p) => /Choose rounds and match length/.test(p)));
 });
 
 test('problems: too few players, invalid courts, parse errors', () => {
@@ -55,7 +62,7 @@ test('draftFromTournament pre-fills the setup form with the current settings', (
   assert.equal(d.editingId, 't9');
   assert.equal(d.name, 'Tenerife Cup');
   assert.equal(d.playersText.split('\n')[0], 'P1: 1');
-  assert.deepEqual([d.courts, d.breakMinutes, d.revealBatch, d.planning], [3, 2, 3, 'recommended']);
+  assert.deepEqual([d.courts, d.breakMinutes, d.revealBatch], [3, 2, 3]);
   const ev = evaluateDraft(d);
   assert.deepEqual(ev.problems, []);
   assert.deepEqual(ev.plan, { rounds: 9, matchMinutes: 11 }, 'the current option is selected');
