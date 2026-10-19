@@ -1,6 +1,6 @@
 import { h, formatSigned, slugify } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults } from '../engine/tournament.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
@@ -141,9 +141,9 @@ function standingsTab(t) {
   return [
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
       h('thead', {}, h('tr', {}, headers.map((x) => h('th', {}, x)))),
-      h('tbody', {}, rows.map((r) => h('tr', { class: r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
-        h('td', { class: 'rank' }, h('span', { class: 'rank-badge' }, r.rank)),
-        h('td', {}, r.name),
+      h('tbody', {}, rows.map((r) => h('tr', { class: r.withdrawn ? 'withdrawn' : r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
+        h('td', { class: 'rank' }, r.withdrawn ? '–' : h('span', { class: 'rank-badge' }, r.rank)),
+        h('td', {}, r.name, r.withdrawn ? h('span', { class: 'muted' }, ' (withdrew)') : null),
         h('td', {}, r.skill),
         h('td', {}, r.games),
         h('td', {}, r.wins),
@@ -152,6 +152,7 @@ function standingsTab(t) {
         h('td', {}, formatSigned(r.avgGap))))))),
     h('p', { class: 'muted' },
       'Games and bonus count only rounds with all results entered. Bonus: 0.5 points per game fewer than the most games played. ',
+      rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
       'Avg. advantage: average difference in team strength per game (positive = played in the stronger team).'),
   ];
 }
@@ -164,12 +165,62 @@ function fact(label, value) {
   return [h('dt', {}, label), h('dd', {}, String(value))];
 }
 
+// A player who cannot go on: keep the rounds played so far and draw the rest again.
+function withdrawCard(ctx, t) {
+  const from = firstRedrawableRound(t);
+  const last = t.settings.rounds;
+  const active = t.players.filter(isActive);
+  const chosen = (ctx.state.view.withdraw ??= new Set());
+  const canRedraw = hasResults(t) && from <= last;
+  const rounds = from === last ? `round ${last}` : `rounds ${from}–${last}`;
+  const button = h('button', {
+    class: 'primary',
+    disabled: !canRedraw || chosen.size === 0 || active.length - chosen.size < 4,
+    onclick: (e) => {
+      const names = active.filter((p) => chosen.has(p.id)).map((p) => p.name).join(', ');
+      if (!confirm(`Withdraw ${names} and redraw ${rounds}? This cannot be undone.`)) return;
+      e.currentTarget.disabled = true;
+      e.currentTarget.textContent = 'Drawing…';
+      setTimeout(() => { // let the browser paint "Drawing…" first
+        try {
+          ctx.save(withdrawPlayers(t, [...chosen], newSeed()));
+          ctx.state.view.withdraw = null;
+          ctx.state.view.tab = 'rounds';
+          ctx.state.view.round = Math.min(from, ctx.state.tournament.revealedRounds);
+        } catch (error) {
+          ctx.state.message = error.message;
+        }
+        ctx.render();
+      }, 20);
+    },
+  }, `Withdraw and redraw ${rounds}`);
+  const note = !hasResults(t) ? 'Before the first result, remove players with Edit settings.'
+    : from > last ? 'All rounds have results, there is nothing left to redraw.'
+      : `${from === 2 ? 'Round 1 stays' : `Rounds 1–${from - 1} stay`} as played; ${rounds} will be drawn again without the chosen players. At least 4 players must remain.`;
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Player leaves'),
+    h('p', { class: 'muted' }, note),
+    canRedraw ? h('div', { class: 'options withdraw' }, active.map((p) => h('label', { class: 'option' },
+      h('input', {
+        type: 'checkbox',
+        checked: chosen.has(p.id),
+        onchange: (e) => {
+          if (e.target.checked) chosen.add(p.id);
+          else chosen.delete(p.id);
+          button.disabled = chosen.size === 0 || active.length - chosen.size < 4;
+        },
+      }),
+      h('span', {}, p.name)))) : null,
+    canRedraw ? h('div', { class: 'actions' }, button) : null);
+}
+
 function manageTab(ctx, t) {
   const s = t.settings;
   const locked = hasResults(t);
+  const withdrawn = t.players.length - t.players.filter(isActive).length;
   return [
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
-      fact('Players', t.players.length),
+      fact('Players', withdrawn ? `${t.players.length - withdrawn} (${withdrawn} withdrew)` : t.players.length),
       fact('Courts', s.courts),
       fact('Rounds', s.rounds),
       fact('Match length', `${s.matchMinutes} min`),
@@ -203,5 +254,6 @@ function manageTab(ctx, t) {
         },
       }, 'Delete tournament')),
     locked ? h('p', { class: 'muted' }, 'Settings and the draw can only be changed before the first result is entered.') : null,
+    withdrawCard(ctx, t),
   ];
 }

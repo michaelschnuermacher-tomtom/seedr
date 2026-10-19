@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTournament, setResult } from '../src/engine/tournament.js';
+import { createTournament, setResult, withdrawPlayers } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 const base = () => {
@@ -51,3 +51,17 @@ for (const [name, [mutate, message]] of Object.entries(cases)) {
     assert.match(result.error, message);
   });
 }
+
+test('withdrawn players may only appear up to their last round', () => {
+  const t = withdrawPlayers(base(), ['p1'], 8);
+  assert.equal(validateTournament(JSON.parse(JSON.stringify(t))).ok, true);
+  const back = JSON.parse(JSON.stringify(t));
+  back.players[0].withdrawnAfter = 3;
+  assert.match(validateTournament(back).error, /round 2 does not include every player/);
+  const early = JSON.parse(JSON.stringify(t));
+  early.players[0].withdrawnAfter = 0;
+  assert.match(validateTournament(early).error, /Withdrawn player in round 1/);
+  const bad = JSON.parse(JSON.stringify(t));
+  bad.players[0].withdrawnAfter = 'yes';
+  assert.match(validateTournament(bad).error, /Invalid withdrawal/);
+});

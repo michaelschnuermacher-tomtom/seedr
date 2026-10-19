@@ -69,3 +69,15 @@ test('rows are sorted by points, then name', () => {
   const rows = computeStandings(players, schedule, { '1-1': 1 });
   assert.deepEqual(rows.map((r) => r.id), ['p1', 'p2', 'p5', 'p3', 'p4']);
 });
+
+test('a withdrawn player keeps wins but gets no bonus and no rank, and is listed last', () => {
+  const gone = players.map((p) => (p.id === 'p1' ? { ...p, withdrawnAfter: 1 } : p));
+  // round 2 as redrawn without Anna
+  const redrawn = [schedule[0], { round: 2, matches: [{ court: 1, team1: ['p2', 'p5'], team2: ['p3', 'p4'] }], sitOuts: [] }];
+  const rows = computeStandings(gone, redrawn, { '1-1': 1, '2-1': 2 });
+  const anna = rows.at(-1);
+  assert.deepEqual([anna.id, anna.withdrawn, anna.wins, anna.games, anna.bonus, anna.rank], ['p1', true, 1, 1, 0, null]);
+  const r = byId(rows);
+  assert.deepEqual([r.p5.games, r.p5.bonus], [1, 0.5], 'bonus counts against the remaining players only');
+  assert.equal(r.p3.rank, 1);
+});

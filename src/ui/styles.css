@@ -124,7 +124,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .option { display: flex; align-items: center; gap: 10px; padding: 12px 14px; box-shadow: none; cursor: pointer; }
 .option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .option input { width: auto; accent-color: var(--accent); }
-.option.uneven { color: var(--muted); }
+.options.withdraw { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 
 /* Segmented controls */
 .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--surface-2); border-radius: 12px; }
@@ -172,6 +172,7 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .standings tr:last-child td { border-bottom: none; }
 .standings td.points { font-weight: 700; }
 .standings td.rank { width: 1%; }
+.standings tr.withdrawn td { color: var(--muted); }
 .rank-badge { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); font-weight: 650; font-size: .88rem; }
 .rank-1 .rank-badge { background: #e9c75b; color: #3d2f00; }
 .rank-2 .rank-badge { background: #cfd4d8; color: #2b3035; }

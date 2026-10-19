@@ -71,7 +71,9 @@ export function hasResults(t) {
 
 export function redraw(t, seed) {
   if (hasResults(t)) throw new Error('Cannot redraw after results have been entered');
-  return { ...t, seed, schedule: drawSchedule(t.players, t.settings, seed), revealedRounds: initialReveal(t.settings) };
+  // Without results, players who withdrew earlier have nothing left to keep.
+  const players = t.players.filter(isActive);
+  return { ...t, players, seed, schedule: drawSchedule(players, t.settings, seed), revealedRounds: initialReveal(t.settings) };
 }
 
 // New name, players or settings for a tournament that has not started: draws a new
@@ -89,6 +91,39 @@ export function updateSettings(t, { name, players, settings }, seed) {
     revealedRounds: initialReveal(settings),
     results: {},
   };
+}
+
+// Players who withdrew keep their entry (for the rounds they played) with
+// `withdrawnAfter`: the last round they are part of.
+export function isActive(player) {
+  return player.withdrawnAfter == null;
+}
+
+// Rounds up to the last one with a result are kept; everything after it can be redrawn.
+export function firstRedrawableRound(t) {
+  const played = t.schedule.filter((r) => r.matches.some((m) => t.results[resultKey(r.round, m.court)]));
+  return played.length ? played[played.length - 1].round + 1 : 1;
+}
+
+// Takes players out of a running tournament: the rounds played so far stay as they are,
+// the remaining rounds are drawn again without them.
+export function withdrawPlayers(t, ids, seed) {
+  if (!hasResults(t)) throw new Error('Before the first result, change the players with Edit settings');
+  const from = firstRedrawableRound(t);
+  if (from > t.settings.rounds) throw new Error('There are no rounds left to redraw');
+  const leaving = new Set(ids);
+  if (leaving.size === 0) throw new Error('Choose at least one player');
+  for (const id of leaving) {
+    if (!t.players.some((p) => p.id === id && isActive(p))) throw new Error(`Unknown or already withdrawn player ${id}`);
+  }
+  const players = t.players.map((p) => (leaving.has(p.id) ? { ...p, withdrawnAfter: from - 1 } : p));
+  const remaining = players.filter(isActive);
+  if (remaining.length < 4) throw new Error('At least 4 players must remain');
+  const past = t.schedule.slice(0, from - 1);
+  const { schedule } = generateSchedule({
+    players: remaining, courts: t.settings.courts, rounds: t.settings.rounds - past.length, seed, past, pastPlayers: players,
+  });
+  return { ...t, players, schedule: [...past, ...schedule] };
 }
 
 export function setResult(t, round, court, winner) {

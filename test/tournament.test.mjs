@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings } from '../src/engine/tournament.js';
+import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
   const { players, errors } = parsePlayers('Anna: 3\nBen Miller: 7\n\n  Müller, Jörg : 1 \r\nDavid:10\n');
@@ -90,4 +90,58 @@ test('updateSettings changes a tournament that has not started and draws a new s
 test('updateSettings is refused once a result has been entered', () => {
   const started = setResult(make(), 1, 1, 1);
   assert.throws(() => updateSettings(started, { name: 'x', players: PLAYERS, settings: SETTINGS }, 1), /results/);
+});
+
+const pairsOf = (rounds) => rounds.flatMap((r) => r.matches.flatMap((m) => [m.team1, m.team2].map((x) => [...x].sort().join('+'))));
+
+test('withdrawPlayers keeps the played rounds and redraws the rest without the players', () => {
+  let t = setResult(setResult(make(), 1, 1, 1), 2, 2, 2); // round 2 partly entered
+  assert.equal(firstRedrawableRound(t), 3);
+  const w = withdrawPlayers(t, ['p3', 'p7'], 5);
+  assert.deepEqual(w.schedule.slice(0, 2), t.schedule.slice(0, 2));
+  assert.deepEqual(w.results, t.results);
+  assert.equal(w.schedule.length, 6);
+  assert.deepEqual(w.players.filter((p) => !isActive(p)).map((p) => [p.id, p.withdrawnAfter]), [['p3', 2], ['p7', 2]]);
+  for (const r of w.schedule.slice(2)) {
+    const ids = [...r.matches.flatMap((m) => [...m.team1, ...m.team2]), ...r.sitOuts];
+    assert.equal(ids.length, 8);
+    assert.ok(!ids.includes('p3') && !ids.includes('p7'));
+    assert.equal(r.matches.length, 2);
+    assert.deepEqual(r.sitOuts, []);
+  }
+  assert.deepEqual(w.schedule.map((r) => r.round), [1, 2, 3, 4, 5, 6]);
+  const pairs = pairsOf(w.schedule);
+  assert.equal(new Set(pairs).size, pairs.length, 'no partner repeats across old and new rounds');
+  assert.equal(t.players.every(isActive), true, 'input unchanged');
+});
+
+test('withdrawPlayers sits out the players who have played most so far', () => {
+  const players = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2].map((skill, i) => ({ name: `P${i + 1}`, skill }));
+  const t = createTournament({ id: 't', name: 'x', players, settings: { ...SETTINGS, rounds: 4 }, seed: 3, now: new Date() });
+  const played = setResult(t, 1, 1, 1);
+  const w = withdrawPlayers(played, ['p1'], 4); // 11 left on 2 courts: 3 sit out per round
+  const satOut = new Set(t.schedule[0].sitOuts);
+  const next = w.schedule[1].sitOuts;
+  assert.equal(next.length, 3);
+  assert.ok(next.every((id) => !satOut.has(id)), 'who sat out in round 1 plays in round 2');
+});
+
+test('withdrawPlayers refuses impossible requests', () => {
+  const t = make();
+  assert.throws(() => withdrawPlayers(t, ['p1'], 1), /Edit settings/);
+  const started = setResult(t, 1, 1, 1);
+  assert.throws(() => withdrawPlayers(started, [], 1), /at least one/);
+  assert.throws(() => withdrawPlayers(started, ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'], 1), /At least 4/);
+  const w = withdrawPlayers(started, ['p1'], 1);
+  assert.throws(() => withdrawPlayers(setResult(w, 2, 1, 1), ['p1'], 1), /already withdrawn/);
+  let done = t;
+  for (let r = 1; r <= 6; r++) done = setResult(done, r, 1, 1);
+  assert.throws(() => withdrawPlayers(done, ['p1'], 1), /no rounds left/);
+});
+
+test('redraw before any result drops players who withdrew earlier', () => {
+  const w = withdrawPlayers(setResult(make(), 1, 1, 1), ['p2'], 1);
+  const r = redraw(setResult(w, 1, 1, null), 9);
+  assert.deepEqual(r.players.map((p) => p.id), ['p1', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10']);
+  assert.ok(r.schedule.every((round) => !JSON.stringify(round).includes('"p2"')));
 });

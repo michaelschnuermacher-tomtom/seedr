@@ -22,10 +22,11 @@ export function strengthOf(skill) {
 // as many fresh candidates as places, e.g. 16 players on 2 courts) about a quarter of
 // the places go to players who just sat out.
 // Each round's list is in selection order (fewest sit-outs first).
-export function assignSitOuts(playerCount, perRound, rounds, rng) {
+// `before` continues from earlier rounds: sit-outs so far per player and who sat out last.
+export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}) {
   const sitting = playerCount - perRound;
-  const count = new Array(playerCount).fill(0);
-  let previous = new Set();
+  const count = before.count ? [...before.count] : new Array(playerCount).fill(0);
+  let previous = new Set(before.previous);
   return Array.from({ length: rounds }, () => {
     const order = shuffle(rng, [...Array(playerCount).keys()]);
     const levels = [...new Set(count)].sort((a, b) => a - b).map((c) => order.filter((i) => count[i] === c));
@@ -60,7 +61,9 @@ function bumpPair(counts, x, y, n) {
   return counts[key] > 1 ? 1 : 0;
 }
 
-export function evaluate(slots, strength, n) {
+// `spreadPlayers` is the number of players taking part, when n also counts players who
+// only appear in earlier rounds.
+export function evaluate(slots, strength, n, spreadPlayers = n) {
   const partners = new Uint16Array(n * n);
   const opponents = new Uint16Array(n * n);
   const balance = new Float64Array(n);
@@ -97,7 +100,7 @@ export function evaluate(slots, strength, n) {
   }
   const cost = WEIGHTS.partner * partnerRepeats + WEIGHTS.match * sumDiffSq
     + WEIGHTS.balance * sumBalanceSq + WEIGHTS.opponent * opponentRepeats
-    + (n >= SPREAD_MIN_PLAYERS ? WEIGHTS.spread * sumSpreadGapSq : 0);
+    + (spreadPlayers >= SPREAD_MIN_PLAYERS ? WEIGHTS.spread * sumSpreadGapSq : 0);
   return { cost, partnerRepeats, opponentRepeats, sumDiffSq, maxAbsDiff, maxAbsBalance, sumSpreadGapSq, maxSpreadGap };
 }
 
@@ -129,20 +132,21 @@ function playerSwapMove(s, rng) {
 
 // Simulated annealing over player swaps and team swaps. The start temperature is
 // high enough to pass through partner repeats early on. Iteration count (not time)
-// keeps results deterministic.
-function anneal(slots, strength, n, rng, iterations) {
+// keeps results deterministic. The first `fixed` rounds were played already: they count
+// towards the cost but are never changed.
+function anneal(slots, strength, n, rng, iterations, fixed, spreadPlayers) {
   const current = slots.map((s) => s.slice());
-  let currentCost = evaluate(current, strength, n).cost;
+  let currentCost = evaluate(current, strength, n, spreadPlayers).cost;
   let best = current.map((s) => s.slice());
   let bestCost = currentCost;
   const startTemp = 2 * WEIGHTS.partner;
   const endTemp = 0.01;
   for (let it = 0; it < iterations; it++) {
     const temp = startTemp * Math.pow(endTemp / startTemp, it / iterations);
-    const s = current[Math.floor(rng() * current.length)];
+    const s = current[fixed + Math.floor(rng() * (current.length - fixed))];
     const undo = s.length >= 8 && rng() < 0.5 ? teamSwapMove(s, rng) : playerSwapMove(s, rng);
     if (!undo) continue;
-    const cost = evaluate(current, strength, n).cost;
+    const cost = evaluate(current, strength, n, spreadPlayers).cost;
     const delta = cost - currentCost;
     if (delta <= 0 || rng() < Math.exp(-delta / temp)) {
       currentCost = cost;
@@ -157,22 +161,35 @@ function anneal(slots, strength, n, rng, iterations) {
   return { best, cost: bestCost };
 }
 
-export function generateSchedule({ players, courts, rounds, seed, iterations }) {
+// Draws `rounds` rounds for `players`. `past` are rounds already played, possibly with
+// other players (`pastPlayers`, e.g. players who withdrew): the new rounds avoid their
+// partners, continue their balance and sit out whoever has played most. New rounds are
+// numbered after the past ones.
+export function generateSchedule({ players, courts, rounds, seed, iterations, past = [], pastPlayers = [] }) {
   const n = players.length;
   iterations ??= n < SPREAD_MIN_PLAYERS ? SMALL_GROUP_ITERATIONS : DEFAULT_ITERATIONS;
   const rng = createRng(seed);
-  const strength = players.map((p) => strengthOf(p.skill));
-  const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng);
+  const ids = new Set(players.map((p) => p.id));
+  const everyone = [...players, ...pastPlayers.filter((p) => !ids.has(p.id))];
+  const index = new Map(everyone.map((p, i) => [p.id, i]));
+  const strength = everyone.map((p) => strengthOf(p.skill));
+  const history = past.map((r) => r.matches.flatMap((m) => [...m.team1, ...m.team2].map((pid) => index.get(pid))));
+  const satOut = past.map((r) => r.sitOuts.map((pid) => index.get(pid)).filter((i) => i < n));
+  const before = {
+    count: players.map((_, i) => satOut.filter((r) => r.includes(i)).length),
+    previous: satOut.at(-1) ?? [],
+  };
+  const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng, before);
   let best = null;
   let bestCost = Infinity;
   for (let restart = 0; restart < RESTARTS; restart++) {
     const slots = sitOuts.map((sitting) => shuffle(rng, [...Array(n).keys()].filter((i) => !sitting.includes(i))));
-    const result = anneal(slots, strength, n, rng, Math.floor(iterations / RESTARTS));
+    const result = anneal([...history, ...slots], strength, everyone.length, rng, Math.floor(iterations / RESTARTS), history.length, n);
     if (result.cost < bestCost) ({ best, cost: bestCost } = result);
   }
-  const id = (i) => players[i].id;
-  const schedule = best.map((s, r) => ({
-    round: r + 1,
+  const id = (i) => everyone[i].id;
+  const schedule = best.slice(history.length).map((s, r) => ({
+    round: past.length + r + 1,
     matches: Array.from({ length: s.length / 4 }, (_, k) => ({
       court: k + 1,
       team1: [id(s[4 * k]), id(s[4 * k + 1])],
@@ -180,7 +197,7 @@ export function generateSchedule({ players, courts, rounds, seed, iterations }) 
     })),
     sitOuts: sitOuts[r].map(id),
   }));
-  return { schedule, stats: evaluate(best, strength, n) };
+  return { schedule, stats: evaluate(best, strength, everyone.length, n) };
 }
 
 export function scheduleStats(players, schedule) {

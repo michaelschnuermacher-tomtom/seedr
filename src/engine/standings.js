@@ -24,13 +24,18 @@ export function computeStandings(players, schedule, results) {
     }
   }
 
+  // Players who withdrew keep their wins but get no bonus for the games they missed and
+  // no rank; they are listed after everyone else.
+  const withdrawn = new Set(players.filter((p) => p.withdrawnAfter != null).map((p) => p.id));
   const list = [...rows.values()];
-  const maxGames = Math.max(0, ...list.map((r) => r.games));
+  const maxGames = Math.max(0, ...list.filter((r) => !withdrawn.has(r.id)).map((r) => r.games));
   const out = list.map(({ gapSum, ...r }) => {
-    const bonus = 0.5 * (maxGames - r.games);
-    return { ...r, bonus, points: r.wins + bonus, avgGap: r.games ? gapSum / r.games : 0 };
+    const gone = withdrawn.has(r.id);
+    const bonus = gone ? 0 : 0.5 * (maxGames - r.games);
+    return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, avgGap: r.games ? gapSum / r.games : 0 };
   });
-  out.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-  for (const r of out) r.rank = 1 + out.filter((o) => o.points > r.points).length;
+  out.sort((a, b) => a.withdrawn - b.withdrawn || b.points - a.points || a.name.localeCompare(b.name));
+  const ranked = out.filter((r) => !r.withdrawn);
+  for (const r of out) r.rank = r.withdrawn ? null : 1 + ranked.filter((o) => o.points > r.points).length;
   return out;
 }

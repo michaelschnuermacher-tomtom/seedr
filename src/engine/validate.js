@@ -39,7 +39,7 @@ function checkSettings(s) {
 
 function checkPlayers(players) {
   if (!Array.isArray(players) || players.length < 4) fail('At least 4 players are required');
-  const ids = new Set();
+  const ids = new Map();
   const names = new Set();
   for (const p of players) {
     if (!isObject(p) || typeof p.id !== 'string' || typeof p.name !== 'string' || !p.name.trim()) fail('Invalid player entry');
@@ -47,21 +47,25 @@ function checkPlayers(players) {
     if (ids.has(p.id)) fail(`Duplicate player id ${p.id}`);
     const key = p.name.trim().toLowerCase();
     if (names.has(key)) fail(`Duplicate player name ${p.name}`);
-    ids.add(p.id);
+    if ('withdrawnAfter' in p && (!isInt(p.withdrawnAfter) || p.withdrawnAfter < 0)) fail(`Invalid withdrawal for ${p.name}`);
+    ids.set(p.id, p.withdrawnAfter ?? Infinity);
     names.add(key);
   }
   return ids;
 }
 
-function checkSchedule(schedule, settings, ids) {
+// `lastRound` maps each player id to the last round the player is part of.
+function checkSchedule(schedule, settings, lastRound) {
   if (!Array.isArray(schedule) || schedule.length !== settings.rounds) fail('Schedule does not match the number of rounds');
   schedule.forEach((r, i) => {
     const label = `round ${i + 1}`;
     if (!isObject(r) || r.round !== i + 1 || !Array.isArray(r.matches) || !Array.isArray(r.sitOuts)) fail(`Invalid ${label}`);
+    const ids = new Set([...lastRound].filter(([, last]) => last > i).map(([id]) => id));
     const seen = new Set();
     const courts = new Set();
     const use = (pid) => {
-      if (!ids.has(pid)) fail(`Unknown player in ${label}`);
+      if (!lastRound.has(pid)) fail(`Unknown player in ${label}`);
+      if (!ids.has(pid)) fail(`Withdrawn player in ${label}`);
       if (seen.has(pid)) fail(`Player appears twice in ${label}`);
       seen.add(pid);
     };
