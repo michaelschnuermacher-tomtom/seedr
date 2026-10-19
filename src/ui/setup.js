@@ -4,10 +4,29 @@ import { parsePlayers, createTournament, updateSettings, isActive } from '../eng
 import { recommendOptions, gamesPerPlayer } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
+// The regular group, pre-filled for every new tournament.
+export const DEFAULT_PLAYERS = `Jenny: 5
+Basti: 6
+Mickey: 7
+Becci: 4
+Seb: 1
+Anne: 7
+Henri: 3
+Hugo: 5
+Felix: 4
+Bianca: 6
+Micha: 1
+Lia: 3
+Ada: 6
+Uta: 3
+Markus: 1
+Vera: 3
+Gesa: 3`;
+
 export function newDraft() {
   return {
     name: '',
-    playersText: '',
+    playersText: DEFAULT_PLAYERS,
     courts: 2,
     totalMinutes: 240,
     breakMinutes: 5,

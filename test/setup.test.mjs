@@ -13,6 +13,13 @@ test('defaults: 2 courts, 5-minute break, 240 minutes', () => {
   assert.deepEqual([d.courts, d.breakMinutes, d.totalMinutes], [2, 5, 240]);
 });
 
+test('a new draft is pre-filled with the regular 17 players', () => {
+  const ev = evaluateDraft(newDraft());
+  assert.equal(ev.players.length, 17);
+  assert.deepEqual([ev.players[0].name, ev.players[0].skill], ['Jenny', 5]);
+  assert.ok(!ev.problems.some((p) => /^Line/.test(p)));
+});
+
 test('rounds and match length must be chosen from the options', () => {
   const ev = evaluateDraft({ ...example(), playersText: text18 });
   assert.equal(ev.players.length, 18);
