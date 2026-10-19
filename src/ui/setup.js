@@ -1,7 +1,7 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { parsePlayers, createTournament, updateSettings, isActive } from '../engine/tournament.js';
-import { recommendOptions, gamesPerPlayer } from '../engine/timeplan.js';
+import { parsePlayers, createTournament, updateSettings, isActive, checkFewer } from '../engine/tournament.js';
+import { recommendOptions, gamesPerPlayer, fewerGamesCount } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
 // The regular group, pre-filled for every new tournament.
@@ -43,7 +43,7 @@ export function draftFromTournament(t) {
     ...newDraft(),
     editingId: t.id,
     name: t.name,
-    playersText: t.players.filter(isActive).map((p) => `${p.name}: ${p.skill}`).join('\n'),
+    playersText: t.players.filter(isActive).map((p) => `${p.name}: ${p.skill}${p.fewer ? ' *' : ''}`).join('\n'),
     courts: s.courts,
     breakMinutes: s.breakMinutes,
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
@@ -72,6 +72,10 @@ export function evaluateDraft(d) {
       else if (!chosen) problems.push('Choose rounds and match length.');
       else plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes };
     }
+  }
+  if (plan) {
+    const problem = checkFewer(players, { courts: d.courts, rounds: plan.rounds });
+    if (problem) problems.push(problem);
   }
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds) : null;
   return { players, problems, options, plan, games };
@@ -117,7 +121,7 @@ export function setupScreen(ctx) {
     card('Tournament', 'ao',
       field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; } }))),
     card('Players', 'wim',
-      field('One per line as "Name: skill" (skill 1–10, 1 = best)', playersBox),
+      field('One per line as "Name: skill" (skill 1–10, 1 = best); add * for fewer games', playersBox),
       h('div', { class: 'actions' },
         h('label', { class: 'button' }, 'Load players file',
           h('input', { type: 'file', accept: '.txt,text/plain', hidden: true, onchange: (e) => { loadPlayers(e.target.files[0]); e.target.value = ''; } })))),
@@ -162,6 +166,13 @@ function setupPreview(ctx, d, ev) {
     out.push(ev.games.even
       ? h('p', { class: 'ok' }, `Everyone plays ${ev.games.min} games.`)
       : h('p', { class: 'warning' }, `Uneven: players get ${ev.games.min} or ${ev.games.max} games. Players with fewer games get 0.5 points per missing game.`));
+    const fewer = fewerGamesCount(ev.players.length, d.courts, ev.plan.rounds);
+    const marked = ev.players.filter((p) => p.fewer).map((p) => p.name);
+    if (fewer > 0) {
+      out.push(h('p', { class: 'muted' }, `${fewer} player${fewer === 1 ? '' : 's'} get${fewer === 1 ? 's' : ''} ${ev.games.min} games. `,
+        marked.length ? `Marked with *: ${marked.join(', ')}` : 'Add * after a skill (e.g. "Anna: 3 *") to choose who.',
+        marked.length && marked.length < fewer ? `; the other ${fewer - marked.length} are drawn at random.` : marked.length ? '.' : ''));
+    }
   }
   if (ev.problems.length) out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));
   out.push(h('div', { class: 'actions' },

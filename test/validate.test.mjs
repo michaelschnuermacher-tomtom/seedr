@@ -65,3 +65,9 @@ test('withdrawn players may only appear up to their last round', () => {
   bad.players[0].withdrawnAfter = 'yes';
   assert.match(validateTournament(bad).error, /Invalid withdrawal/);
 });
+
+test('the fewer-games mark must be true or false', () => {
+  const t = base();
+  t.players[0].fewer = 'yes';
+  assert.match(validateTournament(t).error, /fewer-games/);
+});

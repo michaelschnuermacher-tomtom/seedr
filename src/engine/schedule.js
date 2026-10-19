@@ -23,7 +23,9 @@ export function strengthOf(skill) {
 // the places go to players who just sat out.
 // Each round's list is in selection order (fewest sit-outs first).
 // `before` continues from earlier rounds: sit-outs so far per player and who sat out last.
-export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}) {
+// `fewer` are players who should get the extra sit-outs when the games come out uneven:
+// whenever only some of the players on a level sit out, they go first.
+export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}, fewer = new Set()) {
   const sitting = playerCount - perRound;
   const count = before.count ? [...before.count] : new Array(playerCount).fill(0);
   let previous = new Set(before.previous);
@@ -38,20 +40,32 @@ export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}) {
         chosen.push(...level);
         continue;
       }
-      const fresh = level.filter((i) => !previous.has(i));
-      if (fresh.length > need) chosen.push(...fresh.slice(0, need));
-      else if (fresh.length === need) {
-        // Taking exactly the fresh players would freeze the groups: let about a
-        // quarter of the places go to players who just sat out, so the groups mix.
-        const repeat = Math.max(1, Math.round(need / 4));
-        chosen.push(...level.filter((i) => previous.has(i)).slice(0, repeat), ...fresh.slice(0, need - repeat));
+      const marked = level.filter((i) => fewer.has(i));
+      if (marked.length > need) {
+        chosen.push(...pickSitOuts(marked, need, previous));
+        continue;
       }
-      else chosen.push(...fresh, ...level.filter((i) => previous.has(i)).slice(0, need - fresh.length));
+      chosen.push(...marked);
+      chosen.push(...pickSitOuts(level.filter((i) => !marked.includes(i)), need - marked.length, previous));
     }
     chosen.forEach((i) => count[i]++);
     previous = new Set(chosen);
     return chosen;
   });
+}
+
+// Picks `need` of the candidates (fewer than there are), avoiding who sat out last round.
+function pickSitOuts(level, need, previous) {
+  if (need === 0) return [];
+  const fresh = level.filter((i) => !previous.has(i));
+  if (fresh.length > need) return fresh.slice(0, need);
+  if (fresh.length === need) {
+    // Taking exactly the fresh players would freeze the groups: let about a
+    // quarter of the places go to players who just sat out, so the groups mix.
+    const repeat = Math.max(1, Math.round(need / 4));
+    return [...level.filter((i) => previous.has(i)).slice(0, repeat), ...fresh.slice(0, need - repeat)];
+  }
+  return [...fresh, ...level.filter((i) => previous.has(i)).slice(0, need - fresh.length)];
 }
 
 // Counts one meeting of x and y; returns 1 if they had met before.
@@ -179,7 +193,8 @@ export function generateSchedule({ players, courts, rounds, seed, iterations, pa
     count: players.map((_, i) => satOut.filter((r) => r.includes(i)).length),
     previous: satOut.at(-1) ?? [],
   };
-  const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng, before);
+  const fewer = new Set(players.flatMap((p, i) => (p.fewer ? [i] : [])));
+  const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng, before, fewer);
   let best = null;
   let bestCost = Infinity;
   for (let restart = 0; restart < RESTARTS; restart++) {

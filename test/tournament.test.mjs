@@ -145,3 +145,23 @@ test('redraw before any result drops players who withdrew earlier', () => {
   assert.deepEqual(r.players.map((p) => p.id), ['p1', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10']);
   assert.ok(r.schedule.every((round) => !JSON.stringify(round).includes('"p2"')));
 });
+
+test('parsePlayers reads a * after the skill as "fewer games"', () => {
+  const { players, errors } = parsePlayers('Gesa: 3 *\nVera: 3*\nUta: 3\nBad: *');
+  assert.deepEqual(players, [{ name: 'Gesa', skill: 3, fewer: true }, { name: 'Vera', skill: 3, fewer: true }, { name: 'Uta', skill: 3 }]);
+  assert.equal(errors.length, 1);
+});
+
+test('marked players play fewer games, and no more can be marked than play fewer', () => {
+  const group = (marks) => [5, 6, 7, 4, 1, 7, 3, 5, 4, 6, 1, 3, 6, 3, 1, 3, 3]
+    .map((skill, i) => ({ name: `P${i + 1}`, skill, ...(marks.includes(i) ? { fewer: true } : {}) }));
+  const settings = { ...SETTINGS, rounds: 8 }; // 17 players, 2 courts: 4 get 3 games
+  const t = createTournament({ id: 't', name: 'x', players: group([1, 4, 8, 15]), settings, seed: 11, now: new Date() });
+  const games = new Map(t.players.map((p) => [p.id, 0]));
+  t.schedule.forEach((r) => r.matches.forEach((m) => [...m.team1, ...m.team2].forEach((id) => games.set(id, games.get(id) + 1))));
+  assert.deepEqual(t.players.filter((p) => games.get(p.id) === 3).map((p) => p.id), ['p2', 'p5', 'p9', 'p16']);
+  assert.ok(t.players.filter((p) => !p.fewer).every((p) => games.get(p.id) === 4));
+  assert.throws(() => createTournament({ id: 't', name: 'x', players: group([0, 1, 2, 3, 4]), settings, seed: 1, now: new Date() }), /Only 4 players get fewer games, but 5/);
+  const even = createTournament({ id: 't', name: 'x', players: PLAYERS, settings: { ...SETTINGS, rounds: 5 }, seed: 1, now: new Date() });
+  assert.throws(() => updateSettings(even, { name: 'x', players: PLAYERS.map((p, i) => (i ? p : { ...p, fewer: true })), settings: { ...SETTINGS, rounds: 5 } }, 1), /same number of games/);
+});

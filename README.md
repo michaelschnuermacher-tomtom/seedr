@@ -49,7 +49,7 @@ or paste players in the same format.
 
 ### Steps
 
-1. **Who sits out.** Each round, `players − 4 × courts used` players sit out. The players who have sat out least so far sit out first, so nobody sits out twice before everyone has sat out once. Among equals, players who sat out in the previous round are skipped where possible, and the rest are chosen at random.
+1. **Who sits out.** Each round, `players − 4 × courts used` players sit out. The players who have sat out least so far sit out first, so nobody sits out twice before everyone has sat out once. Among equals, players who sat out in the previous round are skipped where possible, and the rest are chosen at random. When the games can't come out even, players marked with `*` after their skill (e.g. `Gesa: 3 *`) are the ones who get fewer games. Only as many players can be marked as there are players who get fewer games; any extra places are drawn at random.
 2. **Starting teams.** Each round's players are shuffled into teams of two and paired into matches.
 3. **Improvement.** The draw then repeatedly makes small changes: it swaps two players, or two whole teams between courts in the same round. Each change is scored, and lower scores are better:
 

@@ -9,6 +9,12 @@ export function gamesPerPlayer(players, courts, rounds) {
   return { min: Math.floor(total / players), max: Math.ceil(total / players), even: total % players === 0 };
 }
 
+// How many players get the smaller number of games (0 when the games come out even).
+export function fewerGamesCount(players, courts, rounds) {
+  const total = rounds * playersPerRound(players, courts);
+  return total % players === 0 ? 0 : players - (total % players);
+}
+
 export function recommendOptions({ players, courts, totalMinutes, breakMinutes }) {
   if (playersPerRound(players, courts) === 0) return [];
   const options = [];

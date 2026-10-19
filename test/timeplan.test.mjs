@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { playersPerRound, gamesPerPlayer, recommendOptions } from '../src/engine/timeplan.js';
+import { playersPerRound, gamesPerPlayer, recommendOptions, fewerGamesCount } from '../src/engine/timeplan.js';
 
 test('players per round is limited by courts and by groups of four', () => {
   assert.equal(playersPerRound(18, 3), 12);
@@ -30,4 +30,10 @@ test('recommendations for the spec example (18 players, 3 courts, 120 min, 2 min
 test('no options with fewer than 4 players or too little time', () => {
   assert.deepEqual(recommendOptions({ players: 3, courts: 1, totalMinutes: 60, breakMinutes: 2 }), []);
   assert.deepEqual(recommendOptions({ players: 8, courts: 2, totalMinutes: 6, breakMinutes: 2 }), []);
+});
+
+test('fewerGamesCount: how many players get the smaller number of games', () => {
+  assert.equal(fewerGamesCount(17, 2, 8), 4); // 64 places: 13 × 4 games, 4 × 3 games
+  assert.equal(fewerGamesCount(16, 2, 8), 0);
+  assert.equal(fewerGamesCount(10, 2, 5), 0); // 40 places, 4 games each
 });

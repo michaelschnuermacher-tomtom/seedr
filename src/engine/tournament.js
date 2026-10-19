@@ -1,10 +1,12 @@
 import { generateSchedule } from './schedule.js';
 import { resultKey } from './standings.js';
+import { fewerGamesCount } from './timeplan.js';
 
 export const FORMAT_VERSION = 1;
 
 // One player per line: "Name: skill". The last ":" separates, so names may contain
-// spaces, commas and other punctuation.
+// spaces, commas and other punctuation. A "*" after the skill marks a player who should
+// get fewer games when they cannot come out even.
 export function parsePlayers(text) {
   const players = [];
   const errors = [];
@@ -19,7 +21,9 @@ export function parsePlayers(text) {
       errors.push(`Line ${n}: expected "Name: skill", e.g. "Anna: 3"`);
       return;
     }
-    const skillText = line.slice(colon + 1).trim();
+    const rest = line.slice(colon + 1).trim();
+    const fewer = rest.endsWith('*');
+    const skillText = fewer ? rest.slice(0, -1).trim() : rest;
     const skill = Number(skillText);
     if (!/^\d+$/.test(skillText) || skill < 1 || skill > 10) {
       errors.push(`Line ${n}: skill must be a whole number from 1 to 10 ("${line}")`);
@@ -30,9 +34,25 @@ export function parsePlayers(text) {
       return;
     }
     names.add(name.toLowerCase());
-    players.push({ name, skill });
+    players.push(fewer ? { name, skill, fewer } : { name, skill });
   });
   return { players, errors };
+}
+
+// Only as many players can be marked for fewer games as there are players who get them.
+export function checkFewer(players, settings) {
+  const marked = players.filter((p) => p.fewer).length;
+  const allowed = fewerGamesCount(players.length, settings.courts, settings.rounds);
+  if (marked <= allowed) return null;
+  return allowed === 0
+    ? 'Everyone plays the same number of games, so no player can be marked with * for fewer games.'
+    : `Only ${allowed} player${allowed === 1 ? '' : 's'} get${allowed === 1 ? 's' : ''} fewer games, but ${marked} are marked with *.`;
+}
+
+function numberPlayers(players, settings) {
+  const problem = checkFewer(players, settings);
+  if (problem) throw new Error(problem);
+  return players.map((p, i) => ({ id: `p${i + 1}`, name: p.name, skill: p.skill, ...(p.fewer ? { fewer: true } : {}) }));
 }
 
 function initialReveal(settings) {
@@ -44,7 +64,7 @@ function drawSchedule(players, settings, seed) {
 }
 
 export function createTournament({ id, name, players, settings, seed, now }) {
-  const withIds = players.map((p, i) => ({ id: `p${i + 1}`, name: p.name, skill: p.skill }));
+  const withIds = numberPlayers(players, settings);
   return {
     version: FORMAT_VERSION,
     id,
@@ -80,7 +100,7 @@ export function redraw(t, seed) {
 // schedule and keeps id and creation date.
 export function updateSettings(t, { name, players, settings }, seed) {
   if (hasResults(t)) throw new Error('Cannot change settings after results have been entered');
-  const withIds = players.map((p, i) => ({ id: `p${i + 1}`, name: p.name, skill: p.skill }));
+  const withIds = numberPlayers(players, settings);
   return {
     ...t,
     name,

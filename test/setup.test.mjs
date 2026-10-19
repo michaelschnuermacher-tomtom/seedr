@@ -74,3 +74,20 @@ test('draftFromTournament pre-fills the setup form with the current settings', (
   assert.deepEqual(ev.problems, []);
   assert.deepEqual(ev.plan, { rounds: 9, matchMinutes: 11 }, 'the current option is selected');
 });
+
+test('setup refuses more players marked with * than get fewer games', () => {
+  const marked = text18.split('\n').map((l, i) => (i < 13 ? `${l} *` : l)).join('\n');
+  const ev = evaluateDraft({ ...example(), playersText: marked, selectedRounds: 8 }); // 96 places for 18: 12 get 5 games
+  assert.ok(ev.problems.some((p) => /Only 12 players get fewer games, but 13/.test(p)));
+  const ok = evaluateDraft({ ...example(), playersText: marked.replace('P13: 7 *', 'P13: 7'), selectedRounds: 8 });
+  assert.deepEqual(ok.problems, []);
+});
+
+test('draftFromTournament keeps the * marks', () => {
+  const t = createTournament({
+    id: 't', name: 'x', seed: 5, now: new Date(),
+    players: SKILLS_18.map((skill, i) => ({ name: `P${i + 1}`, skill, ...(i === 0 ? { fewer: true } : {}) })),
+    settings: { courts: 3, rounds: 8, matchMinutes: 13, breakMinutes: 2, revealBatch: 'all' },
+  });
+  assert.equal(draftFromTournament(t).playersText.split('\n')[0], 'P1: 1 *');
+});

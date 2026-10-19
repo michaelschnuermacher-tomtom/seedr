@@ -47,7 +47,8 @@ function checkPlayers(players) {
     if (ids.has(p.id)) fail(`Duplicate player id ${p.id}`);
     const key = p.name.trim().toLowerCase();
     if (names.has(key)) fail(`Duplicate player name ${p.name}`);
-    if ('withdrawnAfter' in p && (!isInt(p.withdrawnAfter) || p.withdrawnAfter < 0)) fail(`Invalid withdrawal for ${p.name}`);
+    if ('fewer' in p && typeof p.fewer !== 'boolean') fail(`Invalid fewer-games mark for ${p.name}`);
+    if ('withdrawnAfter' in p &&(!isInt(p.withdrawnAfter) || p.withdrawnAfter < 0)) fail(`Invalid withdrawal for ${p.name}`);
     ids.set(p.id, p.withdrawnAfter ?? Infinity);
     names.add(key);
   }
