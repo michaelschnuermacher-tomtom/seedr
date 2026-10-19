@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTournament, setResult } from '../src/engine/tournament.js';
-import { roundsOverview } from '../src/ui/tournament-view.js';
+import { roundsOverview, isAllRoundsPassword } from '../src/ui/tournament-view.js';
 
 const make = (revealBatch) => createTournament({
   id: 't1', name: 'Club night', seed: 4, now: new Date('2026-10-14T18:00:00Z'),
@@ -34,4 +34,12 @@ test('a round is complete when every match has a result', () => {
   const [first, second] = roundsOverview(t);
   assert.equal(first.complete, true);
   assert.equal(second.complete, false);
+});
+
+test('the all-rounds password is Tenerife', () => {
+  assert.equal(isAllRoundsPassword('Tenerife'), true);
+  assert.equal(isAllRoundsPassword(' Tenerife '), true);
+  assert.equal(isAllRoundsPassword('tenerife'), false);
+  assert.equal(isAllRoundsPassword(''), false);
+  assert.equal(isAllRoundsPassword(null), false);
 });

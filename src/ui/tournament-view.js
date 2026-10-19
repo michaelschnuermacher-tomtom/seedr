@@ -73,12 +73,33 @@ function teamButton(ctx, t, round, match, n) {
   }, h('span', { class: 'names' }, team.names), h('span', { class: 'sum' }, `Σ ${team.sum}`));
 }
 
+// The "All rounds" view asks for this password once per page load. It only keeps
+// players from peeking: anyone can read it in the app's source.
+const ALL_ROUNDS_PASSWORD = 'Tenerife';
+
+export function isAllRoundsPassword(input) {
+  return input != null && input.trim() === ALL_ROUNDS_PASSWORD;
+}
+
 function roundsTab(ctx, t, view) {
   const rounds = roundsOverview(t);
   const layout = view.layout ?? 'one';
 
+  const chooseLayout = (key) => {
+    if (key === 'all' && !ctx.state.allRoundsUnlocked) {
+      const input = prompt('Password for all rounds:');
+      if (input == null) return;
+      if (!isAllRoundsPassword(input)) {
+        ctx.flash('Wrong password.');
+        return;
+      }
+      ctx.state.allRoundsUnlocked = true;
+    }
+    view.layout = key;
+    ctx.render();
+  };
   const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
-    h('button', { class: layout === key ? 'current' : '', onclick: () => { view.layout = key; ctx.render(); } }, label)));
+    h('button', { class: layout === key ? 'current' : '', onclick: () => chooseLayout(key) }, label)));
   const hint = h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear. Σ = sum of skills (lower = stronger).');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
