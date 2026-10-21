@@ -40,19 +40,29 @@ export function tournamentScreen(ctx) {
 // Display data for all revealed rounds; hidden rounds are never included.
 export function roundsOverview(t) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
-  const team = (ids) => ({
-    names: ids.map((id) => byId.get(id).name).join(' + '),
-    sum: ids.reduce((sum, id) => sum + byId.get(id).skill, 0),
-  });
+  const team = (ids) => {
+    const skills = ids.map((id) => byId.get(id).skill);
+    return {
+      names: ids.map((id) => byId.get(id).name).join(' + '),
+      sum: skills.reduce((sum, s) => sum + s, 0),
+      spread: Math.max(...skills) - Math.min(...skills),
+    };
+  };
   return t.schedule.slice(0, t.revealedRounds).map((r) => ({
     round: r.round,
     complete: roundComplete(t, r),
-    matches: r.matches.map((m) => ({
-      court: m.court,
-      team1: team(m.team1),
-      team2: team(m.team2),
-      winner: t.results[resultKey(r.round, m.court)],
-    })),
+    matches: r.matches.map((m) => {
+      const team1 = team(m.team1);
+      const team2 = team(m.team2);
+      return {
+        court: m.court,
+        team1,
+        team2,
+        sumGap: Math.abs(team1.sum - team2.sum),
+        spreadGap: Math.abs(team1.spread - team2.spread),
+        winner: t.results[resultKey(r.round, m.court)],
+      };
+    }),
     sitOuts: r.sitOuts.map((id) => byId.get(id).name),
   }));
 }
@@ -62,7 +72,7 @@ function courtColor(court) {
   return `court-color-${(court - 1) % 4}`;
 }
 
-function teamButton(ctx, t, round, match, n) {
+function teamButton(ctx, t, round, match, n, numbers) {
   const team = n === 1 ? match.team1 : match.team2;
   const { winner } = match;
   return h('button', {
@@ -71,7 +81,36 @@ function teamButton(ctx, t, round, match, n) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.names), h('span', { class: 'sum' }, `Σ ${team.sum}`));
+  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'sum' }, `Σ ${team.sum} · ↔ ${team.spread}`) : null);
+}
+
+// Court label, with how far apart the two teams are when numbers are shown.
+function courtLine(tag, m, numbers) {
+  return h(tag, { class: 'court' }, `Court ${m.court}`,
+    numbers ? h('span', { class: 'gaps' }, `Gap Σ ${m.sumGap} · ↔ ${m.spreadGap}`) : null);
+}
+
+// Whether team sums and spreads are shown; remembered on this device.
+const NUMBERS_KEY = 'seedr.showNumbers';
+
+function showNumbers(ctx) {
+  if (ctx.state.showNumbers == null) {
+    try {
+      ctx.state.showNumbers = window.localStorage.getItem(NUMBERS_KEY) !== 'no';
+    } catch {
+      ctx.state.showNumbers = true;
+    }
+  }
+  return ctx.state.showNumbers;
+}
+
+function setShowNumbers(ctx, on) {
+  ctx.state.showNumbers = on;
+  try {
+    window.localStorage.setItem(NUMBERS_KEY, on ? 'yes' : 'no');
+  } catch {
+    // Not remembered, but still applies until the page is reloaded.
+  }
 }
 
 // The "All rounds" view (once per page load) and every reveal ask for this password. It
@@ -106,7 +145,12 @@ function roundsTab(ctx, t, view) {
   };
   const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
     h('button', { class: layout === key ? 'current' : '', onclick: () => chooseLayout(key) }, label)));
-  const hint = h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear. Σ = sum of skills (lower = stronger).');
+  const numbers = showNumbers(ctx);
+  const numbersToggle = h('label', { class: 'toggle' },
+    h('input', { type: 'checkbox', checked: numbers, onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
+    'Show sums and spreads');
+  const hint = h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear.',
+    numbers ? ' Σ = sum of skills (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
     h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
@@ -127,15 +171,16 @@ function roundsTab(ctx, t, view) {
   if (layout === 'all') {
     return [
       layoutSwitch,
+      numbersToggle,
       progress,
       hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
         h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`, starts ? h('span', { class: 'start-time' }, starts[r.round - 1]) : null),
         r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
-          h('span', { class: 'court' }, `Court ${m.court}`),
-          teamButton(ctx, t, r.round, m, 1),
+          courtLine('span', m, numbers),
+          teamButton(ctx, t, r.round, m, 1, numbers),
           h('span', { class: 'vs' }, 'vs'),
-          teamButton(ctx, t, r.round, m, 2))),
+          teamButton(ctx, t, r.round, m, 2, numbers))),
         r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null))),
       revealButton,
     ];
@@ -149,16 +194,17 @@ function roundsTab(ctx, t, view) {
 
   return [
     layoutSwitch,
+    numbersToggle,
     nav,
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
     starts ? h('p', { class: 'start-time' }, `Starts at ${starts[round.round - 1]}`) : null,
     progress,
     hint,
     h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
-      h('div', { class: 'court' }, `Court ${m.court}`),
-      teamButton(ctx, t, round.round, m, 1),
+      courtLine('div', m, numbers),
+      teamButton(ctx, t, round.round, m, 1, numbers),
       h('div', { class: 'vs' }, 'vs'),
-      teamButton(ctx, t, round.round, m, 2)))),
+      teamButton(ctx, t, round.round, m, 2, numbers)))),
     round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
     revealButton,
   ];

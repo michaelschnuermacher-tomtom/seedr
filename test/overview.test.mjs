@@ -43,3 +43,16 @@ test('the all-rounds password is Tenerife', () => {
   assert.equal(isAllRoundsPassword(''), false);
   assert.equal(isAllRoundsPassword(null), false);
 });
+
+test('each match has team spreads and the gaps between the teams', () => {
+  const t = make('all');
+  const byId = new Map(t.players.map((p) => [p.id, p]));
+  const m = t.schedule[0].matches[0];
+  const spread = (ids) => Math.abs(byId.get(ids[0]).skill - byId.get(ids[1]).skill);
+  const sum = (ids) => byId.get(ids[0]).skill + byId.get(ids[1]).skill;
+  const [first] = roundsOverview(t);
+  const x = first.matches[0];
+  assert.equal(x.team1.spread, spread(m.team1));
+  assert.equal(x.sumGap, Math.abs(sum(m.team1) - sum(m.team2)));
+  assert.equal(x.spreadGap, Math.abs(spread(m.team1) - spread(m.team2)));
+});
