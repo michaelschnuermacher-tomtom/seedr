@@ -74,12 +74,21 @@ function teamButton(ctx, t, round, match, n) {
   }, h('span', { class: 'names' }, team.names), h('span', { class: 'sum' }, `Σ ${team.sum}`));
 }
 
-// The "All rounds" view asks for this password once per page load. It only keeps
-// players from peeking: anyone can read it in the app's source.
+// The "All rounds" view (once per page load) and every reveal ask for this password. It
+// only keeps players from peeking: anyone can read it in the app's source.
 const ALL_ROUNDS_PASSWORD = 'Tenerife';
 
 export function isAllRoundsPassword(input) {
   return input != null && input.trim() === ALL_ROUNDS_PASSWORD;
+}
+
+// Asks for the password; false when cancelled or wrong.
+function askPassword(ctx, question) {
+  const input = prompt(question);
+  if (input == null) return false;
+  if (isAllRoundsPassword(input)) return true;
+  ctx.flash('Wrong password.');
+  return false;
 }
 
 function roundsTab(ctx, t, view) {
@@ -89,12 +98,7 @@ function roundsTab(ctx, t, view) {
 
   const chooseLayout = (key) => {
     if (key === 'all' && !ctx.state.allRoundsUnlocked) {
-      const input = prompt('Password for all rounds:');
-      if (input == null) return;
-      if (!isAllRoundsPassword(input)) {
-        ctx.flash('Wrong password.');
-        return;
-      }
+      if (!askPassword(ctx, 'Password for all rounds:')) return;
       ctx.state.allRoundsUnlocked = true;
     }
     view.layout = key;
@@ -113,6 +117,7 @@ function roundsTab(ctx, t, view) {
   const revealButton = hidden > 0 ? h('button', {
     class: 'reveal primary',
     onclick: () => {
+      if (!askPassword(ctx, step === 1 ? `Password to reveal round ${from}:` : `Password to reveal rounds ${from}–${from + step - 1}:`)) return;
       ctx.save(revealNext(t));
       view.round = from;
       ctx.render();
