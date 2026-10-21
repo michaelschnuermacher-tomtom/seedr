@@ -49,3 +49,12 @@ test('describeGames says exactly how many players play how many games', () => {
   assert.equal(describeGames(16, 2, 8), 'all 16 players play 4 games');
   assert.equal(describeGames(9, 2, 1), '8 players play 1 game, 1 player plays 0 games');
 });
+
+test('an extra option leaves courts empty in the last round when that evens out the games', () => {
+  const options = recommendOptions({ players: 17, courts: 2, totalMinutes: 240, breakMinutes: 5 });
+  assert.deepEqual(options[0], { rounds: 9, lastRoundCourts: 1, matchMinutes: 21, breakMinutes: 5, gamesMin: 4, gamesMax: 4, even: true, totalMinutes: 234 });
+  assert.ok(options.some((o) => o.rounds === 9 && !o.lastRoundCourts), 'the option with all courts stays');
+  assert.ok(!options.some((o) => o.rounds === 8 && o.lastRoundCourts), 'no extra option when it would not help');
+  assert.equal(describeGames(17, 2, 9, 1), 'all 17 players play 4 games');
+  assert.equal(fewerGamesCount(18, 3, 8, 1), 2); // 88 places: 16 × 5 games, 2 × 4 games
+});

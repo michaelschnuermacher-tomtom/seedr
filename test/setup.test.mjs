@@ -104,3 +104,16 @@ test('an end time gives each round its start time and is kept in the settings', 
   });
   assert.equal(draftFromTournament(t).endTime, '20:00');
 });
+
+test('choosing an option with fewer courts in the last round keeps them in the plan', () => {
+  const players17 = [5, 9, 8, 6, 1, 9, 4, 6, 5, 7, 1, 4, 6, 3, 1, 3, 4].map((s, i) => `P${i + 1}: ${s}`).join('\n');
+  const d = { ...newDraft(), playersText: players17, selectedRounds: 9, lastRoundCourts: 1 };
+  const ev = evaluateDraft(d);
+  assert.deepEqual(ev.problems, []);
+  assert.deepEqual(ev.plan, { rounds: 9, matchMinutes: 21, lastRoundCourts: 1 });
+  assert.deepEqual(ev.games, { min: 4, max: 4, even: true });
+  const t = createTournament({ id: 't', name: 'x', seed: 1, now: new Date(), players: ev.players,
+    settings: { courts: 2, rounds: 9, matchMinutes: 21, breakMinutes: 5, revealBatch: 'all', lastRoundCourts: 1 } });
+  assert.equal(draftFromTournament(t).lastRoundCourts, 1);
+  assert.deepEqual(evaluateDraft(draftFromTournament(t)).plan, { rounds: 9, matchMinutes: 21, lastRoundCourts: 1 });
+});

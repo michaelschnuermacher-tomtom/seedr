@@ -1,5 +1,5 @@
 import { createRng, shuffle } from './rng.js';
-import { playersPerRound } from './timeplan.js';
+import { perRoundPlayers } from './timeplan.js';
 
 export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, spread: 3 };
 export const DEFAULT_ITERATIONS = 100000;
@@ -25,11 +25,12 @@ export function strengthOf(skill) {
 // `before` continues from earlier rounds: sit-outs so far per player and who sat out last.
 // `fewer` are players who should get the extra sit-outs when the games come out uneven:
 // whenever only some of the players on a level sit out, they go first.
+// `perRound` is the number of players on court, the same for every round or one per round.
 export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}, fewer = new Set()) {
-  const sitting = playerCount - perRound;
   const count = before.count ? [...before.count] : new Array(playerCount).fill(0);
   let previous = new Set(before.previous);
-  return Array.from({ length: rounds }, () => {
+  return Array.from({ length: rounds }, (_, r) => {
+    const sitting = playerCount - (Array.isArray(perRound) ? perRound[r] : perRound);
     const order = shuffle(rng, [...Array(playerCount).keys()]);
     const levels = [...new Set(count)].sort((a, b) => a - b).map((c) => order.filter((i) => count[i] === c));
     const chosen = [];
@@ -178,8 +179,9 @@ function anneal(slots, strength, n, rng, iterations, fixed, spreadPlayers) {
 // Draws `rounds` rounds for `players`. `past` are rounds already played, possibly with
 // other players (`pastPlayers`, e.g. players who withdrew): the new rounds avoid their
 // partners, continue their balance and sit out whoever has played most. New rounds are
-// numbered after the past ones.
-export function generateSchedule({ players, courts, rounds, seed, iterations, past = [], pastPlayers = [] }) {
+// numbered after the past ones. `lastRoundCourts` limits the courts in the tournament's
+// last round, which is the last of the new rounds.
+export function generateSchedule({ players, courts, rounds, seed, iterations, past = [], pastPlayers = [], lastRoundCourts = courts }) {
   const n = players.length;
   iterations ??= n < SPREAD_MIN_PLAYERS ? SMALL_GROUP_ITERATIONS : DEFAULT_ITERATIONS;
   const rng = createRng(seed);
@@ -194,7 +196,7 @@ export function generateSchedule({ players, courts, rounds, seed, iterations, pa
     previous: satOut.at(-1) ?? [],
   };
   const fewer = new Set(players.flatMap((p, i) => (p.fewer ? [i] : [])));
-  const sitOuts = assignSitOuts(n, playersPerRound(n, courts), rounds, rng, before, fewer);
+  const sitOuts = assignSitOuts(n, perRoundPlayers(n, courts, rounds, lastRoundCourts), rounds, rng, before, fewer);
   let best = null;
   let bestCost = Infinity;
   for (let restart = 0; restart < RESTARTS; restart++) {

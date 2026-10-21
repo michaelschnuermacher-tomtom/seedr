@@ -42,7 +42,7 @@ export function parsePlayers(text) {
 // Only as many players can be marked for fewer games as there are players who get them.
 export function checkFewer(players, settings) {
   const marked = players.filter((p) => p.fewer).length;
-  const allowed = fewerGamesCount(players.length, settings.courts, settings.rounds);
+  const allowed = fewerGamesCount(players.length, settings.courts, settings.rounds, settings.lastRoundCourts);
   if (marked <= allowed) return null;
   return allowed === 0
     ? 'Everyone plays the same number of games, so no player can be marked with * for fewer games.'
@@ -60,7 +60,8 @@ function initialReveal(settings) {
 }
 
 function drawSchedule(players, settings, seed) {
-  return generateSchedule({ players, courts: settings.courts, rounds: settings.rounds, seed }).schedule;
+  const { courts, rounds, lastRoundCourts } = settings;
+  return generateSchedule({ players, courts, rounds, lastRoundCourts, seed }).schedule;
 }
 
 export function createTournament({ id, name, players, settings, seed, now }) {
@@ -141,7 +142,7 @@ export function withdrawPlayers(t, ids, seed) {
   if (remaining.length < 4) throw new Error('At least 4 players must remain');
   const past = t.schedule.slice(0, from - 1);
   const { schedule } = generateSchedule({
-    players: remaining, courts: t.settings.courts, rounds: t.settings.rounds - past.length, seed, past, pastPlayers: players,
+    players: remaining, courts: t.settings.courts, lastRoundCourts: t.settings.lastRoundCourts, rounds: t.settings.rounds - past.length, seed, past, pastPlayers: players,
   });
   return { ...t, players, schedule: [...past, ...schedule] };
 }

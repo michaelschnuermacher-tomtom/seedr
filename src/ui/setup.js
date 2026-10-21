@@ -31,6 +31,7 @@ export function newDraft() {
     totalMinutes: 240,
     breakMinutes: 5,
     selectedRounds: null,
+    lastRoundCourts: null,
     endTime: '',
     revealBatch: 'all',
   };
@@ -49,6 +50,7 @@ export function draftFromTournament(t) {
     breakMinutes: s.breakMinutes,
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
     selectedRounds: s.rounds,
+    lastRoundCourts: s.lastRoundCourts ?? null,
     endTime: s.endTime ?? '',
     revealBatch: s.revealBatch,
   };
@@ -70,17 +72,17 @@ export function evaluateDraft(d) {
       problems.push('Total time must be a whole number of minutes.');
     } else {
       options = recommendOptions({ players: players.length, courts: d.courts, totalMinutes: d.totalMinutes, breakMinutes: d.breakMinutes });
-      const chosen = options.find((o) => o.rounds === d.selectedRounds);
+      const chosen = options.find((o) => o.rounds === d.selectedRounds && (o.lastRoundCourts ?? null) === (d.lastRoundCourts ?? null));
       if (options.length === 0) problems.push('Not enough time for even one round of at least 5 minutes.');
       else if (!chosen) problems.push('Choose rounds and match length.');
-      else plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes };
+      else plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes, ...(chosen.lastRoundCourts ? { lastRoundCourts: chosen.lastRoundCourts } : {}) };
     }
   }
   if (plan) {
-    const problem = checkFewer(players, { courts: d.courts, rounds: plan.rounds });
+    const problem = checkFewer(players, { courts: d.courts, rounds: plan.rounds, lastRoundCourts: plan.lastRoundCourts });
     if (problem) problems.push(problem);
   }
-  const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds) : null;
+  const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
   const startTimes = plan && d.endTime && problems.length === 0
     ? roundStartTimes({ rounds: plan.rounds, matchMinutes: plan.matchMinutes, breakMinutes: d.breakMinutes, endTime: d.endTime })
     : null;
@@ -127,7 +129,7 @@ export function setupScreen(ctx) {
     card('Tournament', 'ao',
       field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; } }))),
     card('Players', 'wim',
-      field('One per line as "Name: skill" (skill 1–10, 1 = best); add * for fewer games', playersBox),
+      field('One per line as "Name: skill" (skill 1–10, 1 = best). If games are uneven, a * after the skill picks who plays fewer, e.g. "Anna: 3 *".', playersBox),
       h('div', { class: 'actions' },
         h('label', { class: 'button' }, 'Load players file',
           h('input', { type: 'file', accept: '.txt,text/plain', hidden: true, onchange: (e) => { loadPlayers(e.target.files[0]); e.target.value = ''; } })))),
@@ -156,25 +158,36 @@ export function setupScreen(ctx) {
 }
 
 // Rounds and match length come only from the options that fit the total time, best first.
+// An option is "rounds" or "rounds/courts in the last round".
+const optionKey = (rounds, lastRoundCourts) => (lastRoundCourts ? `${rounds}/${lastRoundCourts}` : String(rounds));
+
 function planField(d, ev, refresh) {
-  const label = (o) => `${o.rounds} rounds × ${o.matchMinutes} min + ${o.breakMinutes} min break = ${o.totalMinutes} min · `
-    + describeGames(ev.players.length, d.courts, o.rounds);
-  const choices = [['', ev.options.length ? 'Choose…' : 'Enter players, courts and time first'], ...ev.options.map((o) => [o.rounds, label(o)])];
-  const select = selectInput(ev.plan ? d.selectedRounds : '', choices, (e) => {
-    d.selectedRounds = e.target.value === '' ? null : Number(e.target.value);
+  const label = (o) => `${o.rounds} rounds${o.lastRoundCourts ? ` (last round on ${courtsText(o.lastRoundCourts)})` : ''}`
+    + ` × ${o.matchMinutes} min + ${o.breakMinutes} min break = ${o.totalMinutes} min · `
+    + describeGames(ev.players.length, d.courts, o.rounds, o.lastRoundCourts);
+  const choices = [['', ev.options.length ? 'Choose…' : 'Enter players, courts and time first'],
+    ...ev.options.map((o) => [optionKey(o.rounds, o.lastRoundCourts), label(o)])];
+  const select = selectInput(ev.plan ? optionKey(d.selectedRounds, d.lastRoundCourts) : '', choices, (e) => {
+    const [rounds, last] = e.target.value.split('/');
+    d.selectedRounds = rounds ? Number(rounds) : null;
+    d.lastRoundCourts = last ? Number(last) : null;
     refresh();
   });
   select.disabled = ev.options.length === 0;
   return field('Rounds and match length', select);
 }
 
+const courtsText = (n) => `${n} court${n === 1 ? '' : 's'}`;
+
 function setupPreview(ctx, d, ev) {
   const out = [h('p', { class: 'muted' }, `${ev.players.length} players entered`)];
   if (ev.games) {
+    const games = describeGames(ev.players.length, d.courts, ev.plan.rounds, ev.plan.lastRoundCourts);
     out.push(ev.games.even
-      ? h('p', { class: 'ok' }, `Even: ${describeGames(ev.players.length, d.courts, ev.plan.rounds)}.`)
-      : h('p', { class: 'warning' }, `Uneven: ${describeGames(ev.players.length, d.courts, ev.plan.rounds)}. Players with fewer games get 0.5 points per missing game.`));
-    const fewer = fewerGamesCount(ev.players.length, d.courts, ev.plan.rounds);
+      ? h('p', { class: 'ok' }, `Even: ${games}.`)
+      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game.`));
+    if (ev.plan.lastRoundCourts) out.push(h('p', { class: 'muted' }, `The last round uses only ${courtsText(ev.plan.lastRoundCourts)}, so the games come out more even.`));
+    const fewer = fewerGamesCount(ev.players.length, d.courts, ev.plan.rounds, ev.plan.lastRoundCourts);
     const marked = ev.players.filter((p) => p.fewer).map((p) => p.name);
     if (fewer > 0) {
       const rest = fewer - marked.length;
@@ -211,7 +224,7 @@ function cancelSetup(ctx) {
 function createFromDraft(ctx, d, ev) {
   const name = d.name.trim() || 'Tournament';
   const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch,
-    ...(d.endTime ? { endTime: d.endTime } : {}) };
+    ...(ev.plan.lastRoundCourts ? { lastRoundCourts: ev.plan.lastRoundCourts } : {}), ...(d.endTime ? { endTime: d.endTime } : {}) };
   const editing = d.editingId && ctx.store.get(d.editingId);
   let t;
   try {

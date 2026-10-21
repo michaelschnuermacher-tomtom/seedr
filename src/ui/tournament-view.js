@@ -245,7 +245,7 @@ function manageTab(ctx, t) {
   return [
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
       fact('Players', withdrawn ? `${t.players.length - withdrawn} (${withdrawn} withdrew)` : t.players.length),
-      fact('Courts', s.courts),
+      fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),
       fact('Rounds', s.rounds),
       fact('Match length', `${s.matchMinutes} min`),
       fact('Break', `${s.breakMinutes} min`),

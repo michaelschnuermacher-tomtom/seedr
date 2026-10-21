@@ -37,7 +37,8 @@ function checkSettings(s) {
   if (!isInt(s.matchMinutes) || s.matchMinutes < 1) fail('Invalid match length');
   if (!isInt(s.breakMinutes) || s.breakMinutes < 0) fail('Invalid break length');
   if (!(s.revealBatch === 'all' || (isInt(s.revealBatch) && s.revealBatch >= 1))) fail('Invalid reveal batch');
-  if ('endTime' in s && !(typeof s.endTime === 'string' && TIME_PATTERN.test(s.endTime))) fail('Invalid end time');
+  if ('lastRoundCourts' in s && (!isInt(s.lastRoundCourts) || s.lastRoundCourts < 1 || s.lastRoundCourts >= s.courts)) fail('Invalid number of courts in the last round');
+  if ('endTime' in s &&!(typeof s.endTime === 'string' && TIME_PATTERN.test(s.endTime))) fail('Invalid end time');
 }
 
 function checkPlayers(players) {
@@ -73,8 +74,9 @@ function checkSchedule(schedule, settings, lastRound) {
       if (seen.has(pid)) fail(`Player appears twice in ${label}`);
       seen.add(pid);
     };
+    const maxCourt = i === schedule.length - 1 ? settings.lastRoundCourts ?? settings.courts : settings.courts;
     for (const m of r.matches) {
-      if (!isObject(m) || !isInt(m.court) || m.court < 1 || m.court > settings.courts || courts.has(m.court)) fail(`Invalid court in ${label}`);
+      if (!isObject(m) || !isInt(m.court) || m.court < 1 || m.court > maxCourt || courts.has(m.court)) fail(`Invalid court in ${label}`);
       courts.add(m.court);
       if (!Array.isArray(m.team1) || m.team1.length !== 2 || !Array.isArray(m.team2) || m.team2.length !== 2) fail(`Invalid team in ${label}`);
       [...m.team1, ...m.team2].forEach(use);

@@ -165,3 +165,16 @@ test('marked players play fewer games, and no more can be marked than play fewer
   const even = createTournament({ id: 't', name: 'x', players: PLAYERS, settings: { ...SETTINGS, rounds: 5 }, seed: 1, now: new Date() });
   assert.throws(() => updateSettings(even, { name: 'x', players: PLAYERS.map((p, i) => (i ? p : { ...p, fewer: true })), settings: { ...SETTINGS, rounds: 5 } }, 1), /same number of games/);
 });
+
+test('the last round can use fewer courts, also after a withdrawal', () => {
+  const players = [5, 9, 8, 6, 1, 9, 4, 6, 5, 7, 1, 4, 6, 3, 1, 3, 4].map((skill, i) => ({ name: `P${i + 1}`, skill }));
+  const settings = { ...SETTINGS, rounds: 9, lastRoundCourts: 1 };
+  const t = createTournament({ id: 't', name: 'x', players, settings, seed: 2, now: new Date() });
+  assert.deepEqual(t.schedule.map((r) => r.matches.length), [2, 2, 2, 2, 2, 2, 2, 2, 1]);
+  assert.equal(t.schedule[8].sitOuts.length, 13);
+  const games = new Map();
+  t.schedule.forEach((r) => r.matches.forEach((m) => [...m.team1, ...m.team2].forEach((id) => games.set(id, (games.get(id) ?? 0) + 1))));
+  assert.deepEqual([...new Set(games.values())], [4]);
+  const w = withdrawPlayers(setResult(t, 1, 1, 1), ['p1'], 3);
+  assert.equal(w.schedule[8].matches.length, 1);
+});

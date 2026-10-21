@@ -79,3 +79,11 @@ test('the end time is optional but must be HH:MM', () => {
   t.settings.endTime = '25:00';
   assert.match(validateTournament(t).error, /end time/);
 });
+
+test('the last round may not use more courts than set', () => {
+  const t = base();
+  t.settings.lastRoundCourts = 1;
+  assert.match(validateTournament(t).error, /Invalid court in round 4/);
+  t.settings.lastRoundCourts = 2;
+  assert.match(validateTournament(t).error, /courts in the last round/);
+});
