@@ -1,7 +1,7 @@
 import { createRng, shuffle } from './rng.js';
 import { perRoundPlayers } from './timeplan.js';
 
-export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, spread: 3 };
+export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, spread: 5 };
 export const DEFAULT_ITERATIONS = 100000;
 // Small groups are cheap to evaluate but hard to balance, so they get more search.
 export const SMALL_GROUP_ITERATIONS = 200000;

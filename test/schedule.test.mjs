@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../src/engine/rng.js';
-import { assignSitOuts, evaluate, strengthOf, generateSchedule, scheduleStats, drawWarnings } from '../src/engine/schedule.js';
+import { WEIGHTS, assignSitOuts, evaluate, strengthOf, generateSchedule, scheduleStats, drawWarnings } from '../src/engine/schedule.js';
 
 test('strength is 11 minus skill', () => {
   assert.equal(strengthOf(1), 10);
@@ -42,7 +42,7 @@ test('evaluate: 1+9 vs 5+5 is penalised for different spreads from 14 players', 
   assert.equal(e.sumDiffSq, 0);
   assert.equal(e.sumSpreadGapSq, 64);
   assert.equal(e.maxSpreadGap, 8);
-  assert.equal(e.cost, 3 * 64);
+  assert.equal(e.cost, WEIGHTS.spread * 64);
 });
 
 test('evaluate: below 14 players the spread is reported but not penalised', () => {
