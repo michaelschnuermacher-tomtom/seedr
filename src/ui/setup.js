@@ -6,22 +6,22 @@ import { newSeed } from '../engine/rng.js';
 
 // The regular group, pre-filled for every new tournament.
 export const DEFAULT_PLAYERS = `Jenny: 5
-Basti: 6
-Mickey: 7
-Becci: 4
+Basti: 9
+Mickey: 8
+Max: 6
 Seb: 1
-Anne: 7
-Henri: 3
-Hugo: 5
-Felix: 4
-Bianca: 6
+Anne: 9
+Henri: 4
+Hugo: 6
+Felix: 5
+Bianca: 7
 Micha: 1
-Lia: 3
+Lia: 4
 Ada: 6
 Uta: 3
 Markus: 1
 Vera: 3
-Gesa: 3`;
+Gesa: 4`;
 
 export function newDraft() {
   return {
