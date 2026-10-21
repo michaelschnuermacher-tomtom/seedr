@@ -71,3 +71,11 @@ test('the fewer-games mark must be true or false', () => {
   t.players[0].fewer = 'yes';
   assert.match(validateTournament(t).error, /fewer-games/);
 });
+
+test('the end time is optional but must be HH:MM', () => {
+  const t = base();
+  t.settings.endTime = '18:30';
+  assert.equal(validateTournament(t).ok, true);
+  t.settings.endTime = '25:00';
+  assert.match(validateTournament(t).error, /end time/);
+});

@@ -4,6 +4,7 @@ import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRou
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
+import { roundStartTimes } from '../engine/timeplan.js';
 import { saveFile, downloadFile } from './export.js';
 import { draftFromTournament } from './setup.js';
 import { photoHero } from './hero.js';
@@ -83,6 +84,7 @@ export function isAllRoundsPassword(input) {
 
 function roundsTab(ctx, t, view) {
   const rounds = roundsOverview(t);
+  const starts = t.settings.endTime ? roundStartTimes(t.settings) : null;
   const layout = view.layout ?? 'one';
 
   const chooseLayout = (key) => {
@@ -123,7 +125,7 @@ function roundsTab(ctx, t, view) {
       progress,
       hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
-        h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
+        h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`, starts ? h('span', { class: 'start-time' }, starts[r.round - 1]) : null),
         r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
           h('span', { class: 'court' }, `Court ${m.court}`),
           teamButton(ctx, t, r.round, m, 1),
@@ -144,6 +146,7 @@ function roundsTab(ctx, t, view) {
     layoutSwitch,
     nav,
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
+    starts ? h('p', { class: 'start-time' }, `Starts at ${starts[round.round - 1]}`) : null,
     progress,
     hint,
     h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
@@ -246,6 +249,7 @@ function manageTab(ctx, t) {
       fact('Rounds', s.rounds),
       fact('Match length', `${s.matchMinutes} min`),
       fact('Break', `${s.breakMinutes} min`),
+      s.endTime ? fact('End time', s.endTime) : null,
       fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)), h('div', { style: 'height: 12px' })),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => exportTournament(t) }, 'Export (.seedr.json)'),

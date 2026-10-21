@@ -1,7 +1,7 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { parsePlayers, createTournament, updateSettings, isActive, checkFewer } from '../engine/tournament.js';
-import { recommendOptions, gamesPerPlayer, fewerGamesCount } from '../engine/timeplan.js';
+import { recommendOptions, gamesPerPlayer, fewerGamesCount, describeGames, roundStartTimes, TIME_PATTERN } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
 // The regular group, pre-filled for every new tournament.
@@ -31,6 +31,7 @@ export function newDraft() {
     totalMinutes: 240,
     breakMinutes: 5,
     selectedRounds: null,
+    endTime: '',
     revealBatch: 'all',
   };
 }
@@ -48,6 +49,7 @@ export function draftFromTournament(t) {
     breakMinutes: s.breakMinutes,
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
     selectedRounds: s.rounds,
+    endTime: s.endTime ?? '',
     revealBatch: s.revealBatch,
   };
 }
@@ -60,6 +62,7 @@ export function evaluateDraft(d) {
   if (players.length < 4) problems.push('Enter at least 4 players.');
   if (!isWhole(d.courts, 1)) problems.push('Courts must be a whole number of at least 1.');
   if (!isWhole(d.breakMinutes, 0)) problems.push('Break must be a whole number of minutes (0 or more).');
+  if (d.endTime && !TIME_PATTERN.test(d.endTime)) problems.push('End time must be a time like 18:00.');
   let options = [];
   let plan = null;
   if (problems.length === 0) {
@@ -78,7 +81,10 @@ export function evaluateDraft(d) {
     if (problem) problems.push(problem);
   }
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds) : null;
-  return { players, problems, options, plan, games };
+  const startTimes = plan && d.endTime && problems.length === 0
+    ? roundStartTimes({ rounds: plan.rounds, matchMinutes: plan.matchMinutes, breakMinutes: d.breakMinutes, endTime: d.endTime })
+    : null;
+  return { players, problems, options, plan, games, startTimes };
 }
 
 function field(label, input) {
@@ -129,7 +135,9 @@ export function setupScreen(ctx) {
       h('div', { class: 'row' },
         field('Courts', numberInput('courts', 1)),
         field('Break between rounds (min)', numberInput('breakMinutes', 0))),
-      field('Total tournament time (min)', numberInput('totalMinutes', 1)),
+      h('div', { class: 'row' },
+        field('Total tournament time (min)', numberInput('totalMinutes', 1)),
+        field('End time (optional)', h('input', { type: 'time', value: d.endTime, oninput: (e) => { d.endTime = e.target.value; refresh(); } }))),
       planBox),
     card('Draw', 'uso',
       field('Rounds revealed at a time', selectInput(d.revealBatch,
@@ -150,7 +158,7 @@ export function setupScreen(ctx) {
 // Rounds and match length come only from the options that fit the total time, best first.
 function planField(d, ev, refresh) {
   const label = (o) => `${o.rounds} rounds × ${o.matchMinutes} min + ${o.breakMinutes} min break = ${o.totalMinutes} min · `
-    + (o.even ? `everyone plays ${o.gamesMin} games` : `${o.gamesMin}–${o.gamesMax} games per player (uneven)`);
+    + describeGames(ev.players.length, d.courts, o.rounds);
   const choices = [['', ev.options.length ? 'Choose…' : 'Enter players, courts and time first'], ...ev.options.map((o) => [o.rounds, label(o)])];
   const select = selectInput(ev.plan ? d.selectedRounds : '', choices, (e) => {
     d.selectedRounds = e.target.value === '' ? null : Number(e.target.value);
@@ -164,15 +172,19 @@ function setupPreview(ctx, d, ev) {
   const out = [h('p', { class: 'muted' }, `${ev.players.length} players entered`)];
   if (ev.games) {
     out.push(ev.games.even
-      ? h('p', { class: 'ok' }, `Everyone plays ${ev.games.min} games.`)
-      : h('p', { class: 'warning' }, `Uneven: players get ${ev.games.min} or ${ev.games.max} games. Players with fewer games get 0.5 points per missing game.`));
+      ? h('p', { class: 'ok' }, `Even: ${describeGames(ev.players.length, d.courts, ev.plan.rounds)}.`)
+      : h('p', { class: 'warning' }, `Uneven: ${describeGames(ev.players.length, d.courts, ev.plan.rounds)}. Players with fewer games get 0.5 points per missing game.`));
     const fewer = fewerGamesCount(ev.players.length, d.courts, ev.plan.rounds);
     const marked = ev.players.filter((p) => p.fewer).map((p) => p.name);
     if (fewer > 0) {
-      out.push(h('p', { class: 'muted' }, `${fewer} player${fewer === 1 ? '' : 's'} get${fewer === 1 ? 's' : ''} ${ev.games.min} games. `,
-        marked.length ? `Marked with *: ${marked.join(', ')}` : 'Add * after a skill (e.g. "Anna: 3 *") to choose who.',
-        marked.length && marked.length < fewer ? `; the other ${fewer - marked.length} are drawn at random.` : marked.length ? '.' : ''));
+      const rest = fewer - marked.length;
+      out.push(h('p', { class: 'muted' }, marked.length === 0
+        ? `The ${fewer} with ${ev.games.min} games are drawn at random. Add * after a skill (e.g. "Anna: 3 *") to choose them.`
+        : `${ev.games.min} games for ${marked.join(', ')}${rest ? ` and ${rest} more drawn at random` : ''}.`));
     }
+  }
+  if (ev.startTimes) {
+    out.push(h('p', { class: 'muted' }, `Round 1 starts at ${ev.startTimes[0]}, round ${ev.startTimes.length} at ${ev.startTimes.at(-1)}; the last match ends at ${d.endTime}.`));
   }
   if (ev.problems.length) out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));
   out.push(h('div', { class: 'actions' },
@@ -198,7 +210,8 @@ function cancelSetup(ctx) {
 
 function createFromDraft(ctx, d, ev) {
   const name = d.name.trim() || 'Tournament';
-  const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch };
+  const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch,
+    ...(d.endTime ? { endTime: d.endTime } : {}) };
   const editing = d.editingId && ctx.store.get(d.editingId);
   let t;
   try {

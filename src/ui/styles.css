@@ -160,6 +160,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .overview-round { padding: 14px; }
 .overview-round.complete { border-color: color-mix(in srgb, var(--win) 45%, var(--line)); }
 .overview-round h3 { display: flex; justify-content: space-between; align-items: center; }
+.start-time { color: var(--muted); font-weight: 500; font-size: .92rem; font-variant-numeric: tabular-nums; }
 .mini-match { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; margin-bottom: 10px; }
 .mini-match .court { grid-column: 1 / -1; }
 .mini-match .team { min-height: 46px; padding: 6px 10px; font-size: .92rem; }

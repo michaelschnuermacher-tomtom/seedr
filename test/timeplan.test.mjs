@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { playersPerRound, gamesPerPlayer, recommendOptions, fewerGamesCount } from '../src/engine/timeplan.js';
+import { playersPerRound, gamesPerPlayer, recommendOptions, fewerGamesCount, roundStartTimes, describeGames } from '../src/engine/timeplan.js';
 
 test('players per round is limited by courts and by groups of four', () => {
   assert.equal(playersPerRound(18, 3), 12);
@@ -36,4 +36,16 @@ test('fewerGamesCount: how many players get the smaller number of games', () => 
   assert.equal(fewerGamesCount(17, 2, 8), 4); // 64 places: 13 × 4 games, 4 × 3 games
   assert.equal(fewerGamesCount(16, 2, 8), 0);
   assert.equal(fewerGamesCount(10, 2, 5), 0); // 40 places, 4 games each
+});
+
+test('roundStartTimes: the last match ends at the end time', () => {
+  assert.deepEqual(roundStartTimes({ rounds: 4, matchMinutes: 25, breakMinutes: 5, endTime: '18:00' }),
+    ['16:05', '16:35', '17:05', '17:35']);
+  assert.deepEqual(roundStartTimes({ rounds: 3, matchMinutes: 20, breakMinutes: 0, endTime: '00:30' }), ['23:30', '23:50', '00:10']);
+});
+
+test('describeGames says exactly how many players play how many games', () => {
+  assert.equal(describeGames(17, 2, 8), '13 players play 4 games, 4 players play 3 games');
+  assert.equal(describeGames(16, 2, 8), 'all 16 players play 4 games');
+  assert.equal(describeGames(9, 2, 1), '8 players play 1 game, 1 player plays 0 games');
 });
