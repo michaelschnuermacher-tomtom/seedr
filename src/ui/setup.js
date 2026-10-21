@@ -1,27 +1,18 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { parsePlayers, createTournament, updateSettings, isActive, checkFewer } from '../engine/tournament.js';
+import { parsePlayers, formatPlayers, createTournament, updateSettings, isActive, checkFewer } from '../engine/tournament.js';
 import { recommendOptions, gamesPerPlayer, fewerGamesCount, describeGames, roundStartTimes, TIME_PATTERN } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
-// The regular group, pre-filled for every new tournament.
-export const DEFAULT_PLAYERS = `Jenny: 5
-Basti: 9
-Mickey: 8
-Max: 6
-Seb: 1
-Anne: 9
-Henri: 4
-Hugo: 6
-Felix: 5
-Bianca: 7
-Micha: 1
-Lia: 4
-Ada: 6
-Uta: 3
-Markus: 1
-Vera: 3
-Gesa: 4`;
+// The regular group, pre-filled for every new tournament: one line per skill.
+export const DEFAULT_PLAYERS = `1: Markus, Micha, Seb
+3: Uta, Vera
+4: Gesa, Henri, Lia
+5: Felix, Jenny
+6: Ada, Hugo, Max
+7: Bianca
+8: Mickey
+9: Anne, Basti`;
 
 export function newDraft() {
   return {
@@ -45,7 +36,7 @@ export function draftFromTournament(t) {
     ...newDraft(),
     editingId: t.id,
     name: t.name,
-    playersText: t.players.filter(isActive).map((p) => `${p.name}: ${p.skill}${p.fewer ? ' *' : ''}`).join('\n'),
+    playersText: formatPlayers(t.players.filter(isActive)),
     courts: s.courts,
     breakMinutes: s.breakMinutes,
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
@@ -114,7 +105,7 @@ export function setupScreen(ctx) {
   });
 
   const playersBox = h('textarea', {
-    rows: 10, value: d.playersText, placeholder: 'Anna: 3\nBen Miller: 7\nCarla: 1\nDavid: 5',
+    rows: 10, value: d.playersText, placeholder: '1: Carla\n3: Anna, David\n7: Ben Miller',
     oninput: (e) => { d.playersText = e.target.value; refresh(); },
   });
   const loadPlayers = async (file) => {
@@ -129,7 +120,7 @@ export function setupScreen(ctx) {
     card('Tournament', 'ao',
       field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; } }))),
     card('Players', 'wim',
-      field('One per line as "Name: skill" (skill 1–10, 1 = best). If games are uneven, a * after the skill picks who plays fewer, e.g. "Anna: 3 *".', playersBox),
+      field('One line per skill (1 = best, 10 = weakest), e.g. "3: Anna, Ben". If games are uneven, a * after a name picks who plays fewer, e.g. "3: Anna, Ben*". Single players as "Anna: 3" work too.', playersBox),
       h('div', { class: 'actions' },
         h('label', { class: 'button' }, 'Load players file',
           h('input', { type: 'file', accept: '.txt,text/plain', hidden: true, onchange: (e) => { loadPlayers(e.target.files[0]); e.target.value = ''; } })))),
@@ -192,7 +183,7 @@ function setupPreview(ctx, d, ev) {
     if (fewer > 0) {
       const rest = fewer - marked.length;
       out.push(h('p', { class: 'muted' }, marked.length === 0
-        ? `The ${fewer} with ${ev.games.min} games are drawn at random. Add * after a skill (e.g. "Anna: 3 *") to choose them.`
+        ? `The ${fewer} with ${ev.games.min} games are drawn at random. Add * after a name (e.g. "3: Anna, Ben*") to choose them.`
         : `${ev.games.min} games for ${marked.join(', ')}${rest ? ` and ${rest} more drawn at random` : ''}.`));
     }
   }

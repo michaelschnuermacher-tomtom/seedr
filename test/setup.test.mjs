@@ -16,7 +16,8 @@ test('defaults: 2 courts, 5-minute break, 240 minutes', () => {
 test('a new draft is pre-filled with the regular 17 players', () => {
   const ev = evaluateDraft(newDraft());
   assert.equal(ev.players.length, 17);
-  assert.deepEqual([ev.players[0].name, ev.players[0].skill], ['Jenny', 5]);
+  assert.deepEqual(ev.players.map((p) => p.skill), [...ev.players.map((p) => p.skill)].sort((a, b) => a - b), 'sorted by skill');
+  assert.deepEqual([ev.players[0].name, ev.players[0].skill], ['Markus', 1]);
   assert.ok(!ev.problems.some((p) => /^Line/.test(p)));
 });
 
@@ -68,7 +69,7 @@ test('draftFromTournament pre-fills the setup form with the current settings', (
   const d = draftFromTournament(t);
   assert.equal(d.editingId, 't9');
   assert.equal(d.name, 'Tenerife Cup');
-  assert.equal(d.playersText.split('\n')[0], 'P1: 1');
+  assert.equal(d.playersText.split('\n')[0], '1: P1');
   assert.deepEqual([d.courts, d.breakMinutes, d.revealBatch], [3, 2, 3]);
   const ev = evaluateDraft(d);
   assert.deepEqual(ev.problems, []);
@@ -89,7 +90,7 @@ test('draftFromTournament keeps the * marks', () => {
     players: SKILLS_18.map((skill, i) => ({ name: `P${i + 1}`, skill, ...(i === 0 ? { fewer: true } : {}) })),
     settings: { courts: 3, rounds: 8, matchMinutes: 13, breakMinutes: 2, revealBatch: 'all' },
   });
-  assert.equal(draftFromTournament(t).playersText.split('\n')[0], 'P1: 1 *');
+  assert.equal(draftFromTournament(t).playersText.split('\n')[0], '1: P1*');
 });
 
 test('an end time gives each round its start time and is kept in the settings', () => {

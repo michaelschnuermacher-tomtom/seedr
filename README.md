@@ -23,14 +23,18 @@ Tournament data stays on the device. The host only serves the empty app.
 ## Players file
 
 On the setup screen, **Load players file** reads a plain text file (e.g. from Dropbox or
-iCloud Drive) with one player per line, name and skill (1 = best, 10 = weakest)
-separated by a colon:
+iCloud Drive) with one line per skill (1 = best, 10 = weakest) and the players of
+that skill after a colon, separated by commas:
 
 ```
-Anna: 3
-Ben Miller: 7
-Müller, Jörg: 1
+1: Carla
+3: Anna, David
+7: Ben Miller
 ```
+
+A single player can also be written as name and skill, e.g. `Ben Miller: 7`. Names
+that contain a comma must be written that way: `Müller, Jörg: 1`. A line counts as a
+skill line when it starts with a number.
 
 The players appear in the text box, where they can still be edited. You can also type
 or paste players in the same format.
@@ -50,7 +54,7 @@ or paste players in the same format.
 
 ### Steps
 
-1. **Who sits out.** Each round, `players − 4 × courts used` players sit out. The players who have sat out least so far sit out first, so nobody sits out twice before everyone has sat out once. Among equals, players who sat out in the previous round are skipped where possible, and the rest are chosen at random. When the games can't come out even, players marked with `*` after their skill (e.g. `Gesa: 3 *`) are the ones who get fewer games. Only as many players can be marked as there are players who get fewer games; any extra places are drawn at random.
+1. **Who sits out.** Each round, `players − 4 × courts used` players sit out. The players who have sat out least so far sit out first, so nobody sits out twice before everyone has sat out once. Among equals, players who sat out in the previous round are skipped where possible, and the rest are chosen at random. When the games can't come out even, players marked with `*` after their name (e.g. `4: Gesa*, Henri`, or `Gesa: 4 *` on a line of their own) are the ones who get fewer games. Only as many players can be marked as there are players who get fewer games; any extra places are drawn at random.
 2. **Starting teams.** Each round's players are shuffled into teams of two and paired into matches.
 3. **Improvement.** The draw then repeatedly makes small changes: it swaps two players, or two whole teams between courts in the same round. Each change is scored, and lower scores are better:
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { parsePlayers, formatPlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
   const { players, errors } = parsePlayers('Anna: 3\nBen Miller: 7\n\n  Müller, Jörg : 1 \r\nDavid:10\n');
@@ -19,9 +19,9 @@ test('parsePlayers reports bad lines and keeps the good ones', () => {
   assert.equal(errors.length, 7);
   assert.match(errors[0], /^Line 1: skill must be a whole number from 1 to 10/);
   assert.match(errors[1], /^Line 2: skill must be a whole number from 1 to 10/);
-  assert.match(errors[2], /^Line 3: expected "Name: skill"/);
+  assert.match(errors[2], /^Line 3: expected "skill: Name, Name" or "Name: skill"/);
   assert.match(errors[3], /^Line 5: duplicate name "Anna"/);
-  assert.match(errors[4], /^Line 6: expected "Name: skill"/);
+  assert.match(errors[4], /^Line 6: expected "skill: Name, Name" or "Name: skill"/);
   assert.match(errors[5], /^Line 7: skill must be a whole number from 1 to 10/);
   assert.match(errors[6], /^Line 8: skill must be a whole number from 1 to 10/);
 });
@@ -177,4 +177,28 @@ test('the last round can use fewer courts, also after a withdrawal', () => {
   assert.deepEqual([...new Set(games.values())], [4]);
   const w = withdrawPlayers(setResult(t, 1, 1, 1), ['p1'], 3);
   assert.equal(w.schedule[8].matches.length, 1);
+});
+
+test('parsePlayers reads "skill: Name, Name" lines, also mixed with "Name: skill"', () => {
+  const { players, errors } = parsePlayers('1: Markus, Micha ,Seb*\n4: Gesa *, Henri\nMüller, Jörg: 2\n11: Zoe\n3:\n5: Anna, *\n6: Markus');
+  assert.deepEqual(players, [
+    { name: 'Markus', skill: 1 }, { name: 'Micha', skill: 1 }, { name: 'Seb', skill: 1, fewer: true },
+    { name: 'Gesa', skill: 4, fewer: true }, { name: 'Henri', skill: 4 },
+    { name: 'Müller, Jörg', skill: 2 }, { name: 'Anna', skill: 5 },
+  ]);
+  assert.equal(errors.length, 4);
+  assert.match(errors[0], /^Line 4: skill must be/);
+  assert.match(errors[1], /^Line 5: expected names after the skill/);
+  assert.match(errors[2], /^Line 6: "\*" without a name/);
+  assert.match(errors[3], /^Line 7: duplicate name "Markus"/);
+});
+
+test('formatPlayers writes one line per skill and reads back the same players', () => {
+  const players = [
+    { name: 'Seb', skill: 1, fewer: true }, { name: 'Ada', skill: 6 }, { name: 'Markus', skill: 1 },
+    { name: 'Müller, Jörg', skill: 2, fewer: true },
+  ];
+  const text = formatPlayers(players);
+  assert.equal(text, '1: Seb*, Markus\n6: Ada\nMüller, Jörg: 2 *');
+  assert.deepEqual(new Set(parsePlayers(text).players.map((p) => JSON.stringify(p))), new Set(players.map((p) => JSON.stringify(p))));
 });

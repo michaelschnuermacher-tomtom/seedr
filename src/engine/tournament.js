@@ -4,39 +4,65 @@ import { fewerGamesCount } from './timeplan.js';
 
 export const FORMAT_VERSION = 1;
 
-// One player per line: "Name: skill". The last ":" separates, so names may contain
-// spaces, commas and other punctuation. A "*" after the skill marks a player who should
-// get fewer games when they cannot come out even.
+// Two kinds of lines:
+// - "skill: Name, Name, ..." lists all players of one skill, e.g. "1: Markus, Micha, Seb".
+// - "Name: skill" is one player. The last ":" separates, so names may contain spaces,
+//   commas and other punctuation, e.g. "Müller, Jörg: 1".
+// A line is the first kind when it starts with a number. A "*" after a name (first
+// kind) or after the skill (second kind) marks a player who should get fewer games
+// when they cannot come out even.
 export function parsePlayers(text) {
   const players = [];
   const errors = [];
   const names = new Set();
+  const skillOf = (skillText) => (/^\d+$/.test(skillText) && Number(skillText) >= 1 && Number(skillText) <= 10 ? Number(skillText) : null);
+  const stripStar = (s) => (s.endsWith('*') ? [s.slice(0, -1).trim(), true] : [s, false]);
   text.split(/\r?\n/).forEach((raw, index) => {
     const line = raw.trim();
     if (!line) return;
     const n = index + 1;
+    const add = (name, skill, fewer) => {
+      if (names.has(name.toLowerCase())) {
+        errors.push(`Line ${n}: duplicate name "${name}"`);
+        return;
+      }
+      names.add(name.toLowerCase());
+      players.push(fewer ? { name, skill, fewer } : { name, skill });
+    };
+    const group = /^(\d+)\s*:(.*)$/.exec(line);
+    if (group) {
+      const skill = skillOf(group[1]);
+      const entries = group[2].split(',').map((s) => s.trim()).filter(Boolean);
+      if (!skill) errors.push(`Line ${n}: skill must be a whole number from 1 to 10 ("${line}")`);
+      else if (entries.length === 0) errors.push(`Line ${n}: expected names after the skill, e.g. "3: Anna, Ben"`);
+      else entries.map(stripStar).forEach(([name, fewer]) => (name ? add(name, skill, fewer) : errors.push(`Line ${n}: "*" without a name`)));
+      return;
+    }
     const colon = line.lastIndexOf(':');
     const name = colon > 0 ? line.slice(0, colon).trim() : '';
     if (!name) {
-      errors.push(`Line ${n}: expected "Name: skill", e.g. "Anna: 3"`);
+      errors.push(`Line ${n}: expected "skill: Name, Name" or "Name: skill", e.g. "3: Anna, Ben"`);
       return;
     }
-    const rest = line.slice(colon + 1).trim();
-    const fewer = rest.endsWith('*');
-    const skillText = fewer ? rest.slice(0, -1).trim() : rest;
-    const skill = Number(skillText);
-    if (!/^\d+$/.test(skillText) || skill < 1 || skill > 10) {
+    const [skillText, fewer] = stripStar(line.slice(colon + 1).trim());
+    const skill = skillOf(skillText);
+    if (!skill) {
       errors.push(`Line ${n}: skill must be a whole number from 1 to 10 ("${line}")`);
       return;
     }
-    if (names.has(name.toLowerCase())) {
-      errors.push(`Line ${n}: duplicate name "${name}"`);
-      return;
-    }
-    names.add(name.toLowerCase());
-    players.push(fewer ? { name, skill, fewer } : { name, skill });
+    add(name, skill, fewer);
   });
   return { players, errors };
+}
+
+// Players as text, one line per skill from 1 to 10, e.g. "1: Markus, Micha, Seb*".
+// Names with a comma get a "Name: skill" line of their own.
+export function formatPlayers(players) {
+  const entry = (p) => `${p.name}${p.fewer ? '*' : ''}`;
+  const grouped = players.filter((p) => !p.name.includes(','));
+  const lines = [...new Set(grouped.map((p) => p.skill))].sort((a, b) => a - b)
+    .map((skill) => `${skill}: ${grouped.filter((p) => p.skill === skill).map(entry).join(', ')}`);
+  return [...lines, ...players.filter((p) => p.name.includes(',')).map((p) => `${p.name}: ${p.skill}${p.fewer ? ' *' : ''}`)].join('\n');
 }
 
 // Only as many players can be marked for fewer games as there are players who get them.
