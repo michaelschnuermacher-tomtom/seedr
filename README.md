@@ -64,6 +64,7 @@ or paste players in the same format.
    | Unequal teams in a match | 10 × (strength difference)² |
    | One player always in the stronger or weaker team | 3 × (that player's total advantage)² |
    | Teams mixed differently, e.g. 1+9 vs 5+5 (14+ players only) | 5 × (difference in spread)² |
+   | Partners far apart in skill, e.g. 1+9 (14+ players only) | 1 × (spread)² per team |
    | Same opponent twice | 1 per repeat |
 
    Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw runs 4 times from different starts, with 100,000 steps in total (200,000 for fewer than 14 players), and the best result wins.

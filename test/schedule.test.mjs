@@ -33,7 +33,7 @@ test('nobody sits out when everyone fits on court', () => {
 test('evaluate: balanced single match', () => {
   const strength = [1, 2, 3, 4].map(strengthOf); // 10, 9, 8, 7
   const e = evaluate([[0, 3, 1, 2]], strength, 4); // 17 vs 17; spreads 3 vs 1
-  assert.deepEqual(e, { cost: 0, partnerRepeats: 0, opponentRepeats: 0, sumDiffSq: 0, maxAbsDiff: 0, maxAbsBalance: 0, sumSpreadGapSq: 4, maxSpreadGap: 2 });
+  assert.deepEqual(e, { cost: 0, partnerRepeats: 0, opponentRepeats: 0, sumDiffSq: 0, maxAbsDiff: 0, maxAbsBalance: 0, sumSpreadGapSq: 4, maxSpreadGap: 2, sumWideSq: 10 });
 });
 
 test('evaluate: 1+9 vs 5+5 is penalised for different spreads from 14 players', () => {
@@ -42,7 +42,8 @@ test('evaluate: 1+9 vs 5+5 is penalised for different spreads from 14 players', 
   assert.equal(e.sumDiffSq, 0);
   assert.equal(e.sumSpreadGapSq, 64);
   assert.equal(e.maxSpreadGap, 8);
-  assert.equal(e.cost, WEIGHTS.spread * 64);
+  assert.equal(e.sumWideSq, 64); // 8² + 0²
+  assert.equal(e.cost, WEIGHTS.spread * 64 + WEIGHTS.wide * 64);
 });
 
 test('evaluate: below 14 players the spread is reported but not penalised', () => {
