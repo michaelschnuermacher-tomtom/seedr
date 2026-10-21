@@ -5,14 +5,14 @@ import { recommendOptions, gamesPerPlayer, fewerGamesCount, describeGames, round
 import { newSeed } from '../engine/rng.js';
 
 // The regular group, pre-filled for every new tournament: one line per skill.
-export const DEFAULT_PLAYERS = `1: Markus, Micha, Seb
+export const DEFAULT_PLAYERS = `1: Markus, Seb, Micha
 3: Uta, Vera
 4: Gesa, Henri, Lia
-5: Felix, Jenny
-6: Ada, Hugo, Max
-7: Bianca
-8: Mickey
-9: Anne, Basti`;
+5: Felix, Jenny, Mickey
+6: Ada, Hugo, Bianca
+7: Basti
+8: Max
+9: Anne`;
 
 export function newDraft() {
   return {
