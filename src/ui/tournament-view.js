@@ -168,28 +168,40 @@ function roundsTab(ctx, t, view) {
     },
   }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
 
+  const swapping = Boolean(view.swapping);
+  const swapStart = h('div', { class: 'actions' }, h('button', {
+    onclick: () => {
+      if (!askPassword(ctx, 'Password to swap players:')) return;
+      view.swapping = true;
+      view.swapPick = null;
+      ctx.render();
+    },
+  }, 'Swap players'));
+
   if (layout === 'all') {
     return [
       layoutSwitch,
       numbersToggle,
       progress,
-      hint,
+      swapping ? swapHeader(ctx, t, view) : hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
         h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`, starts ? h('span', { class: 'start-time' }, starts[r.round - 1]) : null),
-        r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
-          courtLine('span', m, numbers),
-          teamButton(ctx, t, r.round, m, 1, numbers),
-          h('span', { class: 'vs' }, 'vs'),
-          teamButton(ctx, t, r.round, m, 2, numbers))),
-        r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null))),
-      revealButton,
+        swapping ? swapRound(ctx, t, view, r, numbers, true) : [
+          r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
+            courtLine('span', m, numbers),
+            teamButton(ctx, t, r.round, m, 1, numbers),
+            h('span', { class: 'vs' }, 'vs'),
+            teamButton(ctx, t, r.round, m, 2, numbers))),
+          r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null,
+        ]))),
+      swapping ? swapDone(ctx, view) : [swapStart, revealButton],
     ];
   }
 
   const round = rounds[view.round - 1];
   const nav = h('nav', { class: 'round-nav' }, rounds.map((r) => h('button', {
     class: [r.round === view.round ? 'current' : '', r.complete ? 'complete' : ''].join(' ').trim(),
-    onclick: () => { view.round = r.round; view.swapPick = null; ctx.render(); },
+    onclick: () => { view.round = r.round; ctx.render(); },
   }, String(r.round))));
 
   return [
@@ -199,38 +211,51 @@ function roundsTab(ctx, t, view) {
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
     starts ? h('p', { class: 'start-time' }, `Starts at ${starts[round.round - 1]}`) : null,
     progress,
-    hint,
-    view.swapping ? swapPanel(ctx, t, view, round, numbers) : [
+    swapping ? [swapHeader(ctx, t, view), swapRound(ctx, t, view, round, numbers, false), swapDone(ctx, view)] : [
+      hint,
       h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
         courtLine('div', m, numbers),
         teamButton(ctx, t, round.round, m, 1, numbers),
         h('div', { class: 'vs' }, 'vs'),
         teamButton(ctx, t, round.round, m, 2, numbers)))),
       round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
-      h('div', { class: 'actions' }, h('button', {
-        onclick: () => {
-          if (!askPassword(ctx, 'Password to swap players:')) return;
-          view.swapping = true;
-          view.swapPick = null;
-          ctx.render();
-        },
-      }, 'Swap players')),
+      swapStart,
+      revealButton,
     ],
-    view.swapping ? null : revealButton,
   ];
 }
 
-// Tweaking the draw: tap two players of this round to swap them. Matches with a result
-// are locked.
-function swapPanel(ctx, t, view, round, numbers) {
+// Tweaking the draw: tap two players of the same round to swap them, in either view.
+// Matches with a result are locked. `view.swapPick` is the first player tapped.
+function swapHeader(ctx, t, view) {
+  const pick = view.swapPick && t.players.find((p) => p.id === view.swapPick.id);
+  return h('p', { class: 'warning' }, pick
+    ? `Now tap the player in round ${view.swapPick.round} to swap with ${pick.name}.`
+    : 'Swap mode: tap two players of the same round to swap them. Courts with a result are locked.');
+}
+
+function swapDone(ctx, view) {
+  return h('div', { class: 'actions' }, h('button', {
+    class: 'primary',
+    onclick: () => {
+      view.swapping = false;
+      view.swapPick = null;
+      ctx.render();
+    },
+  }, 'Done'));
+}
+
+// One round's matches and sit-outs as player buttons; `mini` for the All rounds view.
+function swapRound(ctx, t, view, round, numbers, mini) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const r = t.schedule[round.round - 1];
+  const picked = (id) => view.swapPick?.round === round.round && view.swapPick.id === id;
   const tap = (id) => {
-    if (!view.swapPick) view.swapPick = id;
-    else if (view.swapPick === id) view.swapPick = null;
+    if (picked(id)) view.swapPick = null;
+    else if (view.swapPick?.round !== round.round) view.swapPick = { round: round.round, id };
     else {
       try {
-        ctx.save(swapPlayers(t, round.round, view.swapPick, id));
+        ctx.save(swapPlayers(t, round.round, view.swapPick.id, id));
       } catch (error) {
         ctx.state.message = error.message;
       }
@@ -239,31 +264,21 @@ function swapPanel(ctx, t, view, round, numbers) {
     ctx.render();
   };
   const chip = (id, locked) => h('button', {
-    class: `chip${view.swapPick === id ? ' picked' : ''}`,
+    class: `chip${picked(id) ? ' picked' : ''}`,
     disabled: locked,
     onclick: () => tap(id),
   }, `${byId.get(id).name} (${byId.get(id).skill})`);
+  const matches = r.matches.map((m, k) => {
+    const locked = Boolean(t.results[resultKey(round.round, m.court)]);
+    return h('div', { class: `match swap ${courtColor(m.court)}` },
+      courtLine('div', round.matches[k], numbers),
+      h('div', { class: 'chips' }, m.team1.map((id) => chip(id, locked))),
+      h('div', { class: 'vs' }, locked ? 'vs · has a result' : 'vs'),
+      h('div', { class: 'chips' }, m.team2.map((id) => chip(id, locked))));
+  });
   return [
-    h('p', { class: 'warning' }, view.swapPick
-      ? `Now tap the player to swap with ${byId.get(view.swapPick).name}.`
-      : 'Swap mode: tap two players to swap them. Courts with a result are locked.'),
-    h('div', { class: 'matches' }, r.matches.map((m, k) => {
-      const locked = Boolean(t.results[resultKey(round.round, m.court)]);
-      return h('div', { class: `match ${courtColor(m.court)}` },
-        courtLine('div', round.matches[k], numbers),
-        h('div', { class: 'chips' }, m.team1.map((id) => chip(id, locked))),
-        h('div', { class: 'vs' }, locked ? 'vs · has a result' : 'vs'),
-        h('div', { class: 'chips' }, m.team2.map((id) => chip(id, locked))));
-    })),
-    r.sitOuts.length ? h('div', {}, h('p', { class: 'muted' }, 'Sitting out:'), h('div', { class: 'chips' }, r.sitOuts.map((id) => chip(id, false)))) : null,
-    h('div', { class: 'actions' }, h('button', {
-      class: 'primary',
-      onclick: () => {
-        view.swapping = false;
-        view.swapPick = null;
-        ctx.render();
-      },
-    }, 'Done')),
+    mini ? matches : h('div', { class: 'matches' }, matches),
+    r.sitOuts.length ? h('div', { class: 'sit-outs' }, h('p', { class: 'muted' }, 'Sitting out:'), h('div', { class: 'chips' }, r.sitOuts.map((id) => chip(id, false)))) : null,
   ];
 }
 
