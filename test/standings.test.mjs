@@ -65,9 +65,9 @@ test('clearing a result recomputes everything (no stale bonus)', () => {
   assert.equal(rows.p1.wins, 0);
 });
 
-test('rows are sorted by points, then name', () => {
+test('rows are sorted by points, then weaker skill first, then name', () => {
   const rows = computeStandings(players, schedule, { '1-1': 1 });
-  assert.deepEqual(rows.map((r) => r.id), ['p1', 'p2', 'p5', 'p3', 'p4']);
+  assert.deepEqual(rows.map((r) => r.id), ['p2', 'p1', 'p5', 'p4', 'p3']); // Ben (5) before Anna (1), David (4) before Carla (3)
 });
 
 test('a withdrawn player keeps wins but gets no bonus and no rank, and is listed last', () => {

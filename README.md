@@ -74,7 +74,7 @@ If repeated partners or unbalanced matches can't be avoided (team strength gap o
 
 ### Standings
 
-A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. *Avg. advantage* shows whether a player mostly played in the stronger (+) or weaker (−) team.
+A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed weaker skill first, so the better player comes last. *Avg. advantage* shows whether a player mostly played in the stronger (+) or weaker (−) team.
 
 ### When a player leaves
 

@@ -34,7 +34,8 @@ export function computeStandings(players, schedule, results) {
     const bonus = gone ? 0 : 0.5 * (maxGames - r.games);
     return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, avgGap: r.games ? gapSum / r.games : 0 };
   });
-  out.sort((a, b) => a.withdrawn - b.withdrawn || b.points - a.points || a.name.localeCompare(b.name));
+  // On equal points the weaker player (higher skill number) is listed first.
+  out.sort((a, b) => a.withdrawn - b.withdrawn || b.points - a.points || b.skill - a.skill || a.name.localeCompare(b.name));
   const ranked = out.filter((r) => !r.withdrawn);
   for (const r of out) r.rank = r.withdrawn ? null : 1 + ranked.filter((o) => o.points > r.points).length;
   return out;
