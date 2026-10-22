@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTournament, setResult } from '../src/engine/tournament.js';
-import { roundsOverview, isAllRoundsPassword } from '../src/ui/tournament-view.js';
+import { roundsOverview, isAllRoundsPassword, printPageGroups } from '../src/ui/tournament-view.js';
 
 const make = (revealBatch) => createTournament({
   id: 't1', name: 'Club night', seed: 4, now: new Date('2026-10-14T18:00:00Z'),
@@ -55,4 +55,17 @@ test('each match has team spreads and the gaps between the teams', () => {
   assert.equal(x.team1.spread, spread(m.team1));
   assert.equal(x.sumGap, Math.abs(sum(m.team1) - sum(m.team2)));
   assert.equal(x.spreadGap, Math.abs(spread(m.team1) - spread(m.team2)));
+});
+
+test('printed rounds have 6 matches per page; a round that does not fit continues', () => {
+  const rounds = [1, 2, 3, 4].map((round) => ({
+    round,
+    matches: [1, 2, 3, 4].map((court) => ({ court })),
+    sitOuts: round === 2 ? ['X'] : [],
+  }));
+  const pages = printPageGroups(rounds);
+  assert.deepEqual(pages.map((p) => p.reduce((n, g) => n + g.matches.length, 0)), [6, 6, 4]);
+  assert.deepEqual(pages[0].map((g) => [g.round.round, g.continued, g.matches.length]), [[1, false, 4], [2, false, 2]]);
+  assert.deepEqual(pages[1].map((g) => [g.round.round, g.continued, g.matches.length]), [[2, true, 2], [3, false, 4]]);
+  assert.deepEqual([pages[0][1].sitOuts, pages[1][0].sitOuts], [[], ['X']], 'sit-outs follow the last match of the round');
 });

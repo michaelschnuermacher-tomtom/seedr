@@ -262,3 +262,22 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
 }
+
+/* Printed rounds (All rounds view): 6 matches per page, sized to fit A4 and Letter. */
+@media print {
+  @page { margin: 10mm; }
+  body:has(.print-pages) .hero, body:has(.print-pages) .print-pages ~ * { display: none; }
+  body:has(.print-pages) .screen > p.muted { display: none; }
+  .print-page { break-after: page; }
+  .print-page:last-child { break-after: auto; }
+  .print-page { padding-top: 3mm; }
+  .print-title { font-size: 9pt; font-weight: 600; color: var(--muted); margin-bottom: 1mm; }
+  .print-page h3 { display: flex; justify-content: space-between; margin: 2mm 0 1.5mm; font-size: 12pt; }
+  .print-match { box-sizing: border-box; height: 28mm; margin-bottom: 2mm; padding: 1.5mm 4mm; display: flex; flex-direction: column; justify-content: center; gap: 1mm;
+    background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--court); border-radius: 3mm; break-inside: avoid; }
+  .print-team { display: flex; justify-content: space-between; gap: 4mm; font-size: 12pt; }
+  .print-team.winner { font-weight: 700; }
+  .print-team .sum { color: var(--muted); font-size: 10pt; white-space: nowrap; }
+  .print-match .vs { font-size: 9pt; }
+  .print-page .muted { margin: 0 0 1.5mm; font-size: 9.5pt; }
+}

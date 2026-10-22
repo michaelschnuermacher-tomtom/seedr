@@ -182,10 +182,10 @@ function roundsTab(ctx, t, view) {
     return [
       layoutSwitch,
       numbersToggle,
-      h('h2', { class: 'print-only' }, 'Rounds'),
       progress,
       swapping ? swapHeader(ctx, t, view) : hint,
-      h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
+      swapping ? null : printPages(t, rounds, starts, numbers),
+      h('div', { class: 'overview no-print' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
         h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`, starts ? h('span', { class: 'start-time' }, starts[r.round - 1]) : null),
         swapping ? swapRound(ctx, t, view, r, numbers, true) : [
           r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
@@ -225,6 +225,41 @@ function roundsTab(ctx, t, view) {
       printButton(),
     ],
   ];
+}
+
+export const MATCHES_PER_PAGE = 6;
+
+// Printed pages for the All rounds view: MATCHES_PER_PAGE matches per page, in order. A
+// round that does not fit continues on the next page; its sit-outs follow its last match.
+export function printPageGroups(rounds, perPage = MATCHES_PER_PAGE) {
+  const items = rounds.flatMap((r) => r.matches.map((m, k) => ({ round: r, match: m, first: k === 0, last: k === r.matches.length - 1 })));
+  const pages = [];
+  for (let i = 0; i < items.length; i += perPage) {
+    const groups = [];
+    for (const item of items.slice(i, i + perPage)) {
+      if (groups.at(-1)?.round !== item.round) groups.push({ round: item.round, continued: !item.first, matches: [], sitOuts: [] });
+      groups.at(-1).matches.push(item.match);
+      if (item.last) groups.at(-1).sitOuts = item.round.sitOuts;
+    }
+    pages.push(groups);
+  }
+  return pages;
+}
+
+function printPages(t, rounds, starts, numbers) {
+  const team = (m, n) => {
+    const x = n === 1 ? m.team1 : m.team2;
+    return h('div', { class: `print-team${m.winner === n ? ' winner' : ''}` },
+      h('span', {}, x.names, m.winner === n ? ' ✓' : ''), numbers ? h('span', { class: 'sum' }, `Σ ${x.sum} · ↔ ${x.spread}`) : null);
+  };
+  return h('div', { class: 'print-pages print-only' }, printPageGroups(rounds).map((groups) => h('section', { class: 'print-page' },
+    h('div', { class: 'print-title' }, t.name),
+    groups.map((g) => [
+      h('h3', {}, `Round ${g.round.round}${g.continued ? ' (continued)' : ''}`, starts ? h('span', { class: 'start-time' }, starts[g.round.round - 1]) : null),
+      g.matches.map((m) => h('div', { class: `print-match ${courtColor(m.court)}` },
+        courtLine('div', m, numbers), team(m, 1), h('div', { class: 'vs' }, 'vs'), team(m, 2))),
+      g.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${g.sitOuts.join(', ')}`) : null,
+    ]))));
 }
 
 // Tweaking the draw: tap two players of the same round to swap them, in either view.
