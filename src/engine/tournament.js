@@ -218,6 +218,13 @@ export function swapPlayers(t, round, a, b) {
   return { ...t, schedule: t.schedule.map((x, i) => (i === round - 1 ? changed : x)) };
 }
 
+// Player `a` as tapped in round `roundA` and `b` in round `roundB`: they trade places in
+// both rounds, so nobody appears twice in a round. The same round is a single swap.
+export function swapPlayersAcross(t, roundA, a, roundB, b) {
+  const once = swapPlayers(t, roundA, a, b);
+  return roundA === roundB ? once : swapPlayers(once, roundB, a, b);
+}
+
 export function setResult(t, round, court, winner) {
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
   if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);

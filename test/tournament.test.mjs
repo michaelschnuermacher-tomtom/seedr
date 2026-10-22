@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, formatPlayers, renamePlayers, swapPlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { parsePlayers, formatPlayers, renamePlayers, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -241,4 +241,17 @@ test('swapPlayers refuses matches with a result, hidden rounds and unknown playe
   assert.throws(() => swapPlayers(t, 3, 'p1', 'p2'), /revealed/);
   assert.throws(() => swapPlayers(t, 2, 'p1', 'p1'), /two different/);
   assert.throws(() => swapPlayers(t, 2, 'p1', 'zz'), /not in round 2/);
+});
+
+test('swapPlayersAcross: two players in different rounds trade places in both rounds', () => {
+  const t = make(); // revealBatch 2: rounds 1–2 revealed
+  const s = swapPlayersAcross(t, 1, 'p1', 2, 'p2');
+  const back = (round) => JSON.parse(JSON.stringify(round).replace(/"p[12]"/g, (x) => (x === '"p1"' ? '"p2"' : '"p1"')));
+  assert.notDeepEqual(s.schedule[0], t.schedule[0]);
+  assert.deepEqual(s.schedule.slice(0, 2).map(back), t.schedule.slice(0, 2), 'p1 and p2 traded places in rounds 1 and 2');
+  assert.deepEqual(s.schedule.slice(2), t.schedule.slice(2), 'other rounds unchanged');
+  assert.equal(validateTournament(JSON.parse(JSON.stringify(s))).ok, true);
+  assert.deepEqual(swapPlayersAcross(t, 2, 'p1', 2, 'p2'), swapPlayers(t, 2, 'p1', 'p2'));
+  const court = t.schedule[0].matches.find((m) => [...m.team1, ...m.team2].includes('p1')).court;
+  assert.throws(() => swapPlayersAcross(setResult(t, 1, court, 1), 2, 'p1', 1, 'p2'), /already has a result/);
 });

@@ -1,6 +1,6 @@
 import { h, formatSigned, slugify } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, swapPlayers } from '../engine/tournament.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, swapPlayersAcross } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
@@ -230,8 +230,8 @@ function roundsTab(ctx, t, view) {
 function swapHeader(ctx, t, view) {
   const pick = view.swapPick && t.players.find((p) => p.id === view.swapPick.id);
   return h('p', { class: 'warning' }, pick
-    ? `Now tap the player in round ${view.swapPick.round} to swap with ${pick.name}.`
-    : 'Swap mode: tap two players of the same round to swap them. Courts with a result are locked.');
+    ? `Now tap the player to swap with ${pick.name} (round ${view.swapPick.round}). In another round, they trade places in both rounds. Tap ${pick.name} again to cancel.`
+    : 'Swap mode: tap two players to swap them, also in different rounds. Courts with a result are locked.');
 }
 
 function swapDone(ctx, view) {
@@ -252,10 +252,10 @@ function swapRound(ctx, t, view, round, numbers, mini) {
   const picked = (id) => view.swapPick?.round === round.round && view.swapPick.id === id;
   const tap = (id) => {
     if (picked(id)) view.swapPick = null;
-    else if (view.swapPick?.round !== round.round) view.swapPick = { round: round.round, id };
+    else if (!view.swapPick) view.swapPick = { round: round.round, id };
     else {
       try {
-        ctx.save(swapPlayers(t, round.round, view.swapPick.id, id));
+        ctx.save(swapPlayersAcross(t, view.swapPick.round, view.swapPick.id, round.round, id));
       } catch (error) {
         ctx.state.message = error.message;
       }
