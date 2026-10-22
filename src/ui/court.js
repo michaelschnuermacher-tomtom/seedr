@@ -1,44 +1,58 @@
 // Top-down tennis court for the page background, in feet: a 36 × 78 ft doubles court
-// centered on a larger run-off area, so the whole court fits on screen. Its four
-// quarters show the Grand Slam surfaces: Australian Open and US Open beyond the net,
-// Wimbledon grass and Roland Garros clay in front.
-const W = 84;
-const H = 150;
-const X0 = (W - 36) / 2; // doubles sideline
-const Y0 = (H - 78) / 2; // baseline
-const NET = H / 2;
-const QUARTERS = [
-  // [x, y, court color, run-off color]
-  [0, 0, '#2596be', '#1b7ea3'], // Australian Open
-  [W / 2, 0, '#1f3c88', '#172f6c'], // US Open
-  [0, NET, '#006633', '#004f27'], // Wimbledon
-  [W / 2, NET, '#c8553d', '#a8432d'], // Roland Garros
-];
+// centered on a larger run-off area. The court lies across the screen: sideways on a
+// phone held upright, lengthwise on a wide screen. The frame is narrow enough that the
+// whole court stays visible when the picture is cropped to the screen. Its four
+// quarters show the Grand Slam surfaces.
+const COURT_W = 36;
+const COURT_L = 78;
+const COLORS = {
+  ao: ['#2596be', '#1b7ea3'], // Australian Open: [court, run-off]
+  uso: ['#1f3c88', '#172f6c'], // US Open
+  wim: ['#006633', '#004f27'], // Wimbledon
+  rg: ['#c8553d', '#a8432d'], // Roland Garros
+};
 
-function courtShapes() {
-  const runOff = QUARTERS.map(([x, y, , dark]) => `<rect x="${x}" y="${y}" width="${W / 2}" height="${NET}" fill="${dark}"/>`).join('');
-  const surface = QUARTERS.map(([x, y, color]) => {
-    const left = Math.max(x, X0);
-    const top = Math.max(y, Y0);
-    return `<rect x="${left}" y="${top}" width="${Math.min(x + W / 2, X0 + 36) - left}" height="${Math.min(y + NET, Y0 + 78) - top}" fill="${color}"/>`;
-  }).join('');
-  const s1 = X0 + 4.5;
-  const s2 = X0 + 31.5;
-  const mid = W / 2;
-  const lines = [
-    `<rect x="${X0}" y="${Y0}" width="36" height="78"/>`, // doubles court
-    `<path d="M${s1} ${Y0}V${Y0 + 78}M${s2} ${Y0}V${Y0 + 78}"/>`, // singles sidelines
-    `<path d="M${s1} ${NET - 21}H${s2}M${s1} ${NET + 21}H${s2}"/>`, // service lines, 21 ft from the net
-    `<path d="M${mid} ${NET - 21}V${NET + 21}M${mid} ${Y0}v1M${mid} ${Y0 + 78}v-1"/>`, // center service line and marks
+// Court lines with the court's top-left corner at 0,0 and the net across the middle.
+function courtLines() {
+  const s1 = 4.5;
+  const s2 = COURT_W - 4.5;
+  const mid = COURT_W / 2;
+  const net = COURT_L / 2;
+  return [
+    `<rect x="0" y="0" width="${COURT_W}" height="${COURT_L}"/>`, // doubles court
+    `<path d="M${s1} 0V${COURT_L}M${s2} 0V${COURT_L}"/>`, // singles sidelines
+    `<path d="M${s1} ${net - 21}H${s2}M${s1} ${net + 21}H${s2}"/>`, // service lines, 21 ft from the net
+    `<path d="M${mid} ${net - 21}V${net + 21}M${mid} 0v1M${mid} ${COURT_L}v-1"/>`, // center service line and marks
+    `<path d="M-3 ${net}H${COURT_W + 3}" stroke-width="0.6"/>`, // net
   ].join('');
-  const net = `<path d="M${X0 - 3} ${NET}H${X0 + 39}" stroke-width="0.6"/>`;
-  return `${runOff}${surface}<g fill="none" stroke="#fff" stroke-width="0.3">${lines}${net}</g>`;
 }
 
+// The court in a frame of `w` × `h` ft. `across`: the net runs from top to bottom.
+function courtShapes(w, h, across) {
+  const cw = across ? COURT_L : COURT_W;
+  const ch = across ? COURT_W : COURT_L;
+  const x0 = (w - cw) / 2;
+  const y0 = (h - ch) / 2;
+  // Quarters top-left, top-right, bottom-left, bottom-right; turned with the court.
+  const order = across ? ['wim', 'ao', 'rg', 'uso'] : ['ao', 'uso', 'wim', 'rg'];
+  const quarters = order.map((key, i) => [(i % 2) * (w / 2), Math.floor(i / 2) * (h / 2), ...COLORS[key]]);
+  const runOff = quarters.map(([x, y, , dark]) => `<rect x="${x}" y="${y}" width="${w / 2}" height="${h / 2}" fill="${dark}"/>`).join('');
+  const surface = quarters.map(([x, y, color]) => {
+    const left = Math.max(x, x0);
+    const top = Math.max(y, y0);
+    return `<rect x="${left}" y="${top}" width="${Math.min(x + w / 2, x0 + cw) - left}" height="${Math.min(y + h / 2, y0 + ch) - top}" fill="${color}"/>`;
+  }).join('');
+  const place = across
+    ? `translate(${w / 2} ${h / 2}) rotate(90) translate(${-COURT_W / 2} ${-COURT_L / 2})`
+    : `translate(${x0} ${y0})`;
+  return `${runOff}${surface}<g fill="none" stroke="#fff" stroke-width="0.3" transform="${place}">${courtLines()}</g>`;
+}
+
+// Portrait: a tall frame (about a phone's shape) with the court sideways. Landscape: a
+// wide frame with the court lengthwise from top to bottom.
 export function courtSvg({ landscape }) {
-  return landscape
-    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${H} ${W}" preserveAspectRatio="xMidYMid slice"><g transform="translate(${H} 0) rotate(90)">${courtShapes()}</g></svg>`
-    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">${courtShapes()}</svg>`;
+  const [w, h] = landscape ? [178, 82] : [82, 178];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice">${courtShapes(w, h, !landscape)}</svg>`;
 }
 
 // Sets the two court pictures as CSS variables; styles.css picks one by orientation.
