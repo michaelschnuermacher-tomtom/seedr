@@ -149,7 +149,7 @@ function roundsTab(ctx, t, view) {
   const numbersToggle = h('label', { class: 'toggle' },
     h('input', { type: 'checkbox', checked: numbers, onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
     'Show sums and spreads');
-  const hint = h('p', { class: 'muted' }, h('span', { class: 'no-print' }, 'Tap the winning team. Tap again to clear.'),
+  const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.',
     numbers ? ' Σ = sum of skills (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },

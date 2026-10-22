@@ -261,4 +261,16 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .card, .match, .overview-round, .table-wrap { box-shadow: none; }
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
+  /* All rounds: compact cards, three rows of two (6 rounds) per page. */
+  .hero { margin-bottom: 4px; }
+  .screen > h2.print-only { margin: 4px 0; font-size: 12pt; }
+  .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
+  .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
+  .overview-round h3 { margin: 0 0 1.5mm; font-size: 10.5pt; }
+  .mini-match { gap: 1.5mm; margin-bottom: 1.5mm; }
+  .mini-match .court { font-size: 6.5pt; }
+  .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9pt; border-radius: 2mm; }
+  .mini-match .team .sum { font-size: 7.5pt; }
+  .mini-match .team.winner::after { width: 14px; height: 14px; font-size: 8px; }
+  .overview-round > p.muted { margin: 1mm 0 0; font-size: 8pt; line-height: 1.3; }
 }
