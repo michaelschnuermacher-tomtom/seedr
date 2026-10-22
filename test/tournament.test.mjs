@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, formatPlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { parsePlayers, formatPlayers, renamePlayers, swapPlayers, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
   const { players, errors } = parsePlayers('Anna: 3\nBen Miller: 7\n\n  Müller, Jörg : 1 \r\nDavid:10\n');
@@ -201,4 +202,43 @@ test('formatPlayers writes one line per skill and reads back the same players', 
   const text = formatPlayers(players);
   assert.equal(text, '1: Seb*, Markus\n6: Ada\nMüller, Jörg: 2 *');
   assert.deepEqual(new Set(parsePlayers(text).players.map((p) => JSON.stringify(p))), new Set(players.map((p) => JSON.stringify(p))));
+});
+
+test('renamePlayers changes names at any time and keeps the draw and results', () => {
+  const t = setResult(make(), 1, 1, 1);
+  const r = renamePlayers(t, { p1: '  Anna ', p2: 'P1' });
+  assert.deepEqual(r.players.slice(0, 2).map((p) => p.name), ['Anna', 'P1']);
+  assert.deepEqual([r.schedule, r.results], [t.schedule, t.results]);
+  assert.deepEqual(renamePlayers(t, { p1: 'P2', p2: 'P1' }).players.slice(0, 2).map((p) => p.name), ['P2', 'P1'], 'names can be swapped');
+  assert.throws(() => renamePlayers(t, { p1: '' }), /empty/);
+  assert.throws(() => renamePlayers(t, { p1: 'p3' }), /used twice/);
+  assert.throws(() => renamePlayers(t, { p1: '7' }), /read as a skill/);
+  assert.throws(() => renamePlayers(t, { p1: 'Anna*' }), /end with \*/);
+  assert.throws(() => renamePlayers(t, { x: 'Anna' }), /Unknown player/);
+});
+
+test('swapPlayers swaps two players within a round, also with a sit-out', () => {
+  const t = setResult(make(), 1, 1, 1); // 10 players, 2 courts: 2 sit out
+  const [m1, m2] = t.schedule[1].matches;
+  const [out] = t.schedule[1].sitOuts;
+  const a = m1.team1[0];
+  const b = m2.team2[1];
+  const s = swapPlayers(t, 2, a, b);
+  assert.equal(s.schedule[1].matches[0].team1[0], b);
+  assert.equal(s.schedule[1].matches[1].team2[1], a);
+  assert.deepEqual(s.schedule[0], t.schedule[0], 'other rounds unchanged');
+  const o = swapPlayers(t, 2, a, out);
+  assert.equal(o.schedule[1].matches[0].team1[0], out);
+  assert.ok(o.schedule[1].sitOuts.includes(a));
+  assert.equal(validateTournament(JSON.parse(JSON.stringify(o))).ok, true);
+});
+
+test('swapPlayers refuses matches with a result, hidden rounds and unknown players', () => {
+  const t = setResult(make(), 1, 1, 1); // revealBatch 2: rounds 1–2 revealed
+  const [m1, m2] = t.schedule[0].matches;
+  assert.throws(() => swapPlayers(t, 1, m1.team1[0], m2.team1[0]), /Court 1 already has a result/);
+  assert.equal(swapPlayers(t, 1, m2.team1[0], m2.team2[0]).schedule[0].matches[1].team1[0], m2.team2[0]);
+  assert.throws(() => swapPlayers(t, 3, 'p1', 'p2'), /revealed/);
+  assert.throws(() => swapPlayers(t, 2, 'p1', 'p1'), /two different/);
+  assert.throws(() => swapPlayers(t, 2, 'p1', 'zz'), /not in round 2/);
 });

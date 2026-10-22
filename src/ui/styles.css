@@ -125,6 +125,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .option input { width: auto; accent-color: var(--accent); }
 .options.withdraw { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.names-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 12px; }
 
 /* Segmented controls */
 .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--surface-2); border-radius: 12px; }
@@ -156,6 +157,10 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .team.winner { background: var(--win-soft); border-color: var(--win); color: var(--text); font-weight: 650; }
 .team.winner::after { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--win); color: var(--surface); font-size: .8rem; flex: none; }
 .team.loser { opacity: .55; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { flex: 1 1 120px; min-height: 48px; background: var(--surface-2); border-color: transparent; font-weight: 500; }
+.chip.picked { background: var(--accent-soft); border-color: var(--accent); font-weight: 650; }
+.chip:disabled { opacity: .55; }
 .reveal { width: 100%; margin-top: 10px; min-height: 52px; }
 
 /* All rounds */

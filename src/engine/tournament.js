@@ -173,6 +173,51 @@ export function withdrawPlayers(t, ids, seed) {
   return { ...t, players, schedule: [...past, ...schedule] };
 }
 
+// New names for players, as { id: name }; allowed at any time since the draw only uses
+// ids. Names must stay readable in the players text: not empty, unique, not just a
+// number and without a "*" at the end.
+export function renamePlayers(t, names) {
+  const players = t.players.map((p) => (p.id in names ? { ...p, name: String(names[p.id]).trim() } : p));
+  const seen = new Set();
+  for (const p of players) {
+    if (!p.name) throw new Error('Names cannot be empty');
+    if (/^\d+$/.test(p.name)) throw new Error(`"${p.name}" cannot be a name: it would be read as a skill`);
+    if (p.name.endsWith('*')) throw new Error(`"${p.name}" cannot end with *`);
+    const key = p.name.toLowerCase();
+    if (seen.has(key)) throw new Error(`The name "${p.name}" is used twice`);
+    seen.add(key);
+  }
+  for (const id of Object.keys(names)) {
+    if (!t.players.some((p) => p.id === id)) throw new Error(`Unknown player ${id}`);
+  }
+  return { ...t, players };
+}
+
+// Swaps two players within a round: between the teams of a match, between courts, or
+// with a player who sits out. Matches that already have a result cannot change.
+export function swapPlayers(t, round, a, b) {
+  const r = t.schedule[round - 1];
+  if (!r) throw new Error(`Unknown round ${round}`);
+  if (round > t.revealedRounds) throw new Error('Only revealed rounds can be changed');
+  if (a === b) throw new Error('Choose two different players');
+  const where = (id) => {
+    const m = r.matches.find((x) => x.team1.includes(id) || x.team2.includes(id));
+    if (m) return { m };
+    if (r.sitOuts.includes(id)) return { m: null };
+    throw new Error(`Player ${id} is not in round ${round}`);
+  };
+  for (const { m } of [where(a), where(b)]) {
+    if (m && t.results[resultKey(round, m.court)]) throw new Error(`Court ${m.court} already has a result`);
+  }
+  const swap = (id) => (id === a ? b : id === b ? a : id);
+  const changed = {
+    ...r,
+    matches: r.matches.map((m) => ({ ...m, team1: m.team1.map(swap), team2: m.team2.map(swap) })),
+    sitOuts: r.sitOuts.map(swap),
+  };
+  return { ...t, schedule: t.schedule.map((x, i) => (i === round - 1 ? changed : x)) };
+}
+
 export function setResult(t, round, court, winner) {
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
   if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);

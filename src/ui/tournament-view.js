@@ -1,6 +1,6 @@
 import { h, formatSigned, slugify } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers } from '../engine/tournament.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, swapPlayers } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
@@ -189,7 +189,7 @@ function roundsTab(ctx, t, view) {
   const round = rounds[view.round - 1];
   const nav = h('nav', { class: 'round-nav' }, rounds.map((r) => h('button', {
     class: [r.round === view.round ? 'current' : '', r.complete ? 'complete' : ''].join(' ').trim(),
-    onclick: () => { view.round = r.round; ctx.render(); },
+    onclick: () => { view.round = r.round; view.swapPick = null; ctx.render(); },
   }, String(r.round))));
 
   return [
@@ -200,13 +200,70 @@ function roundsTab(ctx, t, view) {
     starts ? h('p', { class: 'start-time' }, `Starts at ${starts[round.round - 1]}`) : null,
     progress,
     hint,
-    h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
-      courtLine('div', m, numbers),
-      teamButton(ctx, t, round.round, m, 1, numbers),
-      h('div', { class: 'vs' }, 'vs'),
-      teamButton(ctx, t, round.round, m, 2, numbers)))),
-    round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
-    revealButton,
+    view.swapping ? swapPanel(ctx, t, view, round, numbers) : [
+      h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
+        courtLine('div', m, numbers),
+        teamButton(ctx, t, round.round, m, 1, numbers),
+        h('div', { class: 'vs' }, 'vs'),
+        teamButton(ctx, t, round.round, m, 2, numbers)))),
+      round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
+      h('div', { class: 'actions' }, h('button', {
+        onclick: () => {
+          if (!askPassword(ctx, 'Password to swap players:')) return;
+          view.swapping = true;
+          view.swapPick = null;
+          ctx.render();
+        },
+      }, 'Swap players')),
+    ],
+    view.swapping ? null : revealButton,
+  ];
+}
+
+// Tweaking the draw: tap two players of this round to swap them. Matches with a result
+// are locked.
+function swapPanel(ctx, t, view, round, numbers) {
+  const byId = new Map(t.players.map((p) => [p.id, p]));
+  const r = t.schedule[round.round - 1];
+  const tap = (id) => {
+    if (!view.swapPick) view.swapPick = id;
+    else if (view.swapPick === id) view.swapPick = null;
+    else {
+      try {
+        ctx.save(swapPlayers(t, round.round, view.swapPick, id));
+      } catch (error) {
+        ctx.state.message = error.message;
+      }
+      view.swapPick = null;
+    }
+    ctx.render();
+  };
+  const chip = (id, locked) => h('button', {
+    class: `chip${view.swapPick === id ? ' picked' : ''}`,
+    disabled: locked,
+    onclick: () => tap(id),
+  }, `${byId.get(id).name} (${byId.get(id).skill})`);
+  return [
+    h('p', { class: 'warning' }, view.swapPick
+      ? `Now tap the player to swap with ${byId.get(view.swapPick).name}.`
+      : 'Swap mode: tap two players to swap them. Courts with a result are locked.'),
+    h('div', { class: 'matches' }, r.matches.map((m, k) => {
+      const locked = Boolean(t.results[resultKey(round.round, m.court)]);
+      return h('div', { class: `match ${courtColor(m.court)}` },
+        courtLine('div', round.matches[k], numbers),
+        h('div', { class: 'chips' }, m.team1.map((id) => chip(id, locked))),
+        h('div', { class: 'vs' }, locked ? 'vs · has a result' : 'vs'),
+        h('div', { class: 'chips' }, m.team2.map((id) => chip(id, locked))));
+    })),
+    r.sitOuts.length ? h('div', {}, h('p', { class: 'muted' }, 'Sitting out:'), h('div', { class: 'chips' }, r.sitOuts.map((id) => chip(id, false)))) : null,
+    h('div', { class: 'actions' }, h('button', {
+      class: 'primary',
+      onclick: () => {
+        view.swapping = false;
+        view.swapPick = null;
+        ctx.render();
+      },
+    }, 'Done')),
   ];
 }
 
@@ -289,6 +346,31 @@ function withdrawCard(ctx, t) {
     canRedraw ? h('div', { class: 'actions' }, button) : null);
 }
 
+// Names can be corrected at any time; the draw and the results stay as they are.
+function renameCard(ctx, t) {
+  // Edits not saved yet, by player id; kept when saving fails.
+  const edits = (ctx.state.view.names ??= {});
+  const save = () => {
+    const names = Object.fromEntries(Object.entries(edits).filter(([id, name]) => t.players.find((p) => p.id === id)?.name !== name.trim()));
+    if (Object.keys(names).length === 0) return;
+    ctx.state.message = null;
+    try {
+      ctx.save(renamePlayers(t, names));
+      ctx.state.view.names = null;
+    } catch (error) {
+      ctx.state.message = error.message;
+    }
+    ctx.render();
+  };
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Player names'),
+    h('p', { class: 'muted' }, 'Correct names at any time. The draw and the results stay as they are.'),
+    h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
+      h('span', {}, `Skill ${p.skill}${isActive(p) ? '' : ' · withdrew'}`),
+      h('input', { type: 'text', value: edits[p.id] ?? p.name, oninput: (e) => { edits[p.id] = e.target.value; } })))),
+    h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: save }, 'Save names')));
+}
+
 function manageTab(ctx, t) {
   const s = t.settings;
   const locked = hasResults(t);
@@ -330,6 +412,7 @@ function manageTab(ctx, t) {
         },
       }, 'Delete tournament')),
     locked ? h('p', { class: 'muted' }, 'Settings and the draw can only be changed before the first result is entered.') : null,
+    renameCard(ctx, t),
     withdrawCard(ctx, t),
   ];
 }
