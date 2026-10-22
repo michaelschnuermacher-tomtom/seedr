@@ -66,6 +66,7 @@ or paste players in the same format.
    | Teams mixed differently, e.g. 1+9 vs 5+5 (14+ players only) | 5 × (difference in spread)² |
    | Partners far apart in skill, e.g. 1+9 (14+ players only) | 1 × (spread)² per team |
    | Same opponent twice | 1 per repeat |
+   | Same opponent a third time or more (14+ players only) | 30 per meeting |
 
    Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw runs 4 times from different starts, with 100,000 steps in total (200,000 for fewer than 14 players), and the best result wins.
 4. **Seed.** All randomness comes from one seed number stored with the tournament. The same seed and settings always give the same schedule on every device. **Redraw schedule** simply uses a new seed.
