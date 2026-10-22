@@ -1,6 +1,6 @@
 import { h, formatSigned, slugify } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, swapPlayersAcross } from '../engine/tournament.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, renameTournament, swapPlayersAcross } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
@@ -33,7 +33,7 @@ export function tournamentScreen(ctx) {
       h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'), h('h1', {}, t.name))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
       h('button', { class: view.tab === key ? 'current' : '', onclick: () => { view.tab = key; ctx.render(); } }, label))),
-    drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning' }, w)),
+    drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning no-print' }, w)),
     body);
 }
 
@@ -149,7 +149,7 @@ function roundsTab(ctx, t, view) {
   const numbersToggle = h('label', { class: 'toggle' },
     h('input', { type: 'checkbox', checked: numbers, onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
     'Show sums and spreads');
-  const hint = h('p', { class: 'muted' }, 'Tap the winning team. Tap again to clear.',
+  const hint = h('p', { class: 'muted' }, h('span', { class: 'no-print' }, 'Tap the winning team. Tap again to clear.'),
     numbers ? ' Σ = sum of skills (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
@@ -182,6 +182,7 @@ function roundsTab(ctx, t, view) {
     return [
       layoutSwitch,
       numbersToggle,
+      h('h2', { class: 'print-only' }, 'Rounds'),
       progress,
       swapping ? swapHeader(ctx, t, view) : hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
@@ -194,7 +195,7 @@ function roundsTab(ctx, t, view) {
             teamButton(ctx, t, r.round, m, 2, numbers))),
           r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null,
         ]))),
-      swapping ? swapDone(ctx, view) : [swapStart, revealButton],
+      swapping ? swapDone(ctx, view) : [swapStart, revealButton, printButton()],
     ];
   }
 
@@ -221,6 +222,7 @@ function roundsTab(ctx, t, view) {
       round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
       swapStart,
       revealButton,
+      printButton(),
     ],
   ];
 }
@@ -282,10 +284,16 @@ function swapRound(ctx, t, view, round, numbers, mini) {
   ];
 }
 
+// Prints the current tab without photos, buttons and controls (see @media print).
+function printButton() {
+  return h('div', { class: 'actions' }, h('button', { onclick: () => window.print() }, 'Print'));
+}
+
 function standingsTab(t) {
   const rows = computeStandings(t.players, t.schedule, t.results);
   const headers = ['#', 'Player', 'Skill', 'Games', 'Wins', 'Bonus', 'Points', 'Avg. advantage'];
   return [
+    h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
       h('thead', {}, h('tr', {}, headers.map((x) => h('th', {}, x)))),
       h('tbody', {}, rows.map((r) => h('tr', { class: r.withdrawn ? 'withdrawn' : r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
@@ -301,6 +309,7 @@ function standingsTab(t) {
       'Games and bonus count only rounds with all results entered. Bonus: 0.5 points per game fewer than the most games played. ',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
       'Avg. advantage: average difference in team strength per game (positive = played in the stronger team).'),
+    printButton(),
   ];
 }
 
@@ -362,6 +371,25 @@ function withdrawCard(ctx, t) {
 }
 
 // Names can be corrected at any time; the draw and the results stay as they are.
+// The tournament name can be changed at any time.
+function nameCard(ctx, t) {
+  const input = h('input', { type: 'text', value: t.name });
+  const save = () => {
+    if (input.value.trim() === t.name) return;
+    ctx.state.message = null;
+    try {
+      ctx.save(renameTournament(t, input.value));
+    } catch (error) {
+      ctx.state.message = error.message;
+    }
+    ctx.render();
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Tournament name'),
+    h('div', { class: 'row' }, input, h('button', { class: 'primary', onclick: save }, 'Save name')));
+}
+
 function renameCard(ctx, t) {
   // Edits not saved yet, by player id; kept when saving fails.
   const edits = (ctx.state.view.names ??= {});
@@ -391,6 +419,7 @@ function manageTab(ctx, t) {
   const locked = hasResults(t);
   const withdrawn = t.players.length - t.players.filter(isActive).length;
   return [
+    nameCard(ctx, t),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
       fact('Players', withdrawn ? `${t.players.length - withdrawn} (${withdrawn} withdrew)` : t.players.length),
       fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),

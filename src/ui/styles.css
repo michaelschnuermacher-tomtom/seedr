@@ -244,3 +244,21 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
 .standings tr.rank-1 td { background: color-mix(in srgb, #e9c75b 16%, transparent); }
 .standings tr.rank-2 td { background: color-mix(in srgb, #aab4bd 16%, transparent); }
 .standings tr.rank-3 td { background: color-mix(in srgb, #dcae85 18%, transparent); }
+
+/* Printing (Standings and Rounds): keeps the court background and colors, leaves out
+   the banner photos, buttons and controls. */
+.print-only { display: none; }
+@media print {
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-only { display: block; }
+  .no-print, .hero-photo, .hero::after, .hero .back, .eyebrow img, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
+  .screen { max-width: none; padding: 0; }
+  .hero { height: auto; margin: 0 0 12px; background: none; box-shadow: none; overflow: visible; }
+  .hero::before { display: none; }
+  .hero-content { position: static; padding: 0; }
+  .hero .eyebrow { color: var(--accent); }
+  .hero h1 { color: var(--text); text-shadow: none; }
+  .card, .match, .overview-round, .table-wrap { box-shadow: none; }
+  .match, .overview-round, .standings tr { break-inside: avoid; }
+  .team { min-height: 0; }
+}

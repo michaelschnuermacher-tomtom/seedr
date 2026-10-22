@@ -173,6 +173,13 @@ export function withdrawPlayers(t, ids, seed) {
   return { ...t, players, schedule: [...past, ...schedule] };
 }
 
+// The tournament name can change at any time.
+export function renameTournament(t, name) {
+  const trimmed = String(name).trim();
+  if (!trimmed) throw new Error('The tournament name cannot be empty');
+  return { ...t, name: trimmed };
+}
+
 // New names for players, as { id: name }; allowed at any time since the draw only uses
 // ids. Names must stay readable in the players text: not empty, unique, not just a
 // number and without a "*" at the end.

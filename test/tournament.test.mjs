@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, formatPlayers, renamePlayers, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { parsePlayers, formatPlayers, renamePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -254,4 +254,11 @@ test('swapPlayersAcross: two players in different rounds trade places in both ro
   assert.deepEqual(swapPlayersAcross(t, 2, 'p1', 2, 'p2'), swapPlayers(t, 2, 'p1', 'p2'));
   const court = t.schedule[0].matches.find((m) => [...m.team1, ...m.team2].includes('p1')).court;
   assert.throws(() => swapPlayersAcross(setResult(t, 1, court, 1), 2, 'p1', 1, 'p2'), /already has a result/);
+});
+
+test('renameTournament changes the name at any time but not to an empty one', () => {
+  const t = setResult(make(), 1, 1, 1);
+  assert.equal(renameTournament(t, '  Tenerife Cup ').name, 'Tenerife Cup');
+  assert.deepEqual(renameTournament(t, 'x').schedule, t.schedule);
+  assert.throws(() => renameTournament(t, '   '), /cannot be empty/);
 });
