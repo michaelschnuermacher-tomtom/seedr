@@ -8,8 +8,8 @@ const COURT_W = 36;
 const COURT_L = 78;
 const FILL = 0.92; // share of the screen the court takes along its limiting side
 // Printed background: the paper is not known in advance, so the court is drawn for the
-// middle between A4 (0.72) and Letter (0.80) and a little smaller, to fit both whole.
-const PRINT_ASPECT = 0.76;
+// middle between A4 (0.71) and Letter (0.78) and a little smaller, to fit both whole.
+const PRINT_ASPECT = 0.745;
 const PRINT_FILL = 0.84;
 const COLORS = {
   ao: ['#2596be', '#1b7ea3'], // Australian Open: [court, run-off]

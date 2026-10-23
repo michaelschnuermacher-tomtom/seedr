@@ -243,7 +243,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
   .no-print, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
-  .screen { max-width: 160mm; margin: 0 auto; padding: 0; }
+  /* A little room inside the court area at the top and bottom of every page. */
+  .screen { max-width: 160mm; margin: 0 auto; padding: 4mm 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
   .top h1 { font-size: 2rem; }
   /* Stripe and logo are printed in the top margin of every page instead (print-header.js);
      the court fills the printable area, so the margins stay white. */
@@ -259,7 +260,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .team .won { display: inline; margin-left: 2mm; font-weight: 700; color: var(--win); }
   .team.winner .names { font-weight: 700; }
   /* All rounds: compact cards, three rows of two (6 rounds) per page. */
-  @page { margin: 24mm 12mm 14mm; }
+  @page { margin: 24mm 12mm 10mm; }
   .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
   .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
