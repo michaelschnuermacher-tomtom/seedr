@@ -121,7 +121,7 @@ export function tournamentSummary(t) {
   const favourites = decided.filter((m) => m.gap < 0).length;
   add('📊', 'By the numbers', `${matches.length} ${matches.length === 1 ? 'match' : 'matches'} played. `
     + (decided.length
-      ? `The stronger team won ${favourites} of ${decided.length} with a gap; ${plural(upsets.length, 'upset')}.`
+      ? `The stronger team won ${favourites} of ${decided.length} (even matches not counted); ${plural(upsets.length, 'upset')}.`
       : 'All of them between teams of exactly the same value.'));
   return out;
 }

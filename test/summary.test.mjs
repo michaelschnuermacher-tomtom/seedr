@@ -26,7 +26,7 @@ test('the summary tells the highlights of the results', () => {
   assert.match(s['Dream team'], /Anna & Ben: 2 wins in 2 games together, unbeaten/);
   assert.match(s['Perfect record'], /^Ben won every game/);
   assert.match(s.Rivals, /^Anna and David faced each other 2 times: Anna leads 2:0/);
-  assert.match(s['By the numbers'], /3 matches played\. The stronger team won 0 of 3 with a gap; 3 upsets\./);
+  assert.match(s['By the numbers'], /3 matches played\. The stronger team won 0 of 3 \(even matches not counted\); 3 upsets\./);
 });
 
 test('no highlights before a round is complete', () => {
@@ -36,7 +36,7 @@ test('no highlights before a round is complete', () => {
 test('highlights only appear when there is something to tell', () => {
   const s = summary({ '1-1': 2 }); // only round 1: the stronger team wins
   assert.ok(!('Upset of the tournament' in s) && !('Rivals' in s) && !('Perfect record' in s));
-  assert.match(s['By the numbers'], /1 match played\. The stronger team won 1 of 1 with a gap; 0 upsets\./);
+  assert.match(s['By the numbers'], /1 match played\. The stronger team won 1 of 1 \(even matches not counted\); 0 upsets\./);
 });
 
 test('edges are shown like in the standings, and a single win together is no dream team', () => {

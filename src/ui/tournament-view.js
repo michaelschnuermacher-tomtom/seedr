@@ -20,7 +20,7 @@ export function tournamentScreen(ctx) {
   const view = (ctx.state.view ??= { tab: 'rounds' });
   const body = view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
-      : view.tab === 'print' ? [summaryCard(t), standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, swapping: false })]
+      : view.tab === 'print' ? [summaryCard(t), skillsCard(t), standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, swapping: false })]
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
@@ -85,15 +85,13 @@ function teamButton(ctx, t, round, match, n) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]),
-    // The team value in a small column on the right.
-    h('span', { class: 'side' }, h('span', { class: 'value' }, formatValue(team.value))));
+  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]));
 }
 
-// Court label, with how far apart the two teams are.
+// Court label, with the edge of the match: how much stronger one team is (team values).
 function courtLine(tag, m) {
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)}`));
+    h('span', { class: 'gaps' }, `Edge ${formatValue(m.valueGap)}`));
 }
 
 // Manage asks for this password every time it is opened. It
@@ -233,7 +231,7 @@ function standingsTab(t) {
       'Games count only rounds with all results entered. ',
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
-      'Edge: the average head start of the team a player played in, per game, as the gap between the two team values: + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
+      'Edge: how much stronger, on average, the team a player played in was than its opponents (team values): + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
   ];
 }
 
@@ -352,10 +350,10 @@ function qualityCard(t) {
   return h('section', { class: 'card' },
     h('h2', { class: 'card-title' }, 'Draw quality'),
     warnings,
-    h('p', { class: 'muted' }, `Team value gap = difference between the two teams' values (sum of skills + ¼ of the spread)${scope}.`),
+    h('p', { class: 'muted' }, `Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread)${scope}.`),
     h('dl', { class: 'facts' },
-      fact('Average gap', formatValue(Math.round(q.avgGap * 100) / 100)),
-      fact('Biggest gap', q.worst ? `${formatValue(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
+      fact('Average edge', formatValue(Math.round(q.avgGap * 100) / 100)),
+      fact('Biggest edge', q.worst ? `${formatValue(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
       fact('Different partners', `${one(q.partners.distinct)} per player${q.partners.repeats ? `, ${q.partners.repeats} repeated` : ', none repeated'}`),
       fact('Different opponents', `${one(q.opponents.distinct)} per player`),
       fact('Repeated opponents', q.opponents.repeats
@@ -368,6 +366,17 @@ function qualityCard(t) {
 
 // Everything that changes or reveals the draw, behind the Manage password.
 // Fun highlights of the results so far (Manage and the top of the printout).
+// How the players were assessed, for the printout: one line per skill, like the player list.
+function skillsCard(t) {
+  const skills = [...new Set(t.players.map((p) => p.skill))].sort((a, b) => a - b);
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Player skills'),
+    h('p', { class: 'muted' }, 'Skill 1 is the best, 10 the weakest.'),
+    h('dl', { class: 'facts' }, skills.map((skill) => fact(`Skill ${skill}`, t.players.filter((p) => p.skill === skill)
+      .map((p) => (isActive(p) ? p.name : `${p.name} (withdrew)`)).join(', ')))),
+    h('div', { style: 'height: 12px' }));
+}
+
 function summaryCard(t) {
   const highlights = tournamentSummary(t);
   return h('section', { class: 'card summary' },
