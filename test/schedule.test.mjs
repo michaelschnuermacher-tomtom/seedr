@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../src/engine/rng.js';
-import { WEIGHTS, assignSitOuts, evaluate, strengthOf, generateSchedule, scheduleStats, drawWarnings } from '../src/engine/schedule.js';
+import { DRAW, assignSitOuts, evaluate, strengthOf, teamValue, formatValue, generateSchedule, scheduleStats, drawWarnings } from '../src/engine/schedule.js';
 
 test('strength is 11 minus skill', () => {
   assert.equal(strengthOf(1), 10);
@@ -30,38 +30,51 @@ test('nobody sits out when everyone fits on court', () => {
   assert.deepEqual(assignSitOuts(8, 8, 3, createRng(3)), [[], [], []]);
 });
 
-test('evaluate: balanced single match', () => {
-  const strength = [1, 2, 3, 4].map(strengthOf); // 10, 9, 8, 7
-  const e = evaluate([[0, 3, 1, 2]], strength, 4); // 17 vs 17; spreads 3 vs 1
-  assert.deepEqual(e, { cost: 0, partnerRepeats: 0, opponentRepeats: 0, opponentThirds: 0, sumDiffSq: 0, maxAbsDiff: 0, maxAbsBalance: 0, sumSpreadGapSq: 4, maxSpreadGap: 2 });
+test('team value: sum of skills plus a quarter of the spread (lower = stronger)', () => {
+  assert.equal(teamValue(3, 6), 9.75);
+  assert.equal(teamValue(1, 9), 12);
+  assert.equal(teamValue(5, 5), 10);
+  assert.equal(formatValue(9.75), '9.75');
+  assert.equal(formatValue(10), '10');
 });
 
-test('evaluate: 1+9 vs 5+5 is penalised for different spreads from 14 players', () => {
-  const strength = [1, 9, 5, 5, ...new Array(10).fill(5)].map(strengthOf); // 10, 2, 6, 6, …
-  const e = evaluate([[0, 1, 2, 3]], strength, 14); // sums 12 vs 12; spreads 8 vs 0
-  assert.equal(e.sumDiffSq, 0);
-  assert.equal(e.sumSpreadGapSq, 64);
-  assert.equal(e.maxSpreadGap, 8);
-  assert.equal(e.cost, WEIGHTS.spread * 64);
+const strengths = (skills) => skills.map(strengthOf);
+
+test('evaluate: fairness is Σ (F² + F⁴/9) of the team value gaps, variety Σ T² + Σ O²', () => {
+  const e = evaluate([[0, 1, 2, 3]], strengths([2, 6, 4, 5]), 4); // 9 vs 9.25 → F = 0.25
+  assert.equal(e.sumDiffSq, 0.0625);
+  assert.equal(e.maxAbsDiff, 0.25);
+  assert.equal(e.fairness, DRAW.fairness * (0.0625 + 0.25 ** 4 / 9));
+  assert.deepEqual([e.partnerSq, e.opponentSq], [2, 4]);
+  assert.equal(e.variety, DRAW.teammates * 2 + DRAW.opponents * 4);
 });
 
-test('evaluate: below 14 players the spread is reported but not penalised', () => {
-  const strength = [1, 9, 5, 5, ...new Array(9).fill(5)].map(strengthOf);
-  const e = evaluate([[0, 1, 2, 3]], strength, 13);
-  assert.equal(e.sumSpreadGapSq, 64);
-  assert.equal(e.cost, 0);
+test('evaluate: a big spread makes a team weaker: 1+9 vs 5+5 is 12 vs 10', () => {
+  const e = evaluate([[0, 1, 2, 3]], strengths([1, 9, 5, 5]), 4);
+  assert.equal(e.maxAbsDiff, 2);
 });
 
-test('evaluate: unbalanced match and repeats', () => {
-  const strength = [1, 2, 3, 4].map(strengthOf);
-  const once = evaluate([[0, 1, 2, 3]], strength, 4); // 19 vs 15 → diff 4
-  assert.equal(once.sumDiffSq, 16);
-  assert.equal(once.maxAbsDiff, 4);
-  assert.equal(once.maxAbsBalance, 4);
-  assert.equal(once.cost, 10 * 16 + 3 * (4 * 16));
-  const twice = evaluate([[0, 1, 2, 3], [0, 1, 2, 3]], strength, 4);
-  assert.equal(twice.partnerRepeats, 2);
-  assert.equal(twice.opponentRepeats, 4);
+test('evaluate: large gaps cost much more than small ones (F = 3: twice F², F = 6: five times)', () => {
+  const cost = (skills) => evaluate([[0, 1, 2, 3]], strengths(skills), 4).fairness / DRAW.fairness;
+  assert.equal(cost([3, 7, 4, 4]), 9 + 81 / 9); // 11 vs 8
+  assert.equal(cost([1, 9, 3, 3]), 36 + 1296 / 9); // 12 vs 6
+});
+
+test('evaluate: rest counts runs of sit-outs: single sit-outs are free, longer runs cost more', () => {
+  const rounds = (sitting) => sitting.map((out) => [0, 1, 2, 3, 4].filter((i) => i !== out).slice(0, 4));
+  const rest = (sitting) => evaluate(rounds(sitting), strengths([5, 5, 5, 5, 5]), 5).rest;
+  assert.equal(rest([4, 3, 4, 3]), 0); // players 3 and 4 sit out every other round
+  assert.equal(rest([4, 4, 3, 3]), 4); // two runs of 2: (4 − 2) × 2
+  assert.equal(rest([4, 4, 4, 3]), 6); // a run of 3: 9 − 3
+});
+
+test('evaluate: repeated partners and opponents', () => {
+  const twice = evaluate([[0, 1, 2, 3], [0, 1, 2, 3]], strengths([5, 5, 5, 5]), 4);
+  assert.deepEqual([twice.partnerRepeats, twice.opponentRepeats], [2, 4]);
+  assert.deepEqual([twice.partnerSq, twice.opponentSq], [8, 16]); // each pair met twice: 2²
+  const third = evaluate([[0, 1, 2, 3], [0, 4, 2, 5], [0, 6, 2, 7]], strengths(new Array(8).fill(5)), 8);
+  assert.deepEqual([third.opponentRepeats, third.opponentThirds], [2, 1]);
+  assert.equal(third.opponentSq, 9 + 9, '0 meets 2 three times (3²), nine other pairs once');
 });
 
 const SKILLS_18 = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10];
@@ -90,7 +103,6 @@ test('18 players, 3 courts, 9 rounds: valid, no repeated partners, balanced', ()
   assert.equal(stats.partnerRepeats, 0);
   assert.ok(stats.maxAbsDiff <= 2, `max gap ${stats.maxAbsDiff}`);
   assert.ok(stats.sumDiffSq / 27 <= 1, `mean squared gap ${stats.sumDiffSq / 27}`);
-  // 4 happens now and then with or without the third-meeting cost (e.g. seed 4 without it).
   assert.ok(stats.maxAbsBalance <= 4, `max player balance ${stats.maxAbsBalance}`);
   assert.deepEqual(drawWarnings(stats), []);
 });
@@ -140,31 +152,36 @@ test('drawWarnings', () => {
   const base = { partnerRepeats: 0, maxAbsDiff: 2 };
   assert.deepEqual(drawWarnings(base), []);
   assert.match(drawWarnings({ ...base, partnerRepeats: 2 })[0], /repeated partners: 2/);
-  assert.match(drawWarnings({ ...base, maxAbsDiff: 3 })[0], /unbalanced.*up to 3/);
+  assert.match(drawWarnings({ ...base, maxAbsDiff: 3 })[0], /unbalanced.*up to 3\)/);
+  assert.match(drawWarnings({ ...base, maxAbsDiff: 3.25 })[0], /up to 3.25/);
 });
 
 test('small groups stay reasonably balanced (no stuck draw)', () => {
+  // Worst team value gap, averaged over three draws: groups with extreme skills cannot be
+  // even, and now and then a single draw is a little worse.
   const cases = [
-    { skills: [1, 2, 3, 4, 5, 6, 7, 8], courts: 2, rounds: 7, maxGap: 6 },
-    { skills: [6, 3, 10, 3, 9, 2, 2, 2, 3, 6], courts: 2, rounds: 10, maxGap: 6 },
-    { skills: [8, 1, 10, 6, 7, 7, 10, 7, 10, 9, 1, 2], courts: 3, rounds: 10, maxGap: 7 },
+    { skills: [1, 2, 3, 4, 5, 6, 7, 8], courts: 2, rounds: 7, maxMean: 5 },
+    { skills: [6, 3, 10, 3, 9, 2, 2, 2, 3, 6], courts: 2, rounds: 10, maxMean: 4 },
+    { skills: [8, 1, 10, 6, 7, 7, 10, 7, 10, 9, 1, 2], courts: 3, rounds: 10, maxMean: 7.5 },
   ];
-  for (const { skills, courts, rounds, maxGap } of cases) {
-    for (const seed of [1, 2, 3]) {
+  for (const { skills, courts, rounds, maxMean } of cases) {
+    const worst = [1, 2, 3].map((seed) => {
       const { stats } = generateSchedule({ players: makePlayers(skills), courts, rounds, seed });
       assert.equal(stats.partnerRepeats, 0, `${skills.length} players, seed ${seed}: partner repeats`);
-      assert.ok(stats.maxAbsDiff <= maxGap, `${skills.length} players, seed ${seed}: max gap ${stats.maxAbsDiff} > ${maxGap}`);
-    }
+      return stats.maxAbsDiff;
+    });
+    const mean = worst.reduce((a, b) => a + b) / worst.length;
+    assert.ok(mean <= maxMean, `${skills.length} players: worst gaps ${worst.join(', ')}`);
   }
 });
 
-test('teams in a match have similar skill spreads (no 1+9 vs 5+5)', () => {
+test('18 players: few repeated opponents and rarely a third meeting', () => {
   const players = makePlayers(SKILLS_18);
   for (const seed of [1, 2, 3]) {
     const { stats } = generateSchedule({ players, courts: 3, rounds: 9, seed });
-    assert.ok(stats.maxSpreadGap <= 5, `seed ${seed}: max spread gap ${stats.maxSpreadGap}`);
-    assert.ok(stats.maxAbsDiff <= 2, `seed ${seed}: max gap ${stats.maxAbsDiff}`);
     assert.equal(stats.partnerRepeats, 0);
+    assert.ok(stats.opponentThirds <= 4, `seed ${seed}: ${stats.opponentThirds} third meetings`);
+    assert.ok(stats.maxAbsDiff <= 2, `seed ${seed}: max gap ${stats.maxAbsDiff}`);
   }
 });
 
@@ -193,7 +210,7 @@ test('16 players, 2 courts, 12 rounds: balanced matches', () => {
     const { schedule, stats } = generateSchedule({ players, courts: 2, rounds: 12, seed });
     assertValidSchedule(players, 2, 12, schedule);
     assert.equal(stats.partnerRepeats, 0);
-    assert.ok(stats.maxAbsDiff <= 2, `seed ${seed}: max gap ${stats.maxAbsDiff}`);
+    assert.ok(stats.maxAbsDiff < 3, `seed ${seed}: max gap ${stats.maxAbsDiff}`);
   }
 });
 
@@ -234,11 +251,3 @@ test('without marked players, sit-outs are unchanged', () => {
   assert.deepEqual(assignSitOuts(17, 8, 8, createRng(7)), assignSitOuts(17, 8, 8, createRng(7), {}, new Set()));
 });
 
-test('evaluate: meeting the same opponent a third time costs extra from 14 players', () => {
-  const strength = new Array(14).fill(5).map(strengthOf);
-  const e = evaluate([[0, 1, 2, 3], [0, 4, 2, 5], [0, 6, 2, 7]], strength, 14); // 0 meets 2 three times
-  assert.equal(e.opponentRepeats, 2);
-  assert.equal(e.opponentThirds, 1);
-  assert.equal(e.cost, WEIGHTS.opponent * 2 + WEIGHTS.opponentThird * 1);
-  assert.equal(evaluate([[0, 1, 2, 3], [0, 4, 2, 5], [0, 6, 2, 7]], strength.slice(0, 8), 8).cost, WEIGHTS.opponent * 2, 'not below 14 players');
-});

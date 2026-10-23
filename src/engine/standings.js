@@ -1,4 +1,4 @@
-import { strengthOf } from './schedule.js';
+import { teamValue } from './schedule.js';
 
 export function resultKey(round, court) {
   return `${round}-${court}`;
@@ -7,7 +7,8 @@ export function resultKey(round, court) {
 export function computeStandings(players, schedule, results) {
   const skillOf = new Map(players.map((p) => [p.id, p.skill]));
   const rows = new Map(players.map((p) => [p.id, { id: p.id, name: p.name, skill: p.skill, games: 0, wins: 0, gapSum: 0 }]));
-  const teamStrength = (team) => team.reduce((sum, pid) => sum + strengthOf(skillOf.get(pid)), 0);
+  // Team value as balanced by the draw (lower = stronger).
+  const value = (team) => teamValue(skillOf.get(team[0]), skillOf.get(team[1]));
 
   for (const round of schedule) {
     const winners = round.matches.map((m) => results[resultKey(round.round, m.court)]);
@@ -18,7 +19,7 @@ export function computeStandings(players, schedule, results) {
     const complete = round.matches.length > 0 && winners.every((w) => w === 1 || w === 2);
     if (!complete) continue;
     for (const m of round.matches) {
-      const diff = teamStrength(m.team1) - teamStrength(m.team2);
+      const diff = value(m.team2) - value(m.team1); // positive: team 1 is stronger
       for (const pid of m.team1) { rows.get(pid).games++; rows.get(pid).gapSum += diff; }
       for (const pid of m.team2) { rows.get(pid).games++; rows.get(pid).gapSum -= diff; }
     }

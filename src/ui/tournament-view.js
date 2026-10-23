@@ -2,7 +2,7 @@ import { h, formatSigned, slugify } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, renameTournament, swapPlayersAcross } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
-import { scheduleStats, drawWarnings } from '../engine/schedule.js';
+import { scheduleStats, drawWarnings, teamValue, formatValue } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { roundStartTimes } from '../engine/timeplan.js';
 import { saveFile, downloadFile } from './export.js';
@@ -44,7 +44,7 @@ export function roundsOverview(t) {
     const skills = ids.map((id) => byId.get(id).skill);
     return {
       names: ids.map((id) => byId.get(id).name).join(' + '),
-      sum: skills.reduce((sum, s) => sum + s, 0),
+      value: teamValue(skills[0], skills[1]),
       spread: Math.max(...skills) - Math.min(...skills),
     };
   };
@@ -58,7 +58,7 @@ export function roundsOverview(t) {
         court: m.court,
         team1,
         team2,
-        sumGap: Math.abs(team1.sum - team2.sum),
+        valueGap: Math.abs(team1.value - team2.value),
         spreadGap: Math.abs(team1.spread - team2.spread),
         winner: t.results[resultKey(r.round, m.court)],
       };
@@ -81,13 +81,13 @@ function teamButton(ctx, t, round, match, n, numbers) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'sum' }, `Σ ${team.sum} · ↔ ${team.spread}`) : null);
+  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'sum' }, `${formatValue(team.value)} · ↔ ${team.spread}`) : null);
 }
 
 // Court label, with how far apart the two teams are when numbers are shown.
 function courtLine(tag, m, numbers) {
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    numbers ? h('span', { class: 'gaps' }, `Gap Σ ${m.sumGap} · ↔ ${m.spreadGap}`) : null);
+    numbers ? h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)} · ↔ ${m.spreadGap}`) : null);
 }
 
 // Whether team sums and spreads are shown; remembered on this device.
@@ -150,7 +150,7 @@ function roundsTab(ctx, t, view) {
     h('input', { type: 'checkbox', checked: numbers, onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
     'Show sums and spreads');
   const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.',
-    numbers ? ' Σ = sum of skills (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
+    numbers ? ' Team value = sum of skills + ¼ of the spread (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
     h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
@@ -310,7 +310,7 @@ function standingsTab(t) {
       'Games count only rounds with all results entered. ',
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
-      'Avg. advantage: average difference in team strength per game (positive = played in the stronger team).'),
+      'Avg. advantage: average difference in team value per game (positive = played in the stronger team).'),
     printButton(),
   ];
 }

@@ -45,7 +45,7 @@ or paste players in the same format.
 
 | Setting | What it does |
 |---|---|
-| Players and skill | Skill 1 is the best, 10 the weakest. For the draw it becomes a *strength* of `11 − skill`, so 1 → 10 and 10 → 1. A team's strength is the sum of its two players' strengths. |
+| Players and skill | Skill 1 is the best, 10 the weakest. A team's *value* is the sum of both skills plus a quarter of their difference (the *spread*), since opponents can play to the weaker partner: 3 + 6 → 9.75, 1 + 9 → 12. Lower is stronger. |
 | Courts | Up to 4 players per court play each round. With fewer than `4 × courts` players, only as many courts are used as there are full groups of 4. |
 | Total time, break | From these, Seedr works out every number of rounds that fits: match length = total time ÷ rounds − break, rounded down, at least 5 minutes. |
 | Rounds and match length | Chosen from a dropdown of these options only. Options where everyone plays the same number of games come first. If leaving courts empty in the last round means fewer players get fewer games, that is offered as an extra option, e.g. "9 rounds (last round on 1 court)". Only the number of rounds affects the draw. Match length and break are only used for the time plan. |
@@ -54,23 +54,24 @@ or paste players in the same format.
 
 ### Steps
 
-1. **Who sits out.** Each round, `players − 4 × courts used` players sit out. The players who have sat out least so far sit out first, so nobody sits out twice before everyone has sat out once. Among equals, players who sat out in the previous round are skipped where possible, and the rest are chosen at random. When the games can't come out even, players marked with `*` after their name (e.g. `4: Gesa*, Henri`, or `Gesa: 4 *` on a line of their own) are the ones who get fewer games. Only as many players can be marked as there are players who get fewer games; any extra places are drawn at random.
-2. **Starting teams.** Each round's players are shuffled into teams of two and paired into matches.
-3. **Improvement.** The draw then repeatedly makes small changes: it swaps two players, or two whole teams between courts in the same round. Each change is scored, and lower scores are better:
+1. **How often everyone sits out.** Each round, `players − 4 × courts used` players sit out, and everyone sits out equally often (at most one apart). When the games can't come out even, players marked with `*` after their name (e.g. `4: Gesa*, Henri`, or `Gesa: 4 *` on a line of their own) are the ones who get fewer games. Only as many players can be marked as there are players who get fewer games; any extra places are drawn at random. These numbers never change during the draw.
+2. **Starting draw.** A first rotation decides who sits out in which round, and each round's players are shuffled into teams and matches.
+3. **Improvement.** The draw then repeatedly makes small changes: it swaps two players or two whole teams in a round, or *exchanges sit-outs* between two rounds (Anna plays in round 3 instead of round 6, Ben the other way round, so both keep their number of games). Moving sit-outs lets players meet who would otherwise never be on court in the same round. Each change is scored, and lower scores are better. F is the difference of the two team values in a match:
 
-   | Rule | Weight |
-   |---|---|
-   | Same partner twice | 10,000 per repeat (practically forbidden) |
-   | Unequal teams in a match | 10 × (strength difference)² |
-   | One player always in the stronger or weaker team | 3 × (that player's total advantage)² |
-   | Teams mixed differently, e.g. 1+9 vs 5+5 (14+ players only) | 5 × (difference in spread)² |
-   | Same opponent twice | 1 per repeat |
-   | Same opponent a third time or more (14+ players only) | 30 per meeting |
+   | Rule | What counts | Weight |
+   |---|---|---|
+   | Fair matches | Σ (F² + F⁴/9) over all matches: small gaps cost about F², large ones much more | 10 |
+   | Different partners | Σ (times two players were partners)² | 3 |
+   | Different opponents | Σ (times two players were opponents)² | 1 |
+   | Games spread out | Σ (length of each run of sit-outs)² − sit-outs: single sit-outs are free, longer runs cost more | 50 |
+   | Same partner twice | per repeat (practically forbidden) | 10,000 |
 
-   Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw runs 4 times from different starts, with 100,000 steps in total (200,000 for fewer than 14 players), and the best result wins.
+   It works in two stages. **Fairness first:** 4 searches from different starts look only at fair matches (plus games spread out and no repeated partners); the fairest wins. **Then variety:** starting from it, the draw looks for different partners and opponents, but fair matches may get at most 10% worse than the best found.
+
+   Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw uses 100,000 steps in total (200,000 for fewer than 14 players).
 4. **Seed.** All randomness comes from one seed number stored with the tournament. The same seed and settings always give the same schedule on every device. **Redraw schedule** simply uses a new seed.
 
-If repeated partners or unbalanced matches can't be avoided (team strength gap of 3 or more), the tournament screen shows a warning. This happens with few players or very different skill levels.
+If repeated partners or unbalanced matches can't be avoided (team value gap of 3 or more), the tournament screen shows a warning. This happens with few players or very different skill levels.
 
 ### Standings
 
@@ -80,8 +81,8 @@ A win gives each player in the team 1 point. Players with fewer games than the m
 
 If a player can't continue, open **Manage → Player leaves**, tick the players and choose **Withdraw and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
 - it avoids partners players already had;
-- it continues each player's balance of stronger and weaker teams;
-- whoever has sat out least so far sits out first.
+- it counts the opponents players already met, so they meet others first;
+- whoever has sat out least so far sits out first, and games stay spread out.
 
 Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, remove players with **Edit settings** instead.
 

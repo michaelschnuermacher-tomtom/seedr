@@ -34,8 +34,8 @@ test('after round 1: winners lead, sit-out gets 0.5 bonus', () => {
   assert.deepEqual([rows.p2.points, rows.p2.rank], [1, 1]);
   assert.deepEqual([rows.p5.games, rows.p5.bonus, rows.p5.points, rows.p5.rank], [0, 0.5, 0.5, 3]);
   assert.deepEqual([rows.p3.points, rows.p3.rank], [0, 4]);
-  assert.equal(rows.p1.avgGap, 1); // 16 vs 15
-  assert.equal(rows.p3.avgGap, -1);
+  assert.equal(rows.p1.avgGap, 0.25); // team values 7 (1+5) vs 7.25 (3+4)
+  assert.equal(rows.p3.avgGap, -0.25);
 });
 
 test('after round 2: shared ranks and bonus for both sit-outs', () => {

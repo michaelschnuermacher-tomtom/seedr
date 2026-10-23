@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTournament, setResult } from '../src/engine/tournament.js';
+import { teamValue } from '../src/engine/schedule.js';
 import { roundsOverview, isAllRoundsPassword } from '../src/ui/tournament-view.js';
 
 const make = (revealBatch) => createTournament({
@@ -14,7 +15,7 @@ test('only revealed rounds are listed', () => {
   assert.deepEqual(roundsOverview(make('all')).map((r) => r.round), [1, 2, 3, 4, 5]);
 });
 
-test('each match shows names, skill sums and the winner', () => {
+test('each match shows names, team values and the winner', () => {
   const t = make('all');
   const m = t.schedule[0].matches[0];
   const byId = new Map(t.players.map((p) => [p.id, p]));
@@ -23,7 +24,7 @@ test('each match shows names, skill sums and the winner', () => {
   assert.equal(first.matches[0].winner, 2);
   assert.equal(first.matches[1].winner, undefined);
   assert.equal(first.matches[0].team1.names, m.team1.map((id) => byId.get(id).name).join(' + '));
-  assert.equal(first.matches[0].team1.sum, m.team1.reduce((s, id) => s + byId.get(id).skill, 0));
+  assert.equal(first.matches[0].team1.value, teamValue(...m.team1.map((id) => byId.get(id).skill)));
   assert.equal(first.sitOuts.length, 2);
   assert.equal(first.complete, false);
 });
@@ -49,10 +50,10 @@ test('each match has team spreads and the gaps between the teams', () => {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const m = t.schedule[0].matches[0];
   const spread = (ids) => Math.abs(byId.get(ids[0]).skill - byId.get(ids[1]).skill);
-  const sum = (ids) => byId.get(ids[0]).skill + byId.get(ids[1]).skill;
+  const value = (ids) => teamValue(byId.get(ids[0]).skill, byId.get(ids[1]).skill);
   const [first] = roundsOverview(t);
   const x = first.matches[0];
   assert.equal(x.team1.spread, spread(m.team1));
-  assert.equal(x.sumGap, Math.abs(sum(m.team1) - sum(m.team2)));
+  assert.equal(x.valueGap, Math.abs(value(m.team1) - value(m.team2)));
   assert.equal(x.spreadGap, Math.abs(spread(m.team1) - spread(m.team2)));
 });
