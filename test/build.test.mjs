@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { bundle, build } from '../build.mjs';
 import { readFileSync as readDist, existsSync } from 'node:fs';
-import { PHOTOS } from '../src/ui/photo-list.js';
 
 function fixture(files) {
   const dir = mkdtempSync(join(tmpdir(), 'seedr-bundle-'));
@@ -39,11 +38,14 @@ test('the app bundle compiles', () => {
   assert.doesNotMatch(code, /<\/script/i);
 });
 
-test('the build copies the photos and lets the service worker precache them', () => {
+test('the build copies the icons and lets the service worker precache them', () => {
   const out = mkdtempSync(join(tmpdir(), 'seedr-dist-'));
   build(out);
   const dist = (p) => join(out, p);
-  for (const p of PHOTOS) assert.ok(existsSync(dist(p)), `dist/${p} is missing`);
+  const icons = ['icons/logo.svg', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+  for (const p of icons) assert.ok(existsSync(dist(p)), `dist/${p} is missing`);
+  assert.ok(!existsSync(dist('photos')), 'no photos folder');
   const sw = readDist(dist('sw.js'), 'utf8');
-  for (const p of PHOTOS) assert.ok(sw.includes(`'./${p}'`), `sw.js does not precache ${p}`);
+  for (const p of icons) assert.ok(sw.includes(`'./${p}'`), `sw.js does not precache ${p}`);
+  assert.doesNotMatch(sw, /photos\//);
 });

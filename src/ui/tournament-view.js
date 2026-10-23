@@ -8,7 +8,6 @@ import { roundStartTimes } from '../engine/timeplan.js';
 import { drawQuality } from '../engine/quality.js';
 import { saveFile, downloadFile } from './export.js';
 import { draftFromTournament } from './setup.js';
-import { photoHero } from './hero.js';
 
 const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['manage', 'Manage']];
 
@@ -29,11 +28,19 @@ export function tournamentScreen(ctx) {
     : view.tab === 'manage' ? manageTab(ctx, t)
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
-    photoHero(
+    h('header', { class: 'top' },
       h('button', { class: 'back', onclick: () => ctx.go('home') }, '‹ Home'),
       h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'), h('h1', {}, t.name))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
-      h('button', { class: view.tab === key ? 'current' : '', onclick: () => { view.tab = key; ctx.render(); } }, label))),
+      h('button', {
+        class: view.tab === key ? 'current' : '',
+        onclick: () => {
+          // Manage holds every option that changes or reveals the draw: password each time.
+          if (key === 'manage' && view.tab !== 'manage' && !askPassword(ctx, 'Password for Manage:')) return;
+          view.tab = key;
+          ctx.render();
+        },
+      }, label))),
     drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning no-print' }, w)),
     body);
 }
@@ -114,7 +121,7 @@ function setShowNumbers(ctx, on) {
   }
 }
 
-// The "All rounds" view (once per page load) and every reveal ask for this password. It
+// Manage asks for this password every time it is opened. It
 // only keeps players from peeking: anyone can read it in the app's source.
 const ALL_ROUNDS_PASSWORD = 'Tenerife';
 
@@ -134,22 +141,10 @@ function askPassword(ctx, question) {
 function roundsTab(ctx, t, view) {
   const rounds = roundsOverview(t);
   const starts = t.settings.endTime ? roundStartTimes(t.settings) : null;
+  // The view (one round or all), the numbers, revealing, swapping and printing are all
+  // set in Manage.
   const layout = view.layout ?? 'one';
-
-  const chooseLayout = (key) => {
-    if (key === 'all' && !ctx.state.allRoundsUnlocked) {
-      if (!askPassword(ctx, 'Password for all rounds:')) return;
-      ctx.state.allRoundsUnlocked = true;
-    }
-    view.layout = key;
-    ctx.render();
-  };
-  const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
-    h('button', { class: layout === key ? 'current' : '', onclick: () => chooseLayout(key) }, label)));
   const numbers = showNumbers(ctx);
-  const numbersToggle = h('label', { class: 'toggle' },
-    h('input', { type: 'checkbox', checked: numbers, onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
-    'Show sums and spreads');
   const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.',
     numbers ? ' Team value = sum of skills + ¼ of the spread (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
@@ -157,32 +152,11 @@ function roundsTab(ctx, t, view) {
     h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
 
   const hidden = t.settings.rounds - t.revealedRounds;
-  const step = t.settings.revealBatch === 'all' ? hidden : Math.min(t.settings.revealBatch, hidden);
-  const from = t.revealedRounds + 1;
-  const revealButton = hidden > 0 ? h('button', {
-    class: 'reveal primary',
-    onclick: () => {
-      if (!askPassword(ctx, step === 1 ? `Password to reveal round ${from}:` : `Password to reveal rounds ${from}–${from + step - 1}:`)) return;
-      ctx.save(revealNext(t));
-      view.round = from;
-      ctx.render();
-    },
-  }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
-
+  const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
   const swapping = Boolean(view.swapping);
-  const swapStart = h('div', { class: 'actions' }, h('button', {
-    onclick: () => {
-      if (!askPassword(ctx, 'Password to swap players:')) return;
-      view.swapping = true;
-      view.swapPick = null;
-      ctx.render();
-    },
-  }, 'Swap players'));
 
   if (layout === 'all') {
     return [
-      layoutSwitch,
-      numbersToggle,
       h('h2', { class: 'print-only' }, 'Rounds'),
       progress,
       swapping ? swapHeader(ctx, t, view) : hint,
@@ -196,7 +170,7 @@ function roundsTab(ctx, t, view) {
             teamButton(ctx, t, r.round, m, 2, numbers))),
           r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null,
         ]))),
-      swapping ? swapDone(ctx, view) : [swapStart, revealButton, printButton()],
+      swapping ? swapDone(ctx, view) : comingUp,
     ];
   }
 
@@ -207,8 +181,6 @@ function roundsTab(ctx, t, view) {
   }, String(r.round))));
 
   return [
-    layoutSwitch,
-    numbersToggle,
     nav,
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
     starts ? h('p', { class: 'start-time' }, `Starts at ${starts[round.round - 1]}`) : null,
@@ -221,9 +193,7 @@ function roundsTab(ctx, t, view) {
         h('div', { class: 'vs' }, 'vs'),
         teamButton(ctx, t, round.round, m, 2, numbers)))),
       round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
-      swapStart,
-      revealButton,
-      printButton(),
+      comingUp,
     ],
   ];
 }
@@ -285,9 +255,21 @@ function swapRound(ctx, t, view, round, numbers, mini) {
   ];
 }
 
-// Prints the current tab without photos, buttons and controls (see @media print).
-function printButton() {
-  return h('div', { class: 'actions' }, h('button', { onclick: () => window.print() }, 'Print'));
+// Prints the standings or all revealed rounds without buttons and controls (see
+// @media print): shows that tab, prints, and comes back to Manage.
+function printTab(ctx, tab) {
+  const view = ctx.state.view;
+  const layout = view.layout;
+  view.tab = tab;
+  if (tab === 'rounds') view.layout = 'all';
+  ctx.render();
+  const back = () => {
+    view.tab = 'manage';
+    view.layout = layout;
+    ctx.render();
+  };
+  window.addEventListener('afterprint', back, { once: true });
+  setTimeout(() => window.print(), 50); // let the browser lay out the tab first
 }
 
 function standingsTab(t) {
@@ -312,7 +294,6 @@ function standingsTab(t) {
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
       'PAS (Path Advantage Score): the average gap between the two team values in the games a player played, from their side: + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
-    printButton(),
   ];
 }
 
@@ -417,8 +398,8 @@ function renameCard(ctx, t) {
     h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: save }, 'Save names')));
 }
 
-// How even and how varied the draw is, over the revealed rounds only: Manage has no
-// password, and repeated pairings would otherwise give away hidden rounds.
+// How even and how varied the draw is, over the revealed rounds only: repeated
+// pairings would otherwise give away hidden rounds.
 function qualityCard(t) {
   const revealed = t.schedule.slice(0, t.revealedRounds);
   if (revealed.length === 0) return null;
@@ -441,11 +422,55 @@ function qualityCard(t) {
     h('div', { style: 'height: 12px' }));
 }
 
+// Everything that changes or reveals the draw, behind the Manage password.
+function roundsOptionsCard(ctx, t) {
+  const view = ctx.state.view;
+  const hidden = t.settings.rounds - t.revealedRounds;
+  const step = t.settings.revealBatch === 'all' ? hidden : Math.min(t.settings.revealBatch, hidden);
+  const from = t.revealedRounds + 1;
+  const reveal = hidden > 0 ? h('button', {
+    class: 'primary',
+    onclick: () => {
+      ctx.save(revealNext(t));
+      view.round = from;
+      ctx.state.message = step === 1 ? `Round ${from} is revealed.` : `Rounds ${from}–${from + step - 1} are revealed.`;
+      ctx.render();
+    },
+  }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
+  const layout = view.layout ?? 'one';
+  const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
+    h('button', { class: layout === key ? 'current' : '', onclick: () => { view.layout = key; ctx.render(); } }, label)));
+  const numbers = h('label', { class: 'toggle' },
+    h('input', { type: 'checkbox', checked: showNumbers(ctx), onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
+    'Show team values and spreads (on this device)');
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Rounds & display'),
+    h('p', { class: 'muted' }, hidden > 0
+      ? `Rounds 1–${t.revealedRounds} of ${t.settings.rounds} are revealed.`
+      : `All ${t.settings.rounds} rounds are revealed.`),
+    h('p', { class: 'muted' }, 'The Rounds tab shows:'),
+    layoutSwitch,
+    numbers,
+    h('div', { class: 'actions' },
+      reveal,
+      h('button', {
+        onclick: () => {
+          view.swapping = true;
+          view.swapPick = null;
+          view.tab = 'rounds';
+          ctx.render();
+        },
+      }, 'Swap players'),
+      h('button', { onclick: () => printTab(ctx, 'rounds') }, 'Print rounds'),
+      h('button', { onclick: () => printTab(ctx, 'standings') }, 'Print standings')));
+}
+
 function manageTab(ctx, t) {
   const s = t.settings;
   const locked = hasResults(t);
   const withdrawn = t.players.length - t.players.filter(isActive).length;
   return [
+    roundsOptionsCard(ctx, t),
     nameCard(ctx, t),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
       fact('Players', withdrawn ? `${t.players.length - withdrawn} (${withdrawn} withdrew)` : t.players.length),

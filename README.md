@@ -50,7 +50,7 @@ or paste players in the same format.
 | Total time, break | From these, Seedr works out every number of rounds that fits: match length = total time ÷ rounds − break, rounded down, at least 5 minutes. |
 | Rounds and match length | Chosen from a dropdown of these options only. Options where everyone plays the same number of games come first. If leaving courts empty in the last round means fewer players get fewer games, that is offered as an extra option, e.g. "9 rounds (last round on 1 court)". Only the number of rounds affects the draw. Match length and break are only used for the time plan. |
 | End time (optional) | The time the last match should end. Each round then shows when it must start: the last round starts one match length before the end time, and each earlier round one match plus one break before the next. |
-| Rounds revealed at a time | Only changes what is shown. The whole schedule is drawn up front, and hidden rounds are revealed in batches. |
+| Rounds revealed at a time | Only changes what is shown. The whole schedule is drawn up front, and hidden rounds are revealed in batches with **Manage → Reveal round(s)**. |
 
 ### Steps
 
@@ -73,6 +73,8 @@ or paste players in the same format.
 
 If repeated partners or unbalanced matches can't be avoided (team value gap of 3 or more), the tournament screen shows a warning. This happens with few players or very different skill levels.
 
+**PAS (Path Advantage Score).** The same team value gap F also shows up per player in the standings. In every match it counts as an advantage for the stronger team (+F for both its players) and as a disadvantage for the weaker one (−F). A player's PAS is the average of these over the games they played: + means they mostly played in the stronger team, − mostly in the weaker one. Example: Anna plays one match in a team 0.25 stronger and one in a team 3.5 weaker, so her PAS is (0.25 − 3.5) ÷ 2 ≈ −1.63. The draw doesn't optimize PAS directly, but since it keeps every gap F small, everyone's PAS stays close to 0.
+
 ### Standings
 
 A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed weaker skill first, so the better player comes last. *PAS* (Path Advantage Score) is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one.
@@ -86,26 +88,22 @@ If a player can't continue, open **Manage → Player leaves**, tick the players 
 
 Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, remove players with **Edit settings** instead.
 
+## Manage
+
+Everything that changes or reveals the draw is in **Manage**, which asks for a password every time it is opened. The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. In Manage, **Rounds & display** reveals the next round(s), switches the Rounds tab between one round and all rounds, shows or hides team values and spreads, starts swapping players, and prints the rounds or the standings. The password only keeps players from peeking: it can be read in the app's source.
+
 ## Keeping data safe
 
 Browser storage can be lost (clearing Safari data, a new device). Use **Manage → Export**
 to save a `.seedr.json` file (e.g. to Dropbox or iCloud Drive) and **Import** to load it
 on any device.
 
-## Photos and logo
+## Logo
 
-The tournament screen shows a rotating photo banner. The originals live in `img/`
-(not committed); after adding or changing photos run
+The logo lives in `src/ui/logo.js`; after changing it run `node tools/make-icons.mjs`
+(needs Google Chrome) to render the app icons.
 
-```bash
-python3 tools/optimize-photos.py   # needs Pillow; writes src/ui/photos and the photo list
-```
-
-It shrinks them to 1200 px and removes all metadata, including GPS locations. Photo 13 is
-the first banner image. The logo lives in `src/ui/logo.js`; after changing it run
-`node tools/make-icons.mjs` (needs Google Chrome) to render the app icons.
-
-The build writes `dist/index.html`, `sw.js`, `manifest.webmanifest`, `photos/` and `icons/`.
+The build writes `dist/index.html`, `sw.js`, `manifest.webmanifest` and `icons/`.
 Keep the `dist` folder together, and upload all of it when hosting.
 
 ## Development

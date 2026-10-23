@@ -196,18 +196,6 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 550; }
 
-/* Tournament photo banner */
-.hero { position: relative; height: 260px; margin: 0 0 20px; border-radius: var(--radius); overflow: hidden; background: #1d2a26; box-shadow: var(--shadow); }
-.hero-photo { position: absolute; inset: 0; background-size: cover; background-position: 50% 40%; opacity: 0; transition: opacity 1.4s ease; }
-.hero-photo.visible { opacity: 1; }
-.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,.05) 55%, rgba(0,0,0,.65) 100%); pointer-events: none; }
-.hero-content { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 12px 20px 18px; }
-.hero .back { color: #fff; background: rgba(0,0,0,.28); border-radius: 999px; padding: 6px 14px; min-height: 36px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.hero .eyebrow { color: rgba(255,255,255,.85); }
-.hero h1 { color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.35); font-size: 2rem; }
-@media (max-width: 600px) { .hero { height: 180px; } .hero h1 { font-size: 1.6rem; } }
-@media (prefers-reduced-motion: reduce) { .hero-photo { transition: none; } }
-
 /* Brand */
 .brand { display: flex; align-items: center; gap: 12px; font-size: 2.6rem; font-weight: 800; letter-spacing: -.045em; color: var(--strong); }
 .brand img { width: 52px; height: 52px; }
@@ -223,7 +211,6 @@ body { min-height: 100vh; background: var(--bg); }
 #app { position: relative; }
 :root { --slam-stripe: linear-gradient(90deg, var(--ao) 0 25%, var(--uso) 25% 50%, var(--rg) 50% 75%, var(--wim) 75% 100%); }
 body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-index: 20; background: var(--slam-stripe); }
-.hero::before { content: ""; position: absolute; inset: auto 0 0 0; height: 5px; z-index: 2; background: var(--slam-stripe); }
 
 .court-color-0 { --court: var(--ao); }
 .court-color-1 { --court: var(--rg); }
@@ -247,24 +234,20 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
 .standings tr.rank-3 td { background: color-mix(in srgb, #dcae85 18%, transparent); }
 
 /* Printing (Standings and Rounds): keeps the court background and colors, leaves out
-   the banner photos, buttons and controls. */
+   buttons and controls. */
 .print-only { display: none; }
 @media print {
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
-  .no-print, .hero-photo, .hero::after, .hero .back, .eyebrow img, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
+  .no-print, .top .back, .eyebrow img, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
   .screen { max-width: 160mm; margin: 0 auto; padding: 0; }
-  .hero { height: auto; margin: 0 0 12px; background: none; box-shadow: none; overflow: visible; }
-  .hero::before { display: none; }
-  .hero-content { position: static; padding: 0; }
-  .hero .eyebrow { color: var(--accent); }
-  .hero h1 { color: var(--text); text-shadow: none; }
+  .top h1 { font-size: 2rem; }
   .card, .match, .overview-round, .table-wrap { box-shadow: none; }
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
   /* All rounds: compact cards, three rows of two (6 rounds) per page. */
   @page { margin: 16mm 12mm; }
-  .hero { margin-bottom: 2mm; }
+  .top { margin-bottom: 2mm; }
   .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
   .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
