@@ -5,6 +5,7 @@ import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { roundStartTimes } from '../engine/timeplan.js';
+import { drawQuality } from '../engine/quality.js';
 import { saveFile, downloadFile } from './export.js';
 import { draftFromTournament } from './setup.js';
 import { photoHero } from './hero.js';
@@ -416,6 +417,30 @@ function renameCard(ctx, t) {
     h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: save }, 'Save names')));
 }
 
+// How even and how varied the draw is, over the revealed rounds only: Manage has no
+// password, and repeated pairings would otherwise give away hidden rounds.
+function qualityCard(t) {
+  const revealed = t.schedule.slice(0, t.revealedRounds);
+  if (revealed.length === 0) return null;
+  const q = drawQuality(t.players, revealed);
+  const one = (x) => (Math.round(x * 10) / 10).toString();
+  const scope = revealed.length < t.schedule.length ? ` (rounds 1–${revealed.length} of ${t.schedule.length}, the revealed ones)` : '';
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Draw quality'),
+    h('p', { class: 'muted' }, `Team value gap = difference between the two teams' values (sum of skills + ¼ of the spread)${scope}.`),
+    h('dl', { class: 'facts' },
+      fact('Average gap', formatValue(Math.round(q.avgGap * 100) / 100)),
+      fact('Biggest gap', q.worst ? `${formatValue(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
+      fact('Different partners', `${one(q.partners.distinct)} per player${q.partners.repeats ? `, ${q.partners.repeats} repeated` : ', none repeated'}`),
+      fact('Different opponents', `${one(q.opponents.distinct)} per player`),
+      fact('Repeated opponents', q.opponents.repeats
+        ? `${q.opponents.repeats} meeting(s) again${q.opponents.thirds ? `, ${q.opponents.thirds} a third time or more` : ''}`
+        : 'none'),
+      q.opponents.most.length ? fact('Most often opponents', q.opponents.most.map((m) => `${m.names.join(' & ')} ${m.times}×`).join(', ')) : null,
+      fact('Sitting out twice in a row', q.sitOuts.backToBack ? `${q.sitOuts.backToBack}×, longest ${q.sitOuts.longestRun} rounds` : 'never')),
+    h('div', { style: 'height: 12px' }));
+}
+
 function manageTab(ctx, t) {
   const s = t.settings;
   const locked = hasResults(t);
@@ -458,6 +483,7 @@ function manageTab(ctx, t) {
         },
       }, 'Delete tournament')),
     locked ? h('p', { class: 'muted' }, 'Settings and the draw can only be changed before the first result is entered.') : null,
+    qualityCard(t),
     renameCard(ctx, t),
     withdrawCard(ctx, t),
   ];
