@@ -6,7 +6,7 @@ export function resultKey(round, court) {
 
 export function computeStandings(players, schedule, results) {
   const skillOf = new Map(players.map((p) => [p.id, p.skill]));
-  const rows = new Map(players.map((p) => [p.id, { id: p.id, name: p.name, skill: p.skill, games: 0, wins: 0, gapSum: 0 }]));
+  const rows = new Map(players.map((p) => [p.id, { id: p.id, name: p.name, skill: p.skill, games: 0, wins: 0, fairnessSum: 0 }]));
   // Team value as balanced by the draw (lower = stronger).
   const value = (team) => teamValue(skillOf.get(team[0]), skillOf.get(team[1]));
 
@@ -19,9 +19,11 @@ export function computeStandings(players, schedule, results) {
     const complete = round.matches.length > 0 && winners.every((w) => w === 1 || w === 2);
     if (!complete) continue;
     for (const m of round.matches) {
-      const diff = value(m.team2) - value(m.team1); // positive: team 1 is stronger
-      for (const pid of m.team1) { rows.get(pid).games++; rows.get(pid).gapSum += diff; }
-      for (const pid of m.team2) { rows.get(pid).games++; rows.get(pid).gapSum -= diff; }
+      // Match fairness from each side: the gap between the two team values, positive for
+      // the stronger team (an advantage), negative for the weaker one.
+      const edge = value(m.team2) - value(m.team1); // lower value = stronger
+      for (const pid of m.team1) { rows.get(pid).games++; rows.get(pid).fairnessSum += edge; }
+      for (const pid of m.team2) { rows.get(pid).games++; rows.get(pid).fairnessSum -= edge; }
     }
   }
 
@@ -30,10 +32,12 @@ export function computeStandings(players, schedule, results) {
   const withdrawn = new Set(players.filter((p) => p.withdrawnAfter != null).map((p) => p.id));
   const list = [...rows.values()];
   const maxGames = Math.max(0, ...list.filter((r) => !withdrawn.has(r.id)).map((r) => r.games));
-  const out = list.map(({ gapSum, ...r }) => {
+  // Path Advantage Score (PAS): the average match fairness of the games a player played,
+  // from their side: + = mostly in the stronger team, − = mostly in the weaker one.
+  const out = list.map(({ fairnessSum, ...r }) => {
     const gone = withdrawn.has(r.id);
     const bonus = gone ? 0 : 0.5 * (maxGames - r.games);
-    return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, avgGap: r.games ? gapSum / r.games : 0 };
+    return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, pas: r.games ? fairnessSum / r.games : null };
   });
   // On equal points the weaker player (higher skill number) is listed first.
   out.sort((a, b) => a.withdrawn - b.withdrawn || b.points - a.points || b.skill - a.skill || a.name.localeCompare(b.name));

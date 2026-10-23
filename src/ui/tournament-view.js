@@ -294,7 +294,7 @@ function standingsTab(t) {
   const rows = computeStandings(t.players, t.schedule, t.results);
   // The Bonus column only appears once someone has bonus points.
   const bonus = rows.some((r) => r.bonus);
-  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'Avg. advantage'].filter(Boolean);
+  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'PAS'].filter(Boolean);
   return [
     h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
@@ -306,12 +306,12 @@ function standingsTab(t) {
         h('td', {}, r.wins),
         bonus ? h('td', {}, r.bonus ? `+${r.bonus}` : '') : null,
         h('td', { class: 'points' }, r.points),
-        h('td', {}, formatSigned(r.avgGap))))))),
+        h('td', {}, r.pas == null ? '–' : formatSigned(r.pas))))))),
     h('p', { class: 'muted' },
       'Games count only rounds with all results entered. ',
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
-      'Avg. advantage: average difference in team value per game (positive = played in the stronger team).'),
+      'PAS (Path Advantage Score): the average gap between the two team values in the games a player played, from their side: + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
     printButton(),
   ];
 }
