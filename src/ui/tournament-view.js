@@ -26,6 +26,7 @@ export function tournamentScreen(ctx) {
   view.round = Math.min(Math.max(1, view.round), Math.max(1, t.revealedRounds));
   const body = view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
+      : view.tab === 'print' ? [standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, layout: 'all', swapping: false })]
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
@@ -254,17 +255,14 @@ function swapRound(ctx, t, view, round, numbers, mini) {
   ];
 }
 
-// Prints the standings or all revealed rounds without buttons and controls (see
-// @media print): shows that tab, prints, and comes back to Manage.
-function printTab(ctx, tab) {
+// One printout: the standings, then all revealed rounds from a new page, without buttons
+// and controls (see @media print). Shows them, prints, and comes back to Manage.
+function printAll(ctx) {
   const view = ctx.state.view;
-  const layout = view.layout;
-  view.tab = tab;
-  if (tab === 'rounds') view.layout = 'all';
+  view.tab = 'print';
   ctx.render();
   const back = () => {
     view.tab = 'manage';
-    view.layout = layout;
     ctx.render();
   };
   window.addEventListener('afterprint', back, { once: true });
@@ -465,8 +463,7 @@ function roundsOptionsCard(ctx, t) {
           ctx.render();
         },
       }, 'Swap players'),
-      h('button', { onclick: () => printTab(ctx, 'rounds') }, 'Print rounds'),
-      h('button', { onclick: () => printTab(ctx, 'standings') }, 'Print standings')));
+      h('button', { onclick: () => printAll(ctx) }, 'Print standings & rounds')));
 }
 
 function manageTab(ctx, t) {

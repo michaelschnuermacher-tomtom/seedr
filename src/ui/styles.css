@@ -242,6 +242,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
 @media print {
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
+  .page-break { break-before: page; }
   .no-print, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
   /* A little room inside the court area at the top and bottom of every page. */
   .screen { max-width: 160mm; margin: 0 auto; padding: 4mm 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
