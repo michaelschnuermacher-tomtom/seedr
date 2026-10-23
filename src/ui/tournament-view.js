@@ -4,7 +4,6 @@ import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRou
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
-import { roundStartTimes } from '../engine/timeplan.js';
 import { drawQuality } from '../engine/quality.js';
 import { tournamentSummary } from '../engine/summary.js';
 import { saveFile, downloadFile } from './export.js';
@@ -54,6 +53,7 @@ export function roundsOverview(t) {
     const skills = ids.map((id) => byId.get(id).skill);
     return {
       names: ids.map((id) => byId.get(id).name).join(' + '),
+      members: ids.map((id) => byId.get(id).name),
       value: teamValue(skills[0], skills[1]),
       spread: Math.max(...skills) - Math.min(...skills),
     };
@@ -91,8 +91,9 @@ function teamButton(ctx, t, round, match, n, numbers) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'value' }, formatValue(team.value)) : null,
-    winner === n ? h('span', { class: 'won' }, 'won') : null); // spelled out on paper, see @media print
+  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]),
+    // The team value in a small column on the right.
+    numbers ? h('span', { class: 'side' }, h('span', { class: 'value' }, formatValue(team.value))) : null);
 }
 
 // Court label, with how far apart the two teams are when numbers are shown.
@@ -146,13 +147,11 @@ function askPassword(ctx, question) {
 
 function roundsTab(ctx, t, view) {
   const rounds = roundsOverview(t);
-  const starts = t.settings.endTime ? roundStartTimes(t.settings) : null;
   // The view (one round or all), the numbers, revealing, swapping and printing are all
   // set in Manage.
   const layout = view.layout ?? 'one';
   const numbers = showNumbers(ctx);
-  const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.',
-    numbers ? ' Team value = sum of both skills + ¼ of their difference (lower = stronger). Gap = difference between the two teams.' : '');
+  const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
     h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
@@ -167,7 +166,7 @@ function roundsTab(ctx, t, view) {
       progress,
       swapping ? swapHeader(ctx, t, view) : hint,
       h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
-        h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`, starts ? h('span', { class: 'start-time' }, starts[r.round - 1]) : null),
+        h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
         swapping ? swapRound(ctx, t, view, r, numbers, true) : [
           r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
             courtLine('span', m, numbers),
@@ -188,7 +187,6 @@ function roundsTab(ctx, t, view) {
   return [
     nav,
     h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
-    starts ? h('p', { class: 'start-time' }, `Starts at ${starts[round.round - 1]}`) : null,
     progress,
     swapping ? [swapHeader(ctx, t, view), swapRound(ctx, t, view, round, numbers, false), swapDone(ctx, view)] : [
       hint,
@@ -497,7 +495,6 @@ function manageTab(ctx, t) {
       fact('Rounds', s.rounds),
       fact('Match length', `${s.matchMinutes} min`),
       fact('Break', `${s.breakMinutes} min`),
-      s.endTime ? fact('End time', s.endTime) : null,
       fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)), h('div', { style: 'height: 12px' })),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => exportTournament(t) }, 'Export (.seedr.json)'),

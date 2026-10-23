@@ -49,7 +49,6 @@ or paste players in the same format.
 | Courts | Up to 4 players per court play each round. With fewer than `4 × courts` players, only as many courts are used as there are full groups of 4. |
 | Total time, break | From these, Seedr works out every number of rounds that fits: match length = total time ÷ rounds − break, rounded down, at least 5 minutes. |
 | Rounds and match length | Chosen from a dropdown of these options only. Options where everyone plays the same number of games come first. If leaving courts empty in the last round means fewer players get fewer games, that is offered as an extra option, e.g. "9 rounds (last round on 1 court)". Only the number of rounds affects the draw. Match length and break are only used for the time plan. |
-| End time (optional) | The time the last match should end. Each round then shows when it must start: the last round starts one match length before the end time, and each earlier round one match plus one break before the next. |
 | Rounds revealed at a time | Only changes what is shown. The whole schedule is drawn up front, and hidden rounds are revealed in batches with **Manage → Reveal round(s)**. |
 
 ### Steps

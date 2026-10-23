@@ -1,5 +1,3 @@
-import { TIME_PATTERN } from './timeplan.js';
-
 const isInt = (v) => Number.isInteger(v);
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -38,7 +36,6 @@ function checkSettings(s) {
   if (!isInt(s.breakMinutes) || s.breakMinutes < 0) fail('Invalid break length');
   if (!(s.revealBatch === 'all' || (isInt(s.revealBatch) && s.revealBatch >= 1))) fail('Invalid reveal batch');
   if ('lastRoundCourts' in s && (!isInt(s.lastRoundCourts) || s.lastRoundCourts < 1 || s.lastRoundCourts >= s.courts)) fail('Invalid number of courts in the last round');
-  if ('endTime' in s &&!(typeof s.endTime === 'string' && TIME_PATTERN.test(s.endTime))) fail('Invalid end time');
 }
 
 function checkPlayers(players) {

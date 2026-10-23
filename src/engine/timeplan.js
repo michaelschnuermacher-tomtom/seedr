@@ -19,21 +19,6 @@ export function gamesPerPlayer(players, courts, rounds, lastRoundCourts = courts
   return { min: Math.floor(total / players), max: Math.ceil(total / players), even: total % players === 0 };
 }
 
-export const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-const toMinutes = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-const toTime = (minutes) => {
-  const m = ((minutes % 1440) + 1440) % 1440;
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-};
-
-// Start time of each round ("HH:MM") so that the last match ends at `endTime`, with a
-// break between rounds. Times may wrap past midnight.
-export function roundStartTimes({ rounds, matchMinutes, breakMinutes, endTime }) {
-  const end = toMinutes(endTime);
-  return Array.from({ length: rounds }, (_, i) => toTime(end - matchMinutes - (rounds - 1 - i) * (matchMinutes + breakMinutes)));
-}
-
 // How many players get the smaller number of games (0 when the games come out even).
 export function fewerGamesCount(players, courts, rounds, lastRoundCourts = courts) {
   const total = totalPlaces(players, courts, rounds, lastRoundCourts);

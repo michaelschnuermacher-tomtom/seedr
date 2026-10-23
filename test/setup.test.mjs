@@ -93,19 +93,6 @@ test('draftFromTournament keeps the * marks', () => {
   assert.equal(draftFromTournament(t).playersText.split('\n')[0], '1: P1*');
 });
 
-test('an end time gives each round its start time and is kept in the settings', () => {
-  const ev = evaluateDraft({ ...example(), playersText: text18, selectedRounds: 9, endTime: '20:00' });
-  assert.deepEqual(ev.problems, []);
-  assert.equal(ev.startTimes.length, 9);
-  assert.deepEqual([ev.startTimes[0], ev.startTimes[8]], ['18:05', '19:49']); // 9 × 11 min + 8 × 2 min = 115 min
-  assert.equal(evaluateDraft({ ...example(), playersText: text18, selectedRounds: 9 }).startTimes, null);
-  const t = createTournament({
-    id: 't', name: 'x', seed: 5, now: new Date(), players: SKILLS_18.map((skill, i) => ({ name: `P${i + 1}`, skill })),
-    settings: { courts: 3, rounds: 9, matchMinutes: 11, breakMinutes: 2, revealBatch: 'all', endTime: '20:00' },
-  });
-  assert.equal(draftFromTournament(t).endTime, '20:00');
-});
-
 test('choosing an option with fewer courts in the last round keeps them in the plan', () => {
   const players17 = [5, 9, 8, 6, 1, 9, 4, 6, 5, 7, 1, 4, 6, 3, 1, 3, 4].map((s, i) => `P${i + 1}: ${s}`).join('\n');
   const d = { ...newDraft(), playersText: players17, selectedRounds: 9, lastRoundCourts: 1 };

@@ -1,7 +1,7 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { parsePlayers, formatPlayers, createTournament, updateSettings, isActive, checkFewer } from '../engine/tournament.js';
-import { recommendOptions, gamesPerPlayer, fewerGamesCount, describeGames, roundStartTimes, TIME_PATTERN } from '../engine/timeplan.js';
+import { recommendOptions, gamesPerPlayer, fewerGamesCount, describeGames } from '../engine/timeplan.js';
 import { newSeed } from '../engine/rng.js';
 
 // The regular group, pre-filled for every new tournament: one line per skill.
@@ -23,7 +23,6 @@ export function newDraft() {
     breakMinutes: 5,
     selectedRounds: null,
     lastRoundCourts: null,
-    endTime: '',
     revealBatch: 'all',
   };
 }
@@ -42,7 +41,6 @@ export function draftFromTournament(t) {
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
     selectedRounds: s.rounds,
     lastRoundCourts: s.lastRoundCourts ?? null,
-    endTime: s.endTime ?? '',
     revealBatch: s.revealBatch,
   };
 }
@@ -55,7 +53,6 @@ export function evaluateDraft(d) {
   if (players.length < 4) problems.push('Enter at least 4 players.');
   if (!isWhole(d.courts, 1)) problems.push('Courts must be a whole number of at least 1.');
   if (!isWhole(d.breakMinutes, 0)) problems.push('Break must be a whole number of minutes (0 or more).');
-  if (d.endTime && !TIME_PATTERN.test(d.endTime)) problems.push('End time must be a time like 18:00.');
   let options = [];
   let plan = null;
   if (problems.length === 0) {
@@ -74,10 +71,7 @@ export function evaluateDraft(d) {
     if (problem) problems.push(problem);
   }
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
-  const startTimes = plan && d.endTime && problems.length === 0
-    ? roundStartTimes({ rounds: plan.rounds, matchMinutes: plan.matchMinutes, breakMinutes: d.breakMinutes, endTime: d.endTime })
-    : null;
-  return { players, problems, options, plan, games, startTimes };
+  return { players, problems, options, plan, games };
 }
 
 function field(label, input) {
@@ -128,9 +122,7 @@ export function setupScreen(ctx) {
       h('div', { class: 'row' },
         field('Courts', numberInput('courts', 1)),
         field('Break between rounds (min)', numberInput('breakMinutes', 0))),
-      h('div', { class: 'row' },
-        field('Total tournament time (min)', numberInput('totalMinutes', 1)),
-        field('End time (optional)', h('input', { type: 'time', value: d.endTime, oninput: (e) => { d.endTime = e.target.value; refresh(); } }))),
+      field('Total tournament time (min)', numberInput('totalMinutes', 1)),
       planBox),
     card('Draw', 'uso',
       field('Rounds revealed at a time', selectInput(d.revealBatch,
@@ -194,9 +186,6 @@ function setupPreview(ctx, d, ev) {
         : `${ev.games.min} games for ${marked.join(', ')}${rest ? ` and ${rest} more drawn at random` : ''}.`));
     }
   }
-  if (ev.startTimes) {
-    out.push(h('p', { class: 'muted' }, `Round 1 starts at ${ev.startTimes[0]}, round ${ev.startTimes.length} at ${ev.startTimes.at(-1)}; the last match ends at ${d.endTime}.`));
-  }
   if (ev.problems.length) out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));
   out.push(h('div', { class: 'actions' },
     h('button', { onclick: () => cancelSetup(ctx) }, 'Cancel'),
@@ -222,7 +211,7 @@ function cancelSetup(ctx) {
 function createFromDraft(ctx, d, ev) {
   const name = d.name.trim() || 'Tournament';
   const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch,
-    ...(ev.plan.lastRoundCourts ? { lastRoundCourts: ev.plan.lastRoundCourts } : {}), ...(d.endTime ? { endTime: d.endTime } : {}) };
+    ...(ev.plan.lastRoundCourts ? { lastRoundCourts: ev.plan.lastRoundCourts } : {}) };
   const editing = d.editingId && ctx.store.get(d.editingId);
   let t;
   try {
