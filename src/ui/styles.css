@@ -245,10 +245,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .no-print, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
   .screen { max-width: 160mm; margin: 0 auto; padding: 0; }
   .top h1 { font-size: 2rem; }
-  /* The Slam stripe only once, at the top of the first page, with room below it. */
-  body::before { position: absolute; }
-  .top { padding-top: 5mm; }
-  .eyebrow img { width: 5mm; height: 5mm; }
+  /* Stripe and logo are printed in the top margin of every page instead (print-header.js);
+     the court fills the printable area, so the margins stay white. */
+  body::before, .top .eyebrow { display: none; }
+  /* A table across pages: each part gets its own border, and the column headings repeat. */
+  .table-wrap { -webkit-box-decoration-break: clone; box-decoration-break: clone; }
   .card, .match, .overview-round, .table-wrap { box-shadow: none; }
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
@@ -258,8 +259,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .team .won { display: inline; margin-left: 2mm; font-weight: 700; color: var(--win); }
   .team.winner .names { font-weight: 700; }
   /* All rounds: compact cards, three rows of two (6 rounds) per page. */
-  @page { margin: 16mm 12mm; }
-  .top { margin-bottom: 2mm; }
+  @page { margin: 24mm 12mm 14mm; }
   .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
   .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }

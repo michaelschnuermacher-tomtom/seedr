@@ -41,3 +41,8 @@ test('the whole court is visible and fills most of the limiting side', () => {
     assert.ok(share > 0.9 && share < 0.94, `aspect ${aspect}: fills ${share.toFixed(2)}`);
   }
 });
+
+test('a smaller fill leaves more run-off around the court', () => {
+  const b = box(courtSvg({ aspect: 0.76, fill: 0.84 }));
+  assert.ok(Math.abs(b.ch / b.h - 0.84) < 0.01);
+});

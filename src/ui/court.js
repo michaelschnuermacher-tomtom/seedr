@@ -7,7 +7,10 @@
 const COURT_W = 36;
 const COURT_L = 78;
 const FILL = 0.92; // share of the screen the court takes along its limiting side
-const PRINT_ASPECT = 0.69; // A4 or Letter page, upright, without margins
+// Printed background: the paper is not known in advance, so the court is drawn for the
+// middle between A4 (0.72) and Letter (0.80) and a little smaller, to fit both whole.
+const PRINT_ASPECT = 0.76;
+const PRINT_FILL = 0.84;
 const COLORS = {
   ao: ['#2596be', '#1b7ea3'], // Australian Open: [court, run-off]
   uso: ['#1f3c88', '#172f6c'], // US Open
@@ -55,11 +58,11 @@ function courtShapes(w, h, across) {
 const round1 = (x) => Math.round(x * 10) / 10;
 
 // The court for a screen of the given shape (width / height). The frame has exactly that
-// shape, so nothing is cropped, and the court fills FILL of its limiting side.
-export function courtSvg({ aspect }) {
+// shape, so nothing is cropped, and the court fills `fill` of its limiting side.
+export function courtSvg({ aspect, fill = FILL }) {
   const across = aspect > 1;
   const ratio = across ? 1 / aspect : aspect; // short side / long side
-  const long = round1(Math.max(COURT_L / FILL, COURT_W / (FILL * ratio)));
+  const long = round1(Math.max(COURT_L / fill, COURT_W / (fill * ratio)));
   const short = round1(long * ratio);
   const [w, h] = across ? [long, short] : [short, long];
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice">${courtShapes(w, h, across)}</svg>`;
@@ -68,8 +71,8 @@ export function courtSvg({ aspect }) {
 // Sets the court picture as CSS variables (styles.css picks one by orientation) for the
 // window's current shape, again whenever it changes, and for the page while printing.
 export function installCourtBackground(root = document.documentElement, win = window) {
-  const show = (aspect) => {
-    const url = `url("data:image/svg+xml,${encodeURIComponent(courtSvg({ aspect }))}")`;
+  const show = (aspect, fill) => {
+    const url = `url("data:image/svg+xml,${encodeURIComponent(courtSvg({ aspect, fill }))}")`;
     root.style.setProperty('--court-portrait', url);
     root.style.setProperty('--court-landscape', url);
   };
@@ -80,7 +83,7 @@ export function installCourtBackground(root = document.documentElement, win = wi
     pending = true;
     win.requestAnimationFrame(() => { pending = false; fit(); });
   });
-  win.addEventListener('beforeprint', () => show(PRINT_ASPECT));
+  win.addEventListener('beforeprint', () => show(PRINT_ASPECT, PRINT_FILL));
   win.addEventListener('afterprint', fit);
   fit();
 }

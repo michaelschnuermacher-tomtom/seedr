@@ -3,6 +3,7 @@ import { createStore, STORAGE_PREFIX } from './store.js';
 import { validateTournament } from '../engine/validate.js';
 import { homeScreen } from './home.js';
 import { installCourtBackground } from './court.js';
+import { installPrintHeader } from './print-header.js';
 import { setupScreen } from './setup.js';
 import { tournamentScreen } from './tournament-view.js';
 
@@ -80,4 +81,5 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.protocol 
 }
 
 installCourtBackground();
+installPrintHeader();
 render();
