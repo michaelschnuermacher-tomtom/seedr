@@ -242,9 +242,13 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
 @media print {
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
-  .no-print, .eyebrow img, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
+  .no-print, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
   .screen { max-width: 160mm; margin: 0 auto; padding: 0; }
   .top h1 { font-size: 2rem; }
+  /* The Slam stripe only once, at the top of the first page, with room below it. */
+  body::before { position: absolute; }
+  .top { padding-top: 5mm; }
+  .eyebrow img { width: 5mm; height: 5mm; }
   .card, .match, .overview-round, .table-wrap { box-shadow: none; }
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
