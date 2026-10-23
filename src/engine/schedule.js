@@ -1,7 +1,7 @@
 import { createRng, shuffle } from './rng.js';
 import { perRoundPlayers } from './timeplan.js';
 
-export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, opponentThird: 30, spread: 5, wide: 1 };
+export const WEIGHTS = { partner: 10000, match: 10, balance: 3, opponent: 1, opponentThird: 30, spread: 5 };
 export const DEFAULT_ITERATIONS = 100000;
 // Small groups are cheap to evaluate but hard to balance, so they get more search.
 export const SMALL_GROUP_ITERATIONS = 200000;
@@ -89,7 +89,6 @@ export function evaluate(slots, strength, n, spreadPlayers = n) {
   let maxAbsDiff = 0;
   let sumSpreadGapSq = 0;
   let maxSpreadGap = 0;
-  let sumWideSq = 0;
   for (const s of slots) {
     for (let m = 0; m < s.length; m += 4) {
       const [a, b, c, d] = [s[m], s[m + 1], s[m + 2], s[m + 3]];
@@ -100,8 +99,6 @@ export function evaluate(slots, strength, n, spreadPlayers = n) {
       const spreadGap = Math.abs(strength[a] - strength[b]) - Math.abs(strength[c] - strength[d]);
       sumSpreadGapSq += spreadGap * spreadGap;
       maxSpreadGap = Math.max(maxSpreadGap, Math.abs(spreadGap));
-      // Partners far apart in skill (e.g. 1+9) are allowed, but close partners are preferred.
-      sumWideSq += (strength[a] - strength[b]) ** 2 + (strength[c] - strength[d]) ** 2;
       balance[a] += diff;
       balance[b] += diff;
       balance[c] -= diff;
@@ -122,8 +119,8 @@ export function evaluate(slots, strength, n, spreadPlayers = n) {
   }
   const cost = WEIGHTS.partner * partnerRepeats + WEIGHTS.match * sumDiffSq
     + WEIGHTS.balance * sumBalanceSq + WEIGHTS.opponent * opponentRepeats
-    + (spreadPlayers >= SPREAD_MIN_PLAYERS ? WEIGHTS.spread * sumSpreadGapSq + WEIGHTS.wide * sumWideSq + WEIGHTS.opponentThird * opponentThirds : 0);
-  return { cost, partnerRepeats, opponentRepeats, opponentThirds, sumDiffSq, maxAbsDiff, maxAbsBalance, sumSpreadGapSq, maxSpreadGap, sumWideSq };
+    + (spreadPlayers >= SPREAD_MIN_PLAYERS ? WEIGHTS.spread * sumSpreadGapSq + WEIGHTS.opponentThird * opponentThirds : 0);
+  return { cost, partnerRepeats, opponentRepeats, opponentThirds, sumDiffSq, maxAbsDiff, maxAbsBalance, sumSpreadGapSq, maxSpreadGap };
 }
 
 // Swaps two whole teams between matches of one round: partners stay together,

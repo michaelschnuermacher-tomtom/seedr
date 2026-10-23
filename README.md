@@ -64,7 +64,6 @@ or paste players in the same format.
    | Unequal teams in a match | 10 × (strength difference)² |
    | One player always in the stronger or weaker team | 3 × (that player's total advantage)² |
    | Teams mixed differently, e.g. 1+9 vs 5+5 (14+ players only) | 5 × (difference in spread)² |
-   | Partners far apart in skill, e.g. 1+9 (14+ players only) | 1 × (spread)² per team |
    | Same opponent twice | 1 per repeat |
    | Same opponent a third time or more (14+ players only) | 30 per meeting |
 
