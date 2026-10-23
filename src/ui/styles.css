@@ -154,7 +154,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .toggle input { width: auto; margin: 0; accent-color: var(--accent); }
 .team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 40%, transparent); border-color: transparent; font-weight: 500; }
 .team .names { flex: 1; overflow-wrap: break-word; min-width: 0; }
-.team .sum { color: var(--muted); font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.team .value { color: var(--muted); font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }
 .team.winner::after { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--win); color: var(--surface); font-size: .8rem; flex: none; }
 .team.loser { opacity: .55; }
@@ -255,7 +255,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .mini-match { gap: 1.5mm; margin-bottom: 1.5mm; }
   .mini-match .court { font-size: 6.5pt; }
   .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9pt; border-radius: 2mm; }
-  .mini-match .team .sum { font-size: 7.5pt; }
+  .mini-match .team .value { font-size: 7.5pt; }
   .mini-match .team.winner::after { width: 14px; height: 14px; font-size: 8px; }
   .overview-round > p.muted { margin: 1mm 0 0; font-size: 8pt; line-height: 1.3; }
 }

@@ -89,7 +89,7 @@ function teamButton(ctx, t, round, match, n, numbers) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'sum' }, `${formatValue(team.value)} · ↔ ${team.spread}`) : null);
+  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'value' }, `${formatValue(team.value)} · ↔ ${team.spread}`) : null);
 }
 
 // Court label, with how far apart the two teams are when numbers are shown.
@@ -98,7 +98,7 @@ function courtLine(tag, m, numbers) {
     numbers ? h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)} · ↔ ${m.spreadGap}`) : null);
 }
 
-// Whether team sums and spreads are shown; remembered on this device.
+// Whether team values and spreads are shown; remembered on this device.
 const NUMBERS_KEY = 'seedr.showNumbers';
 
 function showNumbers(ctx) {
