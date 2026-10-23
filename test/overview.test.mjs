@@ -57,3 +57,14 @@ test('each match has team spreads and the gaps between the teams', () => {
   assert.equal(x.valueGap, Math.abs(value(m.team1) - value(m.team2)));
   assert.equal(x.spreadGap, Math.abs(spread(m.team1) - spread(m.team2)));
 });
+
+test('each match knows which team has the edge (lower team value), or 0 when even', () => {
+  const t = make('all');
+  for (const r of roundsOverview(t)) {
+    for (const m of r.matches) {
+      const expected = m.team1.value < m.team2.value ? 1 : m.team2.value < m.team1.value ? 2 : 0;
+      assert.equal(m.favoured, expected);
+      assert.equal(m.valueGap === 0, m.favoured === 0);
+    }
+  }
+});

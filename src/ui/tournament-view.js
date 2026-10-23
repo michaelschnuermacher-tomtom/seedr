@@ -20,7 +20,10 @@ export function tournamentScreen(ctx) {
   const view = (ctx.state.view ??= { tab: 'rounds' });
   const body = view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
-      : view.tab === 'print' ? [summaryCard(t), skillsCard(t), standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, swapping: false })]
+      : view.tab === 'print' ? [
+        h('h2', { class: 'print-only' }, 'Tournament summary'), summaryCard(t),
+        h('h2', { class: 'print-only' }, 'Player skills'), skillsCard(t),
+        standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, swapping: false })]
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
@@ -63,6 +66,8 @@ export function roundsOverview(t) {
         team1,
         team2,
         valueGap: Math.abs(team1.value - team2.value),
+        // The team with the edge (lower team value = stronger); 0 when both are equal.
+        favoured: team1.value < team2.value ? 1 : team2.value < team1.value ? 2 : 0,
         spreadGap: Math.abs(team1.spread - team2.spread),
         winner: t.results[resultKey(r.round, m.court)],
       };
@@ -85,13 +90,15 @@ function teamButton(ctx, t, round, match, n) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]));
+  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]),
+    // The stronger team shows its edge, e.g. +0.5.
+    match.favoured === n ? h('span', { class: 'edge' }, `+${formatValue(match.valueGap)}`) : null);
 }
 
-// Court label, with the edge of the match: how much stronger one team is (team values).
+// Court label; says Even when neither team has an edge (otherwise the stronger team shows it).
 function courtLine(tag, m) {
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    h('span', { class: 'gaps' }, `Edge ${formatValue(m.valueGap)}`));
+    m.favoured ? null : h('span', { class: 'gaps' }, 'Even'));
 }
 
 // Manage asks for this password every time it is opened. It
@@ -369,7 +376,7 @@ function qualityCard(t) {
 // How the players were assessed, for the printout: one line per skill, like the player list.
 function skillsCard(t) {
   const skills = [...new Set(t.players.map((p) => p.skill))].sort((a, b) => a - b);
-  return h('section', { class: 'card' },
+  return h('section', { class: 'card skills' },
     h('h2', { class: 'card-title' }, 'Player skills'),
     h('p', { class: 'muted' }, 'Skill 1 is the best, 10 the weakest.'),
     h('dl', { class: 'facts' }, skills.map((skill) => fact(`Skill ${skill}`, t.players.filter((p) => p.skill === skill)

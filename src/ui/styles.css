@@ -143,6 +143,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .court .gaps { float: right; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 40%, transparent); border-color: transparent; font-weight: 500; }
 .team .names { flex: 1; overflow-wrap: break-word; min-width: 0; }
+.team .edge { flex: none; color: var(--muted); font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }
 .team.loser { opacity: .55; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -235,6 +236,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
   .page-break { break-before: page; }
+  /* Summary and skills get the same chapter headings as Standings and Rounds. */
+  .summary .card-title, .skills .card-title { display: none; }
+  .summary, .skills { padding-block: 12px; }
+  .highlights { font-size: 9.5pt; gap: 6px; }
+  .skills .facts { font-size: 9.5pt; gap: 3px 16px; }
+  .skills .muted { font-size: 9pt; margin-top: 0; }
   .no-print, nav.tabs, .actions, .banner, .progress { display: none !important; }
   /* A little room inside the court area at the top and bottom of every page. */
   .screen { max-width: 160mm; margin: 0 auto; padding: 4mm 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
@@ -259,5 +266,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .mini-match { gap: 1.5mm; margin-bottom: 1.5mm; }
   .mini-match .court { font-size: 6.5pt; }
   .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9pt; border-radius: 2mm; }
+  .mini-match .team .edge { font-size: 7.5pt; }
   .overview-round > p.muted { margin: 1mm 0 0; font-size: 8pt; line-height: 1.3; }
 }
