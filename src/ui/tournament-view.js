@@ -42,7 +42,6 @@ export function tournamentScreen(ctx) {
           ctx.render();
         },
       }, label))),
-    drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning no-print' }, w)),
     body);
 }
 
@@ -401,13 +400,18 @@ function renameCard(ctx, t) {
 // How even and how varied the draw is, over the revealed rounds only: repeated
 // pairings would otherwise give away hidden rounds.
 function qualityCard(t) {
+  // Warnings look at the whole draw, but only say that something is off, not where.
+  const warnings = drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning' }, w));
   const revealed = t.schedule.slice(0, t.revealedRounds);
-  if (revealed.length === 0) return null;
+  if (revealed.length === 0) {
+    return warnings.length ? h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Draw quality'), warnings) : null;
+  }
   const q = drawQuality(t.players, revealed);
   const one = (x) => (Math.round(x * 10) / 10).toString();
   const scope = revealed.length < t.schedule.length ? ` (rounds 1–${revealed.length} of ${t.schedule.length}, the revealed ones)` : '';
   return h('section', { class: 'card' },
     h('h2', { class: 'card-title' }, 'Draw quality'),
+    warnings,
     h('p', { class: 'muted' }, `Team value gap = difference between the two teams' values (sum of skills + ¼ of the spread)${scope}.`),
     h('dl', { class: 'facts' },
       fact('Average gap', formatValue(Math.round(q.avgGap * 100) / 100)),

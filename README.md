@@ -71,7 +71,7 @@ or paste players in the same format.
    Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw uses 100,000 steps in total (200,000 for fewer than 14 players).
 4. **Seed.** All randomness comes from one seed number stored with the tournament. The same seed and settings always give the same schedule on every device. **Redraw schedule** simply uses a new seed.
 
-If repeated partners or unbalanced matches can't be avoided (team value gap of 3 or more), the tournament screen shows a warning. This happens with few players or very different skill levels.
+If repeated partners or unbalanced matches can't be avoided (team value gap of 3 or more), **Manage → Draw quality** shows a warning. This happens with few players or very different skill levels.
 
 **PAS (Path Advantage Score).** The same team value gap F also shows up per player in the standings. In every match it counts as an advantage for the stronger team (+F for both its players) and as a disadvantage for the weaker one (−F). A player's PAS is the average of these over the games they played: + means they mostly played in the stronger team, − mostly in the weaker one. Example: Anna plays one match in a team 0.25 stronger and one in a team 3.5 weaker, so her PAS is (0.25 − 3.5) ÷ 2 ≈ −1.63. The draw doesn't optimize PAS directly, but since it keeps every gap F small, everyone's PAS stays close to 0.
 
