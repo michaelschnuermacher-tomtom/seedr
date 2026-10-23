@@ -94,8 +94,7 @@ button.link { border: none; background: none; flex: 1; justify-content: flex-sta
 /* Surfaces */
 /* Slightly see-through, so the court in the background shines through a bit. */
 .card, .list li, .match, .overview-round, .option, .table-wrap, .preview {
-  background: color-mix(in srgb, var(--surface) 82%, transparent); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
 }
 .card { padding: 18px 18px 6px; margin-bottom: 14px; }
 .preview { padding: 16px 18px; margin-top: 4px; }
@@ -153,10 +152,10 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .court .gaps { float: right; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .toggle { display: flex; align-items: center; gap: 8px; margin: -6px 0 12px; color: var(--muted); font-size: .9rem; cursor: pointer; }
 .toggle input { width: auto; margin: 0; accent-color: var(--accent); }
-.team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 80%, transparent); border-color: transparent; font-weight: 500; }
+.team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 40%, transparent); border-color: transparent; font-weight: 500; }
 .team .names { flex: 1; overflow-wrap: break-word; min-width: 0; }
 .team .sum { color: var(--muted); font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.team.winner { background: var(--win-soft); border-color: var(--win); color: var(--text); font-weight: 650; }
+.team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }
 .team.winner::after { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--win); color: var(--surface); font-size: .8rem; flex: none; }
 .team.loser { opacity: .55; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -264,8 +263,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
   /* All rounds: compact cards, three rows of two (6 rounds) per page. */
-  .hero { margin-bottom: 4px; }
-  .screen > h2.print-only { margin: 4px 0; font-size: 12pt; }
+  @page { margin: 16mm 12mm; }
+  .hero { margin-bottom: 2mm; }
+  .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
   .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
   .overview-round h3 { margin: 0 0 1.5mm; font-size: 10.5pt; }
