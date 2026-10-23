@@ -91,17 +91,17 @@ function teamButton(ctx, t, round, match, n, numbers) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'value' }, `${formatValue(team.value)} · ↔ ${team.spread}`) : null,
+  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'value' }, formatValue(team.value)) : null,
     winner === n ? h('span', { class: 'won' }, 'won') : null); // spelled out on paper, see @media print
 }
 
 // Court label, with how far apart the two teams are when numbers are shown.
 function courtLine(tag, m, numbers) {
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    numbers ? h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)} · ↔ ${m.spreadGap}`) : null);
+    numbers ? h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)}`) : null);
 }
 
-// Whether team values and spreads are shown; remembered on this device.
+// Whether team values are shown; remembered on this device.
 const NUMBERS_KEY = 'seedr.showNumbers';
 
 function showNumbers(ctx) {
@@ -152,7 +152,7 @@ function roundsTab(ctx, t, view) {
   const layout = view.layout ?? 'one';
   const numbers = showNumbers(ctx);
   const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.',
-    numbers ? ' Team value = sum of skills + ¼ of the spread (lower = stronger), ↔ = spread (skill difference between partners). Gap = difference between the two teams.' : '');
+    numbers ? ' Team value = sum of both skills + ¼ of their difference (lower = stronger). Gap = difference between the two teams.' : '');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
     h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
@@ -461,7 +461,7 @@ function roundsOptionsCard(ctx, t) {
     h('button', { class: layout === key ? 'current' : '', onclick: () => { view.layout = key; ctx.render(); } }, label)));
   const numbers = h('label', { class: 'toggle' },
     h('input', { type: 'checkbox', checked: showNumbers(ctx), onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
-    'Show team values and spreads (on this device)');
+    'Show team values (on this device)');
   return h('section', { class: 'card' },
     h('h2', { class: 'card-title' }, 'Rounds & display'),
     h('p', { class: 'muted' }, hidden > 0

@@ -44,3 +44,20 @@ test('edges are shown like in the standings, and a single win together is no dre
   assert.ok(!('Dream team' in s), 'no pair won twice together');
   assert.match(s['Luck of the draw'] ?? '', /edge \+\d\.\d\)/);
 });
+
+test('ties: Still smiling names the lowest skill number, Underdog of the day the highest', () => {
+  // Four players, two rounds; Anna (1) and David (5) both lose twice.
+  const four = [
+    { id: 'a', name: 'Anna', skill: 1 },
+    { id: 'b', name: 'Ben', skill: 9 },
+    { id: 'c', name: 'Carla', skill: 9 },
+    { id: 'd', name: 'David', skill: 5 },
+  ];
+  const rounds = [
+    { round: 1, matches: [{ court: 1, team1: ['a', 'd'], team2: ['b', 'c'] }], sitOuts: [] },
+    { round: 2, matches: [{ court: 1, team1: ['a', 'd'], team2: ['c', 'b'] }], sitOuts: [] },
+  ];
+  const s = Object.fromEntries(tournamentSummary({ players: four, schedule: rounds, results: { '1-1': 2, '2-1': 2 } }).map((x) => [x.title, x.text]));
+  assert.match(s['Still smiling'], /^Anna played 2 games with no wins yet/, 'Anna (skill 1) rather than David (skill 5)');
+  assert.match(s['Underdog of the day'], /^Ben won 2 games/, 'Ben and Carla tie; skill 9 both, then by name');
+});

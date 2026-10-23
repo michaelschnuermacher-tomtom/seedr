@@ -90,7 +90,7 @@ Withdrawn players keep their wins in the standings, but get no bonus and no rank
 
 ## Manage
 
-Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. In Manage, **Rounds & display** reveals the next round(s), switches the Rounds tab between one round and all rounds, shows or hides team values and spreads, starts swapping players, and prints the standings followed by all revealed rounds. Below it, the **Tournament summary** turns the results into fun highlights (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more); it also opens the printout. The password only keeps players from peeking: it can be read in the app's source.
+Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. In Manage, **Rounds & display** reveals the next round(s), switches the Rounds tab between one round and all rounds, shows or hides team values, starts swapping players, and prints the standings followed by all revealed rounds. Below it, the **Tournament summary** turns the results into fun highlights (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more); it also opens the printout. The password only keeps players from peeking: it can be read in the app's source.
 
 ## Keeping data safe
 

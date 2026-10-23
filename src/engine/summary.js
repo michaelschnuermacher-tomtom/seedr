@@ -28,6 +28,9 @@ export function tournamentSummary(t) {
   if (matches.length === 0) return [];
 
   const rows = computeStandings(t.players, t.schedule, t.results).filter((r) => !r.withdrawn && r.games > 0);
+  // Ties: Underdog of the day and Luck of the draw name the player with the highest skill
+  // number, Still smiling the one with the lowest (skill 1 is the best).
+  const weakestFirst = (a, b) => b.skill - a.skill || a.name.localeCompare(b.name);
   const out = [];
   const add = (icon, title, text) => out.push({ icon, title, text });
 
@@ -42,7 +45,7 @@ export function tournamentSummary(t) {
 
   // Underdog of the day: most wins with a negative edge.
   const underdog = rows.filter((r) => r.edge < 0 && r.wins > 0)
-    .sort((a, b) => b.wins - a.wins || a.edge - b.edge)[0];
+    .sort((a, b) => b.wins - a.wins || a.edge - b.edge || weakestFirst(a, b))[0];
   if (underdog) {
     add('🐶', 'Underdog of the day', `${underdog.name} won ${plural(underdog.wins, 'game')} although their team was usually the weaker one`
       + ` (edge ${edge(underdog.edge)}).`);
@@ -102,13 +105,13 @@ export function tournamentSummary(t) {
   }
 
   // Luck of the draw: the strongest teams on average.
-  const lucky = [...rows].sort((a, b) => b.edge - a.edge)[0];
+  const lucky = [...rows].sort((a, b) => b.edge - a.edge || weakestFirst(a, b))[0];
   if (lucky && lucky.edge > 0) {
     add('🍀', 'Luck of the draw', `${lucky.name}'s teams were the strongest on average (edge ${edge(lucky.edge)}).`);
   }
 
   // Still smiling: most games, fewest wins.
-  const smiling = [...rows].sort((a, b) => a.wins - b.wins || b.games - a.games || a.name.localeCompare(b.name))[0];
+  const smiling = [...rows].sort((a, b) => a.wins - b.wins || b.games - a.games || a.skill - b.skill || b.edge - a.edge || a.name.localeCompare(b.name))[0];
   if (smiling && smiling !== top[0] && smiling.games >= 2) {
     add('😄', 'Still smiling', `${smiling.name} played ${plural(smiling.games, 'game')} with ${smiling.wins === 0 ? 'no wins yet' : plural(smiling.wins, 'win')}: there is always the next round!`);
   }
