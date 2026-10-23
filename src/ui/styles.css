@@ -131,32 +131,21 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--surface-2); border-radius: 12px; }
 .tabs button { border: none; background: transparent; min-height: 40px; color: var(--muted); }
 .tabs button.current { background: var(--surface); color: var(--strong); box-shadow: var(--shadow); }
-.tabs.layout { display: flex; width: max-content; max-width: 100%; }
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.toolbar .tabs.layout { margin-left: 0; }
 
 /* Round navigation and progress */
-.round-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
-.round-nav button { min-width: 44px; padding: 8px 0; border-radius: 999px; }
-.round-nav button.complete { background: var(--win-soft); border-color: transparent; color: var(--win); }
-.round-nav button.current { background: var(--strong); border-color: var(--strong); color: var(--strong-text); }
 .progress { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 6px 0 14px; }
 .progress > span { display: block; height: 100%; background: var(--win); border-radius: inherit; transition: width .3s; }
 
 /* Matches */
-.matches { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); margin: 14px 0; }
 .match { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
 .court { font-size: .75rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .vs { text-align: center; color: var(--muted); font-size: .8rem; }
 .court .gaps { float: right; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-variant-numeric: tabular-nums; }
-.toggle { display: flex; align-items: center; gap: 8px; margin: -6px 0 12px; color: var(--muted); font-size: .9rem; cursor: pointer; }
-.toggle input { width: auto; margin: 0; accent-color: var(--accent); }
 .team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 40%, transparent); border-color: transparent; font-weight: 500; }
 .team .names { flex: 1; overflow-wrap: break-word; min-width: 0; }
 .team .side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
 .team .value { color: var(--muted); font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }
-.team.winner::after { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--win); color: var(--surface); font-size: .8rem; flex: none; }
 .team.loser { opacity: .55; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { flex: 1 1 120px; min-height: 48px; background: var(--surface-2); border-color: transparent; font-weight: 500; }
@@ -165,7 +154,6 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .overview-round .match.swap { margin-bottom: 10px; padding: 10px; box-shadow: none; }
 .overview-round .chip { min-height: 42px; padding: 6px 10px; font-size: .92rem; }
 .sit-outs .muted { margin: 4px 0 6px; }
-.reveal { width: 100%; margin-top: 10px; min-height: 52px; }
 
 /* All rounds */
 .overview { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); margin: 14px 0; }
@@ -249,7 +237,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
   .page-break { break-before: page; }
-  .no-print, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
+  .no-print, nav.tabs, .actions, .banner, .progress { display: none !important; }
   /* A little room inside the court area at the top and bottom of every page. */
   .screen { max-width: 160mm; margin: 0 auto; padding: 4mm 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
   .top h1 { font-size: 2rem; }
@@ -263,7 +251,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .team { min-height: 0; }
   /* Winners: green frame and bold names; losers not faded on paper. */
   .team.loser { opacity: 1; }
-  .team.winner::after { display: none; }
   .team.winner .names { font-weight: 700; }
   /* All rounds: compact cards, three rows of two (6 rounds) per page. */
   @page { margin: 24mm 12mm 10mm; }
@@ -275,6 +262,5 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .mini-match .court { font-size: 6.5pt; }
   .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9pt; border-radius: 2mm; }
   .mini-match .team .value { font-size: 7.5pt; }
-  .mini-match .team.winner::after { width: 14px; height: 14px; font-size: 8px; }
   .overview-round > p.muted { margin: 1mm 0 0; font-size: 8pt; line-height: 1.3; }
 }

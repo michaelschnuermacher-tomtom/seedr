@@ -15,18 +15,12 @@ function roundComplete(t, round) {
   return round.matches.every((m) => t.results[resultKey(round.round, m.court)]);
 }
 
-function firstOpenRound(t) {
-  const open = t.schedule.slice(0, t.revealedRounds).find((r) => !roundComplete(t, r));
-  return open ? open.round : Math.max(1, t.revealedRounds);
-}
-
 export function tournamentScreen(ctx) {
   const t = ctx.state.tournament;
-  const view = (ctx.state.view ??= { tab: 'rounds', round: firstOpenRound(t) });
-  view.round = Math.min(Math.max(1, view.round), Math.max(1, t.revealedRounds));
+  const view = (ctx.state.view ??= { tab: 'rounds' });
   const body = view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
-      : view.tab === 'print' ? [summaryCard(t), standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, layout: 'all', swapping: false })]
+      : view.tab === 'print' ? [summaryCard(t), standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, swapping: false })]
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
@@ -82,7 +76,7 @@ function courtColor(court) {
   return `court-color-${(court - 1) % 4}`;
 }
 
-function teamButton(ctx, t, round, match, n, numbers) {
+function teamButton(ctx, t, round, match, n) {
   const team = n === 1 ? match.team1 : match.team2;
   const { winner } = match;
   return h('button', {
@@ -93,36 +87,13 @@ function teamButton(ctx, t, round, match, n, numbers) {
     },
   }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]),
     // The team value in a small column on the right.
-    numbers ? h('span', { class: 'side' }, h('span', { class: 'value' }, formatValue(team.value))) : null);
+    h('span', { class: 'side' }, h('span', { class: 'value' }, formatValue(team.value))));
 }
 
-// Court label, with how far apart the two teams are when numbers are shown.
-function courtLine(tag, m, numbers) {
+// Court label, with how far apart the two teams are.
+function courtLine(tag, m) {
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    numbers ? h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)}`) : null);
-}
-
-// Whether team values are shown; remembered on this device.
-const NUMBERS_KEY = 'seedr.showNumbers';
-
-function showNumbers(ctx) {
-  if (ctx.state.showNumbers == null) {
-    try {
-      ctx.state.showNumbers = window.localStorage.getItem(NUMBERS_KEY) !== 'no';
-    } catch {
-      ctx.state.showNumbers = true;
-    }
-  }
-  return ctx.state.showNumbers;
-}
-
-function setShowNumbers(ctx, on) {
-  ctx.state.showNumbers = on;
-  try {
-    window.localStorage.setItem(NUMBERS_KEY, on ? 'yes' : 'no');
-  } catch {
-    // Not remembered, but still applies until the page is reloaded.
-  }
+    h('span', { class: 'gaps' }, `Gap ${formatValue(m.valueGap)}`));
 }
 
 // Manage asks for this password every time it is opened. It
@@ -145,58 +116,28 @@ function askPassword(ctx, question) {
   return false;
 }
 
+// All revealed rounds; revealing, swapping and the team values are set in Manage.
 function roundsTab(ctx, t, view) {
   const rounds = roundsOverview(t);
-  // The view (one round or all), the numbers, revealing, swapping and printing are all
-  // set in Manage.
-  const layout = view.layout ?? 'one';
-  const numbers = showNumbers(ctx);
   const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.');
   const done = t.schedule.filter((r) => roundComplete(t, r)).length;
   const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
     h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
-
   const hidden = t.settings.rounds - t.revealedRounds;
   const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
   const swapping = Boolean(view.swapping);
-
-  if (layout === 'all') {
-    return [
-      h('h2', { class: 'print-only' }, 'Rounds'),
-      progress,
-      swapping ? swapHeader(ctx, t, view) : hint,
-      h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
-        h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
-        swapping ? swapRound(ctx, t, view, r, numbers, true) : [
-          r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
-            courtLine('span', m, numbers),
-            teamButton(ctx, t, r.round, m, 1, numbers),
-            h('span', { class: 'vs' }, 'vs'),
-            teamButton(ctx, t, r.round, m, 2, numbers))),
-        ]))),
-      swapping ? swapDone(ctx, view) : comingUp,
-    ];
-  }
-
-  const round = rounds[view.round - 1];
-  const nav = h('nav', { class: 'round-nav' }, rounds.map((r) => h('button', {
-    class: [r.round === view.round ? 'current' : '', r.complete ? 'complete' : ''].join(' ').trim(),
-    onclick: () => { view.round = r.round; ctx.render(); },
-  }, String(r.round))));
-
   return [
-    nav,
-    h('h2', {}, `Round ${round.round} of ${t.settings.rounds}`),
+    h('h2', { class: 'print-only' }, 'Rounds'),
     progress,
-    swapping ? [swapHeader(ctx, t, view), swapRound(ctx, t, view, round, numbers, false), swapDone(ctx, view)] : [
-      hint,
-      h('div', { class: 'matches' }, round.matches.map((m) => h('div', { class: `match ${courtColor(m.court)}` },
-        courtLine('div', m, numbers),
-        teamButton(ctx, t, round.round, m, 1, numbers),
-        h('div', { class: 'vs' }, 'vs'),
-        teamButton(ctx, t, round.round, m, 2, numbers)))),
-      comingUp,
-    ],
+    swapping ? swapHeader(ctx, t, view) : hint,
+    h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
+      h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
+      swapping ? swapRound(ctx, t, view, r) : r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
+        courtLine('span', m),
+        teamButton(ctx, t, r.round, m, 1),
+        h('span', { class: 'vs' }, 'vs'),
+        teamButton(ctx, t, r.round, m, 2)))))),
+    swapping ? swapDone(ctx, view) : comingUp,
   ];
 }
 
@@ -220,8 +161,8 @@ function swapDone(ctx, view) {
   }, 'Done'));
 }
 
-// One round's matches and sit-outs as player buttons; `mini` for the All rounds view.
-function swapRound(ctx, t, view, round, numbers, mini) {
+// One round's matches and sit-outs as player buttons.
+function swapRound(ctx, t, view, round) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const r = t.schedule[round.round - 1];
   const picked = (id) => view.swapPick?.round === round.round && view.swapPick.id === id;
@@ -246,13 +187,13 @@ function swapRound(ctx, t, view, round, numbers, mini) {
   const matches = r.matches.map((m, k) => {
     const locked = Boolean(t.results[resultKey(round.round, m.court)]);
     return h('div', { class: `match swap ${courtColor(m.court)}` },
-      courtLine('div', round.matches[k], numbers),
+      courtLine('div', round.matches[k]),
       h('div', { class: 'chips' }, m.team1.map((id) => chip(id, locked))),
       h('div', { class: 'vs' }, locked ? 'vs · has a result' : 'vs'),
       h('div', { class: 'chips' }, m.team2.map((id) => chip(id, locked))));
   });
   return [
-    mini ? matches : h('div', { class: 'matches' }, matches),
+    matches,
     r.sitOuts.length ? h('div', { class: 'sit-outs' }, h('p', { class: 'muted' }, 'Sitting out:'), h('div', { class: 'chips' }, r.sitOuts.map((id) => chip(id, false)))) : null,
   ];
 }
@@ -325,7 +266,6 @@ function withdrawCard(ctx, t) {
           ctx.save(withdrawPlayers(t, [...chosen], newSeed()));
           ctx.state.view.withdraw = null;
           ctx.state.view.tab = 'rounds';
-          ctx.state.view.round = Math.min(from, ctx.state.tournament.revealedRounds);
         } catch (error) {
           ctx.state.message = error.message;
         }
@@ -449,25 +389,15 @@ function roundsOptionsCard(ctx, t) {
     class: 'primary',
     onclick: () => {
       ctx.save(revealNext(t));
-      view.round = from;
       ctx.state.message = step === 1 ? `Round ${from} is revealed.` : `Rounds ${from}–${from + step - 1} are revealed.`;
       ctx.render();
     },
   }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
-  const layout = view.layout ?? 'one';
-  const layoutSwitch = h('nav', { class: 'tabs layout' }, [['one', 'One round'], ['all', 'All rounds']].map(([key, label]) =>
-    h('button', { class: layout === key ? 'current' : '', onclick: () => { view.layout = key; ctx.render(); } }, label)));
-  const numbers = h('label', { class: 'toggle' },
-    h('input', { type: 'checkbox', checked: showNumbers(ctx), onchange: (e) => { setShowNumbers(ctx, e.target.checked); ctx.render(); } }),
-    'Show team values (on this device)');
   return h('section', { class: 'card' },
     h('h2', { class: 'card-title' }, 'Rounds & display'),
     h('p', { class: 'muted' }, hidden > 0
       ? `Rounds 1–${t.revealedRounds} of ${t.settings.rounds} are revealed.`
       : `All ${t.settings.rounds} rounds are revealed.`),
-    h('p', { class: 'muted' }, 'The Rounds tab shows:'),
-    layoutSwitch,
-    numbers,
     h('div', { class: 'actions' },
       reveal,
       h('button', {
@@ -510,7 +440,6 @@ function manageTab(ctx, t) {
         onclick: () => {
           if (!confirm('Draw a completely new schedule?')) return;
           ctx.save(redraw(t, newSeed()));
-          ctx.state.view.round = 1;
           ctx.render();
         },
       }, 'Redraw schedule'),
