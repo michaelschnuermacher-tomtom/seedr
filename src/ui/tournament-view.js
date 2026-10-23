@@ -291,7 +291,9 @@ function printButton() {
 
 function standingsTab(t) {
   const rows = computeStandings(t.players, t.schedule, t.results);
-  const headers = ['#', 'Player', 'Skill', 'Games', 'Wins', 'Bonus', 'Points', 'Avg. advantage'];
+  // The Bonus column only appears once someone has bonus points.
+  const bonus = rows.some((r) => r.bonus);
+  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'Avg. advantage'].filter(Boolean);
   return [
     h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
@@ -299,14 +301,14 @@ function standingsTab(t) {
       h('tbody', {}, rows.map((r) => h('tr', { class: r.withdrawn ? 'withdrawn' : r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
         h('td', { class: 'rank' }, r.withdrawn ? '–' : h('span', { class: 'rank-badge' }, r.rank)),
         h('td', {}, r.name, r.withdrawn ? h('span', { class: 'muted' }, ' (withdrew)') : null),
-        h('td', {}, r.skill),
         h('td', {}, r.games),
         h('td', {}, r.wins),
-        h('td', {}, r.bonus ? `+${r.bonus}` : ''),
+        bonus ? h('td', {}, r.bonus ? `+${r.bonus}` : '') : null,
         h('td', { class: 'points' }, r.points),
         h('td', {}, formatSigned(r.avgGap))))))),
     h('p', { class: 'muted' },
-      'Games and bonus count only rounds with all results entered. Bonus: 0.5 points per game fewer than the most games played. ',
+      'Games count only rounds with all results entered. ',
+      bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
       'Avg. advantage: average difference in team strength per game (positive = played in the stronger team).'),
     printButton(),
