@@ -126,6 +126,8 @@ function setShowNumbers(ctx, on) {
 // Manage asks for this password every time it is opened. It
 // only keeps players from peeking: anyone can read it in the app's source.
 const ALL_ROUNDS_PASSWORD = 'Tenerife';
+// Switched off for now: Manage opens without asking. Set to true to ask again.
+const PASSWORD_REQUIRED = false;
 
 export function isAllRoundsPassword(input) {
   return input != null && input.trim() === ALL_ROUNDS_PASSWORD;
@@ -133,6 +135,7 @@ export function isAllRoundsPassword(input) {
 
 // Asks for the password; false when cancelled or wrong.
 function askPassword(ctx, question) {
+  if (!PASSWORD_REQUIRED) return true;
   const input = prompt(question);
   if (input == null) return false;
   if (isAllRoundsPassword(input)) return true;
@@ -273,11 +276,11 @@ function standingsTab(t) {
   const rows = computeStandings(t.players, t.schedule, t.results);
   // The Bonus column only appears once someone has bonus points.
   const bonus = rows.some((r) => r.bonus);
-  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'PAS'].filter(Boolean);
+  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'Edge'].filter(Boolean);
   return [
     h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
-      h('thead', {}, h('tr', {}, headers.map((x) => h('th', {}, x)))),
+      h('thead', {}, h('tr', {}, headers.map((x) => h('th', { class: x === 'Edge' ? 'num' : null }, x)))),
       h('tbody', {}, rows.map((r) => h('tr', { class: r.withdrawn ? 'withdrawn' : r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
         h('td', { class: 'rank' }, r.withdrawn ? '–' : h('span', { class: 'rank-badge' }, r.rank)),
         h('td', {}, r.name, r.withdrawn ? h('span', { class: 'muted' }, ' (withdrew)') : null),
@@ -285,12 +288,12 @@ function standingsTab(t) {
         h('td', {}, r.wins),
         bonus ? h('td', {}, r.bonus ? `+${r.bonus}` : '') : null,
         h('td', { class: 'points' }, r.points),
-        h('td', {}, r.pas == null ? '–' : formatSigned(r.pas))))))),
+        h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge))))))),
     h('p', { class: 'muted' },
       'Games count only rounds with all results entered. ',
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
-      'PAS (Path Advantage Score): the average gap between the two team values in the games a player played, from their side: + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
+      'Edge: the average head start of the team a player played in, per game, as the gap between the two team values: + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
   ];
 }
 

@@ -34,9 +34,9 @@ test('after round 1: winners lead, sit-out gets 0.5 bonus', () => {
   assert.deepEqual([rows.p2.points, rows.p2.rank], [1, 1]);
   assert.deepEqual([rows.p5.games, rows.p5.bonus, rows.p5.points, rows.p5.rank], [0, 0.5, 0.5, 3]);
   assert.deepEqual([rows.p3.points, rows.p3.rank], [0, 4]);
-  assert.equal(rows.p1.pas, 0.25); // team values 7 (1+5, stronger) vs 7.25 (3+4)
-  assert.equal(rows.p3.pas, -0.25, 'a disadvantage for the weaker team');
-  assert.equal(rows.p5.pas, null, 'no games yet');
+  assert.equal(rows.p1.edge, 0.25); // team values 7 (1+5, stronger) vs 7.25 (3+4)
+  assert.equal(rows.p3.edge, -0.25, 'a disadvantage for the weaker team');
+  assert.equal(rows.p5.edge, null, 'no games yet');
 });
 
 test('after round 2: shared ranks and bonus for both sit-outs', () => {
@@ -83,11 +83,11 @@ test('a withdrawn player keeps wins but gets no bonus and no rank, and is listed
   assert.equal(r.p3.rank, 1);
 });
 
-test('PAS averages advantages and disadvantages over the games of a player', () => {
+test('Edge averages advantages and disadvantages over the games of a player', () => {
   // round 2: 1+9 (12) vs 5+3 (8.5): Ben and Carla 3.5 stronger
   const rows = byId(computeStandings(players, schedule, { '1-1': 1, '2-1': 2 }));
-  assert.equal(rows.p1.pas, (0.25 - 3.5) / 2);
-  assert.equal(rows.p2.pas, (0.25 + 3.5) / 2);
-  assert.equal(rows.p3.pas, (-0.25 + 3.5) / 2);
-  assert.equal(rows.p5.pas, -3.5);
+  assert.equal(rows.p1.edge, (0.25 - 3.5) / 2);
+  assert.equal(rows.p2.edge, (0.25 + 3.5) / 2);
+  assert.equal(rows.p3.edge, (-0.25 + 3.5) / 2);
+  assert.equal(rows.p5.edge, -3.5);
 });

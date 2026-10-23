@@ -73,11 +73,11 @@ or paste players in the same format.
 
 If repeated partners or unbalanced matches can't be avoided (team value gap of 3 or more), **Manage → Draw quality** shows a warning. This happens with few players or very different skill levels.
 
-**PAS (Path Advantage Score).** The same team value gap F also shows up per player in the standings. In every match it counts as an advantage for the stronger team (+F for both its players) and as a disadvantage for the weaker one (−F). A player's PAS is the average of these over the games they played: + means they mostly played in the stronger team, − mostly in the weaker one. Example: Anna plays one match in a team 0.25 stronger and one in a team 3.5 weaker, so her PAS is (0.25 − 3.5) ÷ 2 ≈ −1.63. The draw doesn't optimize PAS directly, but since it keeps every gap F small, everyone's PAS stays close to 0.
+**Edge.** The same team value gap F also shows up per player in the standings. In every match it counts as an advantage for the stronger team (+F for both its players) and as a disadvantage for the weaker one (−F). A player's edge is the average of these over the games they played, i.e. their team's average head start: + means they mostly played in the stronger team, − mostly in the weaker one. Example: Anna plays one match in a team 0.25 stronger and one in a team 3.5 weaker, so her edge is (0.25 − 3.5) ÷ 2 ≈ −1.63. The draw doesn't optimize the edge directly, but since it keeps every gap F small, everyone's edge stays close to 0.
 
 ### Standings
 
-A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed weaker skill first, so the better player comes last. *PAS* (Path Advantage Score) is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one.
+A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed weaker skill first, so the better player comes last. *Edge* is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one.
 
 ### When a player leaves
 
@@ -90,7 +90,7 @@ Withdrawn players keep their wins in the standings, but get no bonus and no rank
 
 ## Manage
 
-Everything that changes or reveals the draw is in **Manage**, which asks for a password every time it is opened. The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. In Manage, **Rounds & display** reveals the next round(s), switches the Rounds tab between one round and all rounds, shows or hides team values and spreads, starts swapping players, and prints the standings followed by all revealed rounds. The password only keeps players from peeking: it can be read in the app's source.
+Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. In Manage, **Rounds & display** reveals the next round(s), switches the Rounds tab between one round and all rounds, shows or hides team values and spreads, starts swapping players, and prints the standings followed by all revealed rounds. The password only keeps players from peeking: it can be read in the app's source.
 
 ## Keeping data safe
 

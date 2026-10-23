@@ -18,7 +18,8 @@ export function h(tag, props, ...children) {
 
 export function formatSigned(x) {
   const v = Math.round(x * 10) / 10;
-  return (v > 0 ? '+' : '') + (v === 0 ? 0 : v).toFixed(1);
+  // A real minus sign (−), as wide as the plus, so signed numbers line up.
+  return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1);
 }
 
 export function slugify(name) {

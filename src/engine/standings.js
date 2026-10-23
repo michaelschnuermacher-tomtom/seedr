@@ -32,12 +32,12 @@ export function computeStandings(players, schedule, results) {
   const withdrawn = new Set(players.filter((p) => p.withdrawnAfter != null).map((p) => p.id));
   const list = [...rows.values()];
   const maxGames = Math.max(0, ...list.filter((r) => !withdrawn.has(r.id)).map((r) => r.games));
-  // Path Advantage Score (PAS): the average match fairness of the games a player played,
+  // Edge: the average head start of a player's team per game, i.e. the match fairness
   // from their side: + = mostly in the stronger team, − = mostly in the weaker one.
   const out = list.map(({ fairnessSum, ...r }) => {
     const gone = withdrawn.has(r.id);
     const bonus = gone ? 0 : 0.5 * (maxGames - r.games);
-    return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, pas: r.games ? fairnessSum / r.games : null };
+    return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, edge: r.games ? fairnessSum / r.games : null };
   });
   // On equal points the weaker player (higher skill number) is listed first.
   out.sort((a, b) => a.withdrawn - b.withdrawn || b.points - a.points || b.skill - a.skill || a.name.localeCompare(b.name));

@@ -184,6 +184,7 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .standings td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .standings tr:last-child td { border-bottom: none; }
 .standings td.points { font-weight: 700; }
+.standings .num { text-align: right; } /* decimal points line up */
 .standings td.rank { width: 1%; }
 .standings tr.withdrawn td { color: var(--muted); }
 .rank-badge { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); font-weight: 650; font-size: .88rem; }
