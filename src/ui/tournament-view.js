@@ -6,6 +6,7 @@ import { scheduleStats, drawWarnings, teamValue, formatValue } from '../engine/s
 import { newSeed } from '../engine/rng.js';
 import { roundStartTimes } from '../engine/timeplan.js';
 import { drawQuality } from '../engine/quality.js';
+import { tournamentSummary } from '../engine/summary.js';
 import { saveFile, downloadFile } from './export.js';
 import { draftFromTournament } from './setup.js';
 
@@ -26,7 +27,7 @@ export function tournamentScreen(ctx) {
   view.round = Math.min(Math.max(1, view.round), Math.max(1, t.revealedRounds));
   const body = view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
-      : view.tab === 'print' ? [standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, layout: 'all', swapping: false })]
+      : view.tab === 'print' ? [summaryCard(t), standingsTab(t), h('div', { class: 'page-break' }), roundsTab(ctx, t, { ...view, layout: 'all', swapping: false })]
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
@@ -428,6 +429,19 @@ function qualityCard(t) {
 }
 
 // Everything that changes or reveals the draw, behind the Manage password.
+// Fun highlights of the results so far (Manage and the top of the printout).
+function summaryCard(t) {
+  const highlights = tournamentSummary(t);
+  return h('section', { class: 'card summary' },
+    h('h2', { class: 'card-title' }, 'Tournament summary'),
+    highlights.length
+      ? h('ul', { class: 'highlights' }, highlights.map((x) => h('li', {},
+        h('span', { class: 'icon', 'aria-hidden': 'true' }, x.icon),
+        h('span', {}, h('strong', {}, x.title), ' ', x.text))))
+      : h('p', { class: 'muted' }, 'The highlights appear once the first round has all its results.'),
+    h('div', { style: 'height: 12px' }));
+}
+
 function roundsOptionsCard(ctx, t) {
   const view = ctx.state.view;
   const hidden = t.settings.rounds - t.revealedRounds;
@@ -475,6 +489,7 @@ function manageTab(ctx, t) {
   const withdrawn = t.players.length - t.players.filter(isActive).length;
   return [
     roundsOptionsCard(ctx, t),
+    summaryCard(t),
     nameCard(ctx, t),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
       fact('Players', withdrawn ? `${t.players.length - withdrawn} (${withdrawn} withdrew)` : t.players.length),

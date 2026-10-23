@@ -196,6 +196,10 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 550; }
+.highlights { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.highlights li { display: flex; gap: 10px; align-items: baseline; line-height: 1.4; }
+.highlights .icon { flex: none; width: 1.4em; text-align: center; }
+.highlights strong { font-weight: 650; }
 
 /* Brand */
 .brand { display: flex; align-items: center; gap: 12px; font-size: 2.6rem; font-weight: 800; letter-spacing: -.045em; color: var(--strong); }
