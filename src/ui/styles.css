@@ -87,7 +87,6 @@ button.primary { background: var(--strong); border-color: var(--strong); color: 
 button.primary:hover { background: color-mix(in srgb, var(--strong) 85%, black); }
 button.danger { color: var(--danger); }
 button.small { min-height: 36px; padding: 4px 12px; font-size: .875rem; }
-button.back { border: none; background: transparent; color: var(--muted); padding: 8px 10px 8px 4px; }
 button.link { border: none; background: none; flex: 1; justify-content: flex-start; text-align: left; padding-left: 0; font-weight: 400; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 
@@ -158,6 +157,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }
 .team.winner::after { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--win); color: var(--surface); font-size: .8rem; flex: none; }
 .team.loser { opacity: .55; }
+.team .won { display: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { flex: 1 1 120px; min-height: 48px; background: var(--surface-2); border-color: transparent; font-weight: 500; }
 .chip.picked { background: var(--accent-soft); border-color: var(--accent); font-weight: 650; }
@@ -201,6 +201,9 @@ table.standings { width: 100%; border-collapse: collapse; font-variant-numeric: 
 .brand img { width: 52px; height: 52px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 6px; }
 .eyebrow img { width: 16px; height: 16px; }
+/* The Seedr logo leads back to Home. */
+button.home-link { min-height: 0; padding: 0; border: none; background: none; justify-content: flex-start; font: inherit; font-size: .75rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+button.home-link:hover { opacity: .75; }
 
 /* Grand Slam colors across the page: a top-down court in the four surfaces behind
    everything, under a veil so text stays readable. */
@@ -239,12 +242,17 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
 @media print {
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
-  .no-print, .top .back, .eyebrow img, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
+  .no-print, .eyebrow img, nav.tabs, .round-nav, .toggle, .actions, .reveal, .banner, .progress { display: none !important; }
   .screen { max-width: 160mm; margin: 0 auto; padding: 0; }
   .top h1 { font-size: 2rem; }
   .card, .match, .overview-round, .table-wrap { box-shadow: none; }
   .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }
+  /* Results in words, so they survive printers without colors or backgrounds. */
+  .team.loser { opacity: 1; }
+  .team.winner::after { display: none; }
+  .team .won { display: inline; margin-left: 2mm; font-weight: 700; color: var(--win); }
+  .team.winner .names { font-weight: 700; }
   /* All rounds: compact cards, three rows of two (6 rounds) per page. */
   @page { margin: 16mm 12mm; }
   .top { margin-bottom: 2mm; }

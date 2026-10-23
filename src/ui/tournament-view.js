@@ -29,8 +29,9 @@ export function tournamentScreen(ctx) {
       : roundsTab(ctx, t, view);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
-      h('button', { class: 'back', onclick: () => ctx.go('home') }, '‹ Home'),
-      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'), h('h1', {}, t.name))),
+      h('div', { class: 'titles' },
+        h('button', { class: 'eyebrow home-link', title: 'Home', onclick: () => ctx.go('home') }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
+        h('h1', {}, t.name))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
       h('button', {
         class: view.tab === key ? 'current' : '',
@@ -89,7 +90,8 @@ function teamButton(ctx, t, round, match, n, numbers) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'value' }, `${formatValue(team.value)} · ↔ ${team.spread}`) : null);
+  }, h('span', { class: 'names' }, team.names), numbers ? h('span', { class: 'value' }, `${formatValue(team.value)} · ↔ ${team.spread}`) : null,
+    winner === n ? h('span', { class: 'won' }, 'won') : null); // spelled out on paper, see @media print
 }
 
 // Court label, with how far apart the two teams are when numbers are shown.
@@ -168,7 +170,6 @@ function roundsTab(ctx, t, view) {
             teamButton(ctx, t, r.round, m, 1, numbers),
             h('span', { class: 'vs' }, 'vs'),
             teamButton(ctx, t, r.round, m, 2, numbers))),
-          r.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${r.sitOuts.join(', ')}`) : null,
         ]))),
       swapping ? swapDone(ctx, view) : comingUp,
     ];
@@ -192,7 +193,6 @@ function roundsTab(ctx, t, view) {
         teamButton(ctx, t, round.round, m, 1, numbers),
         h('div', { class: 'vs' }, 'vs'),
         teamButton(ctx, t, round.round, m, 2, numbers)))),
-      round.sitOuts.length ? h('p', { class: 'muted' }, `Sitting out: ${round.sitOuts.join(', ')}`) : null,
       comingUp,
     ],
   ];
@@ -240,7 +240,7 @@ function swapRound(ctx, t, view, round, numbers, mini) {
     class: `chip${picked(id) ? ' picked' : ''}`,
     disabled: locked,
     onclick: () => tap(id),
-  }, `${byId.get(id).name} (${byId.get(id).skill})`);
+  }, byId.get(id).name);
   const matches = r.matches.map((m, k) => {
     const locked = Boolean(t.results[resultKey(round.round, m.court)]);
     return h('div', { class: `match swap ${courtColor(m.court)}` },

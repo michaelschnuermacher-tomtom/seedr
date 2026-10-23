@@ -141,8 +141,15 @@ export function setupScreen(ctx) {
   refresh();
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
-      h('button', { class: 'back', onclick: () => cancelSetup(ctx) }, d.editingId ? '‹ Back' : '‹ Home'),
-      h('div', { class: 'titles' }, h('span', { class: 'eyebrow' }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
+      h('div', { class: 'titles' },
+        h('button', {
+          class: 'eyebrow home-link',
+          title: 'Home',
+          onclick: () => {
+            ctx.state.draft = null;
+            ctx.go('home');
+          },
+        }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
         h('h1', {}, d.editingId ? 'Edit tournament' : 'New tournament'))),
     form,
     preview);
