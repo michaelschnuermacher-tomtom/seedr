@@ -288,6 +288,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   @page { margin: 24mm 12mm 10mm; }
   .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
+  p.timing { margin: -2mm 0 3mm; break-after: avoid; }
   .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
   .overview-round h3 { margin: 0 0 1.5mm; font-size: 9.5pt; }
   .mini-match { gap: 1.5mm; margin-bottom: 1.5mm; }

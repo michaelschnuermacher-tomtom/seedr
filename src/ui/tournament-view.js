@@ -130,9 +130,11 @@ function roundsTab(ctx, t, view) {
   const hidden = t.settings.rounds - t.revealedRounds;
   const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
   const swapping = Boolean(view.swapping);
+  const { matchMinutes, breakMinutes } = t.settings;
+  const timing = `Each round takes ${matchMinutes} min, ${breakMinutes ? `with a ${breakMinutes} min break between rounds` : 'with no break between rounds'}.`;
   return [
     h('h2', { class: 'print-only' }, 'Rounds'),
-    swapping ? swapHeader(ctx, t, view) : null,
+    swapping ? swapHeader(ctx, t, view) : h('p', { class: 'muted timing' }, timing),
     h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
       h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
       swapping ? swapRound(ctx, t, view, r) : r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
