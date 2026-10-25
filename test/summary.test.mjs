@@ -23,7 +23,7 @@ const summary = (r = results) => Object.fromEntries(tournamentSummary({ players,
 test('the summary tells the highlights of the results', () => {
   const s = summary();
   assert.match(s.Champion, /^Ben leads with 3 points \(3 wins from 3 games\)/);
-  assert.match(s['Upset of the tournament'], /Ben & Eva beat Anna & Carla in round 2, although their team value was 6.5 weaker/);
+  assert.match(s['Upset of the tournament'], /Ben & Eva beat Anna & Carla in round 2, although their team was much weaker/);
   assert.match(s['Dream team'], /Anna & Ben: 2 wins in 2 games together, unbeaten/);
   assert.match(s['Perfect record'], /^Ben won every game/);
   assert.match(s.Rivals, /^Anna and David faced each other 2 times: Anna leads 2:0/);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTournament, setResult } from '../src/engine/tournament.js';
-import { teamValue } from '../src/engine/schedule.js';
+import { teamValue, edgeLevel } from '../src/engine/schedule.js';
 import { roundsOverview, isAllRoundsPassword } from '../src/ui/tournament-view.js';
 
 const make = (revealBatch) => createTournament({
@@ -56,6 +56,12 @@ test('each match has team spreads and the gaps between the teams', () => {
   assert.equal(x.team1.spread, spread(m.team1));
   assert.equal(x.valueGap, Math.abs(value(m.team1) - value(m.team2)));
   assert.equal(x.spreadGap, Math.abs(spread(m.team1) - spread(m.team2)));
+});
+
+test('edges in words: even under 0.25, slight under 0.75, clear under 1.5, big from 1.5', () => {
+  assert.deepEqual([0, 0.1, 0.25, 0.5, 0.74, 0.75, 1.25, 1.49, 1.5, 3].map(edgeLevel),
+    ['even', 'even', 'slight', 'slight', 'slight', 'clear', 'clear', 'clear', 'big', 'big']);
+  assert.equal(edgeLevel(-1), 'clear', 'the sign does not matter');
 });
 
 test('each match knows which team has the edge (lower team value), or 0 when even', () => {

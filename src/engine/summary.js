@@ -1,5 +1,5 @@
 import { computeStandings, resultKey } from './standings.js';
-import { teamValue } from './schedule.js';
+import { teamValue, edgeLevel } from './schedule.js';
 
 // A fun summary of the results so far: highlights like the champion, the underdog of the
 // day or the upset of the tournament. Only rounds with all results entered count, as in
@@ -78,7 +78,7 @@ export function tournamentSummary(t) {
   const upset = [...upsets].sort((a, b) => b.gap - a.gap)[0];
   if (upset) {
     add('💥', 'Upset of the tournament', `${names(upset.won)} beat ${names(upset.lost)} in round ${upset.round}, `
-      + `although their team value was ${fmt(upset.gap)} weaker.`, [...upset.won, ...upset.lost]);
+      + `although their team was ${{ slight: 'slightly', clear: 'clearly', big: 'much' }[edgeLevel(upset.gap)]} weaker.`, [...upset.won, ...upset.lost]);
   }
 
   // Perfect record: won every game, at least two.

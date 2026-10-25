@@ -22,6 +22,15 @@
   --warn-soft: #fbebe6;
   --danger: var(--rg);
   --shadow: 0 1px 2px rgba(16, 28, 45, .05), 0 4px 16px rgba(16, 28, 45, .07);
+  /* Edge levels on the round cards: even grey, slight blue, clear amber, big red. */
+  --edge-even: var(--muted);
+  --edge-even-soft: var(--surface-2);
+  --edge-slight: #1d6a87;
+  --edge-slight-soft: #e2f2f8;
+  --edge-clear: #8a5a00;
+  --edge-clear-soft: #fbf0d9;
+  --edge-big: #a63d26;
+  --edge-big-soft: #fbe4de;
   --radius: 16px;
   --radius-sm: 10px;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -44,6 +53,12 @@
     --win-soft: #16301f;
     --warn: #f0a593;
     --warn-soft: #3a2420;
+    --edge-slight: #7cc7e6;
+    --edge-slight-soft: #173341;
+    --edge-clear: #e8b96a;
+    --edge-clear-soft: #3a2f1a;
+    --edge-big: #f0a593;
+    --edge-big-soft: #3a2420;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
     color-scheme: dark;
   }
@@ -139,6 +154,11 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .court { font-size: .75rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .vs { text-align: center; color: var(--muted); font-size: .8rem; }
 .court .gaps { float: right; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.edge-tag { padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+.edge-even { color: var(--edge-even); background: var(--edge-even-soft); }
+.edge-slight { color: var(--edge-slight); background: var(--edge-slight-soft); }
+.edge-clear { color: var(--edge-clear); background: var(--edge-clear-soft); }
+.edge-big { color: var(--edge-big); background: var(--edge-big-soft); }
 .team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 40%, transparent); border-color: transparent; font-weight: 500; }
 .team .names { flex: 1; overflow-wrap: break-word; min-width: 0; }
 .team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }

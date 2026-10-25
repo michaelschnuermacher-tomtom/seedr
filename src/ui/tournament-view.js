@@ -2,7 +2,7 @@ import { h, formatSigned, slugify } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, renameTournament, swapPlayersAcross } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
-import { scheduleStats, drawWarnings, teamValue, formatValue } from '../engine/schedule.js';
+import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
 import { tournamentSummary } from '../engine/summary.js';
@@ -94,11 +94,14 @@ function teamButton(ctx, t, round, match, n) {
   }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]));
 }
 
-// Court label, with the team that has the edge (e.g. "Felix & Gesa +0.5"), or Even.
+const EDGE_LABELS = { slight: 'Slight edge', clear: 'Clear edge', big: 'Big edge' };
+
+// Court label, with how big the edge is and which team has it (e.g. "Slight edge: Felix & Gesa"), or Even.
 function courtLine(tag, m) {
-  const favoured = m.favoured === 1 ? m.team1 : m.favoured === 2 ? m.team2 : null;
+  const level = edgeLevel(m.valueGap);
+  const favoured = m.favoured === 1 ? m.team1 : m.team2;
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    h('span', { class: 'gaps' }, favoured ? `${favoured.members.join(' & ')} +${formatValue(m.valueGap)}` : 'Even'));
+    h('span', { class: `gaps edge-tag edge-${level}` }, level === 'even' ? 'Even' : `${EDGE_LABELS[level]}: ${favoured.members.join(' & ')}`));
 }
 
 // Manage asks for this password every time it is opened. It

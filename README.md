@@ -76,7 +76,7 @@ If repeated partners or unbalanced matches can't be avoided (team value gap of 3
 
 ### Standings
 
-A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed lowest edge first (the one who won with less help from the draw), then weaker skill first. *Edge* is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one.
+A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed lowest edge first (the one who won with less help from the draw), then weaker skill first. *Edge* is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one. On the round cards, each match says in words how big the edge is and which team has it: *Even* (under 0.25), *Slight* (under 0.75), *Clear* (under 1.5) or *Big* (1.5 and more; one skill step is 1.0).
 
 ### When a player leaves
 

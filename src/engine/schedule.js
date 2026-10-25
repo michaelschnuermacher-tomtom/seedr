@@ -323,6 +323,13 @@ export function formatValue(x) {
   return String(Math.round(x * 100) / 100);
 }
 
+// How big an edge is, in words: one skill step is 1.0, and team values move in quarter
+// steps. Under 0.25 even, under 0.75 slight, under 1.5 clear, from 1.5 big.
+export function edgeLevel(gap) {
+  const x = Math.abs(gap);
+  return x < 0.25 ? 'even' : x < 0.75 ? 'slight' : x < 1.5 ? 'clear' : 'big';
+}
+
 export function drawWarnings(stats) {
   const warnings = [];
   if (stats.partnerRepeats > 0) {
