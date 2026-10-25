@@ -54,7 +54,7 @@ export function tournamentSummary(t) {
       + ` although ${all.length > 1 ? 'their teams were' : 'their team was'} usually the weaker one (edge ${edge(underdog.edge)}).`, all.map((r) => r.id));
   }
 
-  // Dream team: the partnership with the most wins together. The draw never repeats
+  // Dream team: the partnership with the most wins together. The draw rarely repeats
   // partners, so this needs at least two wins together (e.g. after swapping players).
   const pairs = new Map();
   for (const m of matches) {

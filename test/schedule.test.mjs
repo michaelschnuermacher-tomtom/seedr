@@ -151,7 +151,7 @@ test('scheduleStats recomputes the stats of a stored schedule', () => {
 test('drawWarnings', () => {
   const base = { partnerRepeats: 0, maxAbsDiff: 2 };
   assert.deepEqual(drawWarnings(base), []);
-  assert.match(drawWarnings({ ...base, partnerRepeats: 2 })[0], /repeated partners: 2/);
+  assert.match(drawWarnings({ ...base, partnerRepeats: 2 })[0], /team up twice \(2 repeated pairing/);
   assert.match(drawWarnings({ ...base, maxAbsDiff: 3 })[0], /unbalanced.*up to 3\)/);
   assert.match(drawWarnings({ ...base, maxAbsDiff: 3.25 })[0], /up to 3.25/);
 });
@@ -160,18 +160,54 @@ test('small groups stay reasonably balanced (no stuck draw)', () => {
   // Worst team value gap, averaged over three draws: groups with extreme skills cannot be
   // even, and now and then a single draw is a little worse.
   const cases = [
-    { skills: [1, 2, 3, 4, 5, 6, 7, 8], courts: 2, rounds: 7, maxMean: 5 },
-    { skills: [6, 3, 10, 3, 9, 2, 2, 2, 3, 6], courts: 2, rounds: 10, maxMean: 4 },
-    { skills: [8, 1, 10, 6, 7, 7, 10, 7, 10, 9, 1, 2], courts: 3, rounds: 10, maxMean: 7.5 },
+    // A few partners repeat where avoiding them all would force a big mismatch.
+    { skills: [1, 2, 3, 4, 5, 6, 7, 8], courts: 2, rounds: 7, maxMean: 3.5, maxRepeats: 4 },
+    { skills: [6, 3, 10, 3, 9, 2, 2, 2, 3, 6], courts: 2, rounds: 10, maxMean: 3, maxRepeats: 3 },
+    { skills: [8, 1, 10, 6, 7, 7, 10, 7, 10, 9, 1, 2], courts: 3, rounds: 10, maxMean: 3.5, maxRepeats: 6 },
   ];
-  for (const { skills, courts, rounds, maxMean } of cases) {
+  for (const { skills, courts, rounds, maxMean, maxRepeats } of cases) {
     const worst = [1, 2, 3].map((seed) => {
       const { stats } = generateSchedule({ players: makePlayers(skills), courts, rounds, seed });
-      assert.equal(stats.partnerRepeats, 0, `${skills.length} players, seed ${seed}: partner repeats`);
+      assert.ok(stats.partnerRepeats <= maxRepeats, `${skills.length} players, seed ${seed}: ${stats.partnerRepeats} partner repeats`);
       return stats.maxAbsDiff;
     });
     const mean = worst.reduce((a, b) => a + b) / worst.length;
     assert.ok(mean <= maxMean, `${skills.length} players: worst gaps ${worst.join(', ')}`);
+  }
+});
+
+// The 8-player example: two skill-1 players and two skill-4 players would otherwise face
+// each other in every round, and over 7+ rounds the skill-1 players had to team up.
+const EIGHT = [['Seb', 1], ['Micha', 1], ['Henri', 4], ['Lia', 4], ['Felix', 5], ['Ada', 6], ['Hugo', 6], ['Bianca', 6]]
+  .map(([name, skill]) => ({ id: name, name, skill }));
+const meetings = (schedule, x, y) => {
+  const count = { opponents: 0, partners: 0 };
+  for (const r of schedule) for (const m of r.matches) {
+    if ([m.team1, m.team2].some((t) => t.includes(x) && t.includes(y))) count.partners++;
+    else if ([...m.team1, ...m.team2].includes(x) && [...m.team1, ...m.team2].includes(y)) count.opponents++;
+  }
+  return count;
+};
+
+test('two players are opponents in at most two-thirds of the rounds', () => {
+  for (const rounds of [5, 6]) {
+    for (const seed of [1, 2, 3]) {
+      const { schedule, stats } = generateSchedule({ players: EIGHT, courts: 2, rounds, seed });
+      const cap = Math.floor((2 * rounds) / 3);
+      assert.equal(stats.overMeet, 0, `${rounds} rounds, seed ${seed}`);
+      assert.ok(meetings(schedule, 'Seb', 'Micha').opponents <= cap, `${rounds} rounds, seed ${seed}: Seb & Micha`);
+      assert.ok(meetings(schedule, 'Henri', 'Lia').opponents <= cap, `${rounds} rounds, seed ${seed}: Henri & Lia`);
+    }
+  }
+});
+
+test('with 8 players a partner repeats rather than a big mismatch', () => {
+  for (const rounds of [7, 9]) {
+    for (const seed of [1, 2, 3]) {
+      const { schedule, stats } = generateSchedule({ players: EIGHT, courts: 2, rounds, seed });
+      assert.equal(meetings(schedule, 'Seb', 'Micha').partners, 0, `${rounds} rounds, seed ${seed}: Seb & Micha never team up`);
+      assert.ok(stats.maxAbsDiff <= 3, `${rounds} rounds, seed ${seed}: worst edge ${stats.maxAbsDiff}`);
+    }
   }
 });
 

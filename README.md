@@ -63,14 +63,17 @@ or paste players in the same format.
    | Different partners | Σ (times two players were partners)² | 3 |
    | Different opponents | Σ (times two players were opponents)² | 1 |
    | Games spread out | Σ (length of each run of sit-outs)² − sit-outs: single sit-outs are free, longer runs cost more | 50 |
-   | Same partner twice | per repeat (practically forbidden) | 10,000 |
+   | Same partner twice | per repeat: more than any normal mismatch, less than a big one (edge about 4 or more) | 300 |
+   | Opponents too often | per meeting beyond two-thirds of the rounds (at least 1) | 300 |
 
-   It works in two stages. **Fairness first:** 4 searches from different starts look only at fair matches (plus games spread out and no repeated partners); the fairest wins. **Then variety:** starting from it, the draw looks for different partners and opponents, but fair matches may get at most 10% worse than the best found.
+   The last two rules matter mostly with few players. Take 8 players with two of skill 1 (Seb, Micha) and two of skill 4 (Henri, Lia): the fairest round always puts Seb against Micha and Henri against Lia, so they would face each other every round, and over 7 rounds everyone would have to team up with everyone once, including Seb with Micha (an edge of 6). Now no two players face each other in more than two-thirds of the rounds, and a partner repeats rather than creating such a mismatch.
+
+   It works in two stages. **Fairness first:** 4 searches from different starts look only at fair matches (plus games spread out, repeated partners and opponents meeting too often); the fairest wins. **Then variety:** starting from it, the draw looks for different partners and opponents, but fair matches may get at most 10% worse than the best found.
 
    Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw uses 100,000 steps in total (200,000 for fewer than 14 players).
 4. **Seed.** All randomness comes from one seed number stored with the tournament. The same seed and settings always give the same schedule on every device. **Redraw schedule** simply uses a new seed.
 
-If repeated partners or unbalanced matches can't be avoided (team value gap of 3 or more), **Manage → Draw quality** shows a warning. This happens with few players or very different skill levels.
+If partners repeat or matches are unbalanced (team value gap of 3 or more), **Manage → Draw quality** shows a warning. This happens with few players or very different skill levels.
 
 **Edge.** The same team value gap F also shows up per player in the standings. In every match it counts as an advantage for the stronger team (+F for both its players) and as a disadvantage for the weaker one (−F). A player's edge is the average of these over the games they played, i.e. their team's average head start: + means they mostly played in the stronger team, − mostly in the weaker one. Example: Anna plays one match in a team 0.25 stronger and one in a team 3.5 weaker, so her edge is (0.25 − 3.5) ÷ 2 ≈ −1.63. The draw doesn't optimize the edge directly, but since it keeps every gap F small, everyone's edge stays close to 0.
 

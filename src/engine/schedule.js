@@ -5,7 +5,12 @@ import { perRoundPlayers } from './timeplan.js';
 // - handicap: share of a team's skill spread added to its skill sum (opponents can play
 //   to the weaker partner);
 // - fairness: weight of Σ (F² + F⁴/9) over all matches;
-// - partner: cost of a repeated partner (practically forbidden);
+// - partner: cost of a repeated partner: high, but less than a big mismatch (an edge of
+//   about 4 or more), so with few players a partner repeats rather than e.g. both
+//   skill-1 players forming one team;
+// - meetShare, meetCost: two players should be opponents in at most this share of the
+//   rounds (at least 1); each meeting beyond that costs meetCost, so strong outliers
+//   don't face each other every round just because that is the fairest;
 // - teammates, opponents: weights of Σ T² and Σ O² in the variety stage;
 // - rest: weight of how unevenly each player's games are spread over the rounds;
 // - tolerance: how much the fairness may get worse in the variety stage (share of the
@@ -14,9 +19,11 @@ import { perRoundPlayers } from './timeplan.js';
 // - varietyTemp: start temperature of the variety stage;
 // - exchangeShare: share of search steps that exchange sit-outs between rounds.
 export const DRAW = {
-  handicap: 0.25, fairness: 10, partner: 10000, teammates: 3, opponents: 1, rest: 50,
+  handicap: 0.25, fairness: 10, partner: 300, meetShare: 2 / 3, meetCost: 300, teammates: 3, opponents: 1, rest: 50,
   tolerance: 0.1, minSlack: 10, fairnessShare: 0.7, varietyTemp: 20, exchangeShare: 0.3,
 };
+// Start temperature of the fairness stage.
+const FAIRNESS_TEMP = 20000;
 export const DEFAULT_ITERATIONS = 100000;
 // Small groups are cheap to evaluate but hard to balance, so they get more search.
 export const SMALL_GROUP_ITERATIONS = 200000;
@@ -116,6 +123,8 @@ export function evaluate(slots, strength, n, current = n) {
   let partnerRepeats = 0;
   let opponentRepeats = 0;
   let opponentThirds = 0;
+  let overMeet = 0; // opponent meetings beyond the share of rounds allowed
+  const meetCap = Math.max(1, Math.floor(DRAW.meetShare * slots.length));
   let sumDiffSq = 0;
   let maxAbsDiff = 0;
   let gapCost = 0;
@@ -151,6 +160,7 @@ export function evaluate(slots, strength, n, current = n) {
         opponentSq += 2 * o - 1;
         if (o > 1) opponentRepeats++;
         if (o > 2) opponentThirds++;
+        if (o > meetCap) overMeet++;
       }
     }
   }
@@ -159,7 +169,7 @@ export function evaluate(slots, strength, n, current = n) {
   const fairness = DRAW.fairness * gapCost;
   const variety = DRAW.teammates * partnerSq + DRAW.opponents * opponentSq;
   return {
-    fairness, variety, rest, partnerRepeats, opponentRepeats, opponentThirds, partnerSq, opponentSq,
+    fairness, variety, rest, partnerRepeats, opponentRepeats, opponentThirds, overMeet, partnerSq, opponentSq,
     sumDiffSq, maxAbsDiff, maxAbsBalance,
   };
 }
@@ -248,7 +258,8 @@ function anneal(start, strength, n, current, rng, iterations, fixed, costOf, sta
 }
 
 // Draws `rounds` rounds for `players` in two stages:
-// A. fairness: the fairest draw without repeated partners (several restarts);
+// A. fairness: the fairest draw, avoiding repeated partners and players who face each
+//    other in too many rounds (several restarts);
 // B. variety: starting from it, the most different partners and opponents while the
 //    fairness stays within DRAW.tolerance of the best found in stage A.
 // Both stages may also move sit-outs between rounds (everyone keeps the same number),
@@ -277,7 +288,7 @@ export function generateSchedule({ players, courts, rounds, seed, iterations, pa
   const fixed = history.length;
 
   // Stage A: fairness.
-  const fairCost = (st) => DRAW.partner * st.partnerRepeats + st.fairness + DRAW.rest * st.rest;
+  const fairCost = (st) => DRAW.partner * st.partnerRepeats + DRAW.meetCost * st.overMeet + st.fairness + DRAW.rest * st.rest;
   const stageA = Math.floor((iterations * DRAW.fairnessShare) / RESTARTS);
   let best = null;
   let bestCost = Infinity;
@@ -286,7 +297,7 @@ export function generateSchedule({ players, courts, rounds, seed, iterations, pa
       slots: [...history, ...sitOuts.map((sitting) => shuffle(rng, [...Array(n).keys()].filter((i) => !sitting.includes(i))))],
       sits: [...satOut, ...sitOuts.map((s) => s.slice())],
     };
-    const result = anneal(start, strength, total, n, rng, stageA, fixed, fairCost, 2 * DRAW.partner);
+    const result = anneal(start, strength, total, n, rng, stageA, fixed, fairCost, FAIRNESS_TEMP);
     if (result.cost < bestCost) ({ best, cost: bestCost } = result);
   }
 
@@ -294,6 +305,7 @@ export function generateSchedule({ players, courts, rounds, seed, iterations, pa
   const a = evaluate(best.slots, strength, total, n);
   const limit = a.fairness + Math.max(DRAW.tolerance * a.fairness, DRAW.minSlack);
   const varietyCost = (st) => DRAW.partner * Math.max(0, st.partnerRepeats - a.partnerRepeats)
+    + DRAW.meetCost * Math.max(0, st.overMeet - a.overMeet)
     + st.variety + DRAW.rest * st.rest + (st.fairness > limit ? DRAW.partner * (1 + st.fairness - limit) : 0);
   const stageB = iterations - stageA * RESTARTS;
   ({ best } = anneal(best, strength, total, n, rng, stageB, fixed, varietyCost, DRAW.varietyTemp));
@@ -333,10 +345,10 @@ export function edgeLevel(gap) {
 export function drawWarnings(stats) {
   const warnings = [];
   if (stats.partnerRepeats > 0) {
-    warnings.push(`Could not avoid repeated partners: ${stats.partnerRepeats} repeated pairing(s).`);
+    warnings.push(`Some players team up twice (${stats.partnerRepeats} repeated pairing(s)): with these players, that keeps the matches more balanced.`);
   }
   if (stats.maxAbsDiff >= UNBALANCED_GAP) {
-    warnings.push(`Some matches are unbalanced (team value gap up to ${formatValue(stats.maxAbsDiff)}). With few players or very different skill levels, avoiding repeated partners limits how balanced matches can be.`);
+    warnings.push(`Some matches are unbalanced (team value gap up to ${formatValue(stats.maxAbsDiff)}). With few players or very different skill levels, not every match can be balanced.`);
   }
   return warnings;
 }
