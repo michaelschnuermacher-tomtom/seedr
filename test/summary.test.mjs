@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tournamentSummary } from '../src/engine/summary.js';
+import { createTournament } from '../src/engine/tournament.js';
 
 // Team values: Anna+Ben 12, Carla+David 10, Anna+Carla 7, Ben+Eva 13.5, David+Eva 8.5.
 const players = [
@@ -53,10 +54,34 @@ test('every player who played is mentioned at least once', () => {
   }
 });
 
-test('players without a highlight are grouped into fun categories', () => {
+test('more properties name everyone who has them, until every player is mentioned', () => {
   const s = summary({ '1-1': 2, '2-1': 1 });
-  assert.match(s['One to remember'], /^Carla & David \(round 1\) and Anna & Carla \(round 2\) each had a win to celebrate\./);
-  assert.match(s['Saving the best for later'], /^Eva is still warming up/);
+  assert.match(s['Still smiling'], /^Eva and Ben have no wins yet/, 'everyone without a win');
+  assert.match(s.Comeback, /^Anna lost the first game and won the last one\./);
+  assert.match(s['Flying start'], /^Carla and David won the very first game\./, 'Carla is named again: the group is complete');
+  assert.match(summary({ '1-1': 1, '2-1': 1, '3-1': 2 })['Strong finish'], /^David & Eva won in round 3, the latest round\./);
+});
+
+test('in a real-size tournament, every player who played is mentioned and no property names more than a third', () => {
+  const fixed = new Set(['Champion', 'Champions', 'Underdog of the day', 'Dream team', 'Upset of the tournament', 'Perfect record',
+    'Rivals', 'Luck of the draw', 'Still smiling', 'Win tally', 'By the numbers']);
+  const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
+  const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
+  for (const [seed, played] of [[3, 5], [8, 9], [11, 3], [5, 7]]) {
+    const t = createTournament({ id: 'x', name: 'x', seed, now: new Date(), players: names.map((name, i) => ({ name, skill: skills[i] })),
+      settings: { courts: 2, rounds: 9, lastRoundCourts: 1, matchMinutes: 21, breakMinutes: 5, revealBatch: 'all' } });
+    let k = seed;
+    const results = {};
+    for (const r of t.schedule.slice(0, played)) for (const m of r.matches) { k = (k * 31 + 7) % 97; results[`${r.round}-${m.court}`] = (k % 2) + 1; }
+    const s = tournamentSummary({ ...t, results });
+    const text = s.map((x) => `${x.title} ${x.text}`).join(' ');
+    const playedIds = new Set(t.schedule.slice(0, played).flatMap((r) => r.matches.flatMap((m) => [...m.team1, ...m.team2])));
+    for (const p of t.players.filter((x) => playedIds.has(x.id))) assert.ok(text.includes(p.name), `seed ${seed}: ${p.name} missing`);
+    for (const x of s.filter((y) => !fixed.has(y.title))) {
+      const named = t.players.filter((p) => new RegExp(`\\b${p.name}\\b`).test(x.text)).length;
+      assert.ok(named <= Math.ceil(17 / 3), `seed ${seed}: ${x.title} names ${named}`);
+    }
+  }
 });
 
 test('ties: players with the same statistic are named together', () => {
@@ -72,7 +97,7 @@ test('ties: players with the same statistic are named together', () => {
     { round: 2, matches: [{ court: 1, team1: ['a', 'd'], team2: ['c', 'b'] }], sitOuts: [] },
   ];
   const s = Object.fromEntries(tournamentSummary({ players: four, schedule: rounds, results: { '1-1': 2, '2-1': 2 } }).map((x) => [x.title, x.text]));
-  assert.match(s['Still smiling'], /^David and Anna played 2 games each with no wins yet/, 'in standings order');
+  assert.match(s['Still smiling'], /^David and Anna have no wins yet/, 'in standings order');
   assert.match(s['Underdog of the day'], /^Ben and Carla won 2 games each although their teams were usually the weaker one/);
   assert.ok(!('Saving the best for later' in s), 'nobody with the same record is left over');
 });

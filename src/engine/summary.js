@@ -4,7 +4,7 @@ import { teamValue } from './schedule.js';
 // A fun summary of the results so far: highlights like the champion, the underdog of the
 // day or the upset of the tournament. Only rounds with all results entered count, as in
 // the standings. Each highlight is { icon, title, text }; one only appears when there is
-// something to tell. Players without a highlight get a line of their own.
+// something to tell. Every player is mentioned at least once.
 export function tournamentSummary(t) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const name = (id) => byId.get(id).name;
@@ -116,41 +116,111 @@ export function tournamentSummary(t) {
       : `${lucky.name}'s teams were the strongest on average (edge ${edge(lucky.edge)}).`, all.map((r) => r.id));
   }
 
-  // Still smiling: most games, fewest wins.
+  // Still smiling: everyone without a win, or else the fewest wins in the most games.
   const smiling = [...rows].sort((a, b) => a.wins - b.wins || b.games - a.games)[0];
   if (smiling && !top.includes(smiling) && smiling.games >= 2) {
-    const all = rows.filter((r) => r.wins === smiling.wins && r.games === smiling.games);
-    add('😄', 'Still smiling', `${and(all.map((r) => r.name))} played ${plural(smiling.games, 'game')}${all.length > 1 ? ' each' : ''}`
-      + ` with ${smiling.wins === 0 ? 'no wins yet' : plural(smiling.wins, 'win')}: there is always the next round!`, all.map((r) => r.id));
+    const all = smiling.wins === 0 ? rows.filter((r) => r.wins === 0)
+      : rows.filter((r) => r.wins === smiling.wins && r.games === smiling.games);
+    add('😄', 'Still smiling', smiling.wins === 0
+      ? `${and(all.map((r) => r.name))} ${all.length > 1 ? 'have' : 'has'} no wins yet: there is always the next round!`
+      : `${and(all.map((r) => r.name))} played ${plural(smiling.games, 'game')}${all.length > 1 ? ' each' : ''}`
+        + ` with ${plural(smiling.wins, 'win')}: there is always the next round!`, all.map((r) => r.id));
   }
 
-  // Everyone not mentioned yet lands in one of these, so the summary covers every player.
-  // Wins are told per team: "Henri & Hugo (round 4)".
-  const unmentioned = () => rows.filter((x) => !mentioned.has(x.id));
-  const fresh = (m) => m.won.some((id) => !mentioned.has(id));
-  const teamWins = (list) => and(list.map((m) => `${names(m.won)} (round ${m.round})`));
-  const byRound = (a, b) => a.round - b.round || a.court - b.court;
-  // Giant slayers: the other upsets, as long as they bring in someone new.
-  const slayed = upsets.filter((m) => m !== upset && fresh(m)).sort(byRound);
-  if (slayed.length) {
-    add('🗡️', 'Giant slayers',`${teamWins(slayed)} won as the weaker team.`, slayed.flatMap((m) => m.won));
+  // More properties that tell players apart. Each names everyone who has it; the rarest come
+  // first, and they are added until every player is mentioned. A property shared by more
+  // than a third of the players says little about them and is left out.
+  const history = new Map(rows.map((r) => [r.id, []])); // each player's games, in order
+  for (const m of matches) {
+    for (const [team, other, won] of [[m.won, m.lost, true], [m.lost, m.won, false]]) {
+      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other });
+    }
   }
-  const steady = unmentioned().filter((r) => r.wins >= 2);
-  if (steady.length) {
-    add('💪', 'Steady hands', `${and(steady.map((r) => `${r.name} (${r.wins} of ${r.games})`))} kept the wins coming.`, steady.map((r) => r.id));
+  const games = (r) => history.get(r.id);
+  const who = (list) => and(list.map((r) => r.name));
+  const ids = (list) => list.map((r) => r.id);
+  const teams = (list) => and(list.map((m) => `${names(m.won)} (round ${m.round})`));
+  const pool = [];
+  const offer = (icon, title, members, text) => { if (members.length) pool.push({ icon, title, members: [...new Set(members)], text }); };
+
+  // Hot streak: the most wins in a row.
+  const streak = (r) => { let best = 0; let run = 0; for (const g of games(r)) { run = g.won ? run + 1 : 0; best = Math.max(best, run); } return best; };
+  const longest = Math.max(0, ...rows.map(streak));
+  if (longest >= 2) {
+    const list = rows.filter((r) => streak(r) === longest);
+    offer('🔥', 'Hot streak', ids(list), `${who(list)} won ${longest} games in a row.`);
   }
-  // One to remember: the single win of each player still missing, one entry per team.
-  const remembered = [...new Set(unmentioned().filter((r) => r.wins === 1)
-    .map((r) => matches.find((m) => m.won.includes(r.id))))].sort(byRound);
-  if (remembered.length) {
-    add('🎉', 'One to remember', `${teamWins(remembered)} ${remembered.length === 1 ? 'had a win' : 'each had a win'} to celebrate.`,
-      remembered.flatMap((m) => m.won));
+  // Comeback: lost the first game, won the last one.
+  const comeback = rows.filter((r) => games(r).length >= 2 && !games(r)[0].won && games(r).at(-1).won);
+  offer('📈', 'Comeback', ids(comeback), `${who(comeback)} lost the first game and won the last one.`);
+  // Flying start: won the first game.
+  const flying = rows.filter((r) => games(r)[0]?.won);
+  offer('🌅', 'Flying start', ids(flying), `${who(flying)} won the very first game.`);
+  // Strong finish: won in the latest round played.
+  const lastRound = Math.max(...matches.map((m) => m.round));
+  const finish = matches.filter((m) => m.round === lastRound);
+  offer('🎬', 'Strong finish', finish.flatMap((m) => m.won), `${and(finish.map((m) => names(m.won)))} won in round ${lastRound}, the latest round.`);
+  // Rollercoaster: win and loss alternate in every game.
+  const roller = rows.filter((r) => games(r).length >= 4 && games(r).every((g, i) => i === 0 || g.won !== games(r)[i - 1].won));
+  offer('🎢', 'Rollercoaster', ids(roller), `${who(roller)} alternated wins and losses in every game.`);
+  // Odd couple: the biggest skill difference in a winning team.
+  const skillGap = (m) => Math.abs(byId.get(m.won[0]).skill - byId.get(m.won[1]).skill);
+  const widest = Math.max(0, ...matches.map(skillGap));
+  if (widest >= 3) {
+    const list = matches.filter((m) => skillGap(m) === widest);
+    offer('🎓', 'Odd couple', list.flatMap((m) => m.won), `${and(list.map((m) => `${names(m.won)} (skills ${m.won.map((id) => byId.get(id).skill).join(' and ')})`))}`
+      + ' won together: the biggest skill difference in a winning team.');
   }
-  const warming = unmentioned().filter((r) => r.wins === 0);
-  if (warming.length) {
-    add('🌱', 'Saving the best for later', `${and(warming.map((r) => r.name))} ${warming.length === 1 ? 'is' : 'are'} still warming up:`
-      + ' the first win is just around the corner.', warming.map((r) => r.id));
+  // Toughest draw: the strongest opponents on average (lowest team value).
+  const against = (r) => shown(games(r).reduce((sum, g) => sum + g.theirs, 0) / games(r).length);
+  const regulars = rows.filter((r) => games(r).length >= 2);
+  const toughest = Math.min(...regulars.map(against));
+  const tough = regulars.filter((r) => against(r) === toughest);
+  offer('🏔️', 'Toughest draw', ids(tough), `${who(tough)} faced the strongest opponents on average (team value ${fmt(toughest / 10)}).`);
+  // Champion beater: beat a team with one of the leaders.
+  if (top.length < rows.length) {
+    const beaters = rows.filter((r) => !top.includes(r) && matches.some((m) => m.won.includes(r.id) && m.lost.some((id) => top.some((x) => x.id === id))));
+    offer('👑', 'Champion beater', ids(beaters), `${who(beaters)} beat ${top.length > 1 ? 'one of the leaders' : 'the leader'}.`);
   }
+  // Nemesis: lost to the same player more than once.
+  const losses = new Map();
+  for (const m of matches) for (const a of m.lost) for (const b of m.won) losses.set(`${a}|${b}`, (losses.get(`${a}|${b}`) ?? 0) + 1);
+  const nemeses = [...losses].filter(([, n]) => n >= 2).map(([key, n]) => [...key.split('|'), n]).filter(([a]) => history.has(a));
+  offer('😈', 'Nemesis', nemeses.flatMap(([a, b]) => [a, b]),
+    `${and(nemeses.map(([a, b, n]) => `${name(a)} lost ${n === 2 ? 'twice' : `${n} times`} against ${name(b)}`))}.`);
+  // Unshakable: won every game against a stronger team.
+  const unshakable = rows.filter((r) => games(r).length >= 2 && games(r).some((g) => g.mine > g.theirs) && games(r).every((g) => g.mine <= g.theirs || g.won));
+  offer('🧱', 'Unshakable', ids(unshakable), `${who(unshakable)} won every game against a stronger team.`);
+  // Overachiever: more wins as the weaker team than losses as the stronger one.
+  const over = rows.filter((r) => {
+    const up = games(r).filter((g) => g.won && g.mine > g.theirs).length;
+    return up > 0 && up > games(r).filter((g) => !g.won && g.mine < g.theirs).length;
+  });
+  offer('🚀', 'Overachiever', ids(over), `${who(over)} won more games as the weaker team than they lost as the stronger one.`);
+  // So close: lost although their team was the stronger one.
+  const close = upsets.map((m) => ({ ...m, won: m.lost }));
+  offer('😬', 'So close', close.flatMap((m) => m.won), `${teams(close)} lost although their team was the stronger one.`);
+  // Perfectly balanced: their matches were even on average.
+  const balanced = regulars.filter((r) => shown(r.edge) === 0);
+  offer('⚖️', 'Perfectly balanced', ids(balanced), `${who(balanced)} played perfectly balanced matches on average (edge 0.0).`);
+  // Bench warmer and iron player: sat out the most rounds, or none at all.
+  const played = new Set(matches.map((m) => m.round)).size;
+  const rested = (r) => played - games(r).length;
+  const most = Math.max(...rows.map(rested));
+  if (most > 0) {
+    const bench = rows.filter((r) => rested(r) === most);
+    offer('🪑', 'Bench warmer', ids(bench), `${who(bench)} sat out ${plural(most, 'round')}: well rested for what comes next!`);
+    const iron = played >= 2 ? rows.filter((r) => rested(r) === 0) : [];
+    offer('⚙️', 'Iron player', ids(iron), `${who(iron)} played every round so far without a break.`);
+  }
+
+  const limit = Math.ceil(rows.length / 3);
+  for (const g of pool.filter((x) => x.members.length <= limit).sort((a, b) => a.members.length - b.members.length)) {
+    if (g.members.some((id) => !mentioned.has(id))) add(g.icon, g.title, g.text, g.members);
+  }
+  // Anyone still missing gets the win tally, so the summary covers every player.
+  const left = rows.filter((r) => !mentioned.has(r.id));
+  if (left.length) add('🎾', 'Win tally', `${and(left.map((r) => `${r.name} ${plural(r.wins, 'win')}`))}.`, ids(left));
 
   // By the numbers: how often the stronger team won.
   const decided = matches.filter((m) => m.gap !== 0);

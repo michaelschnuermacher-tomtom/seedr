@@ -15,18 +15,11 @@ export function homeScreen(ctx) {
         h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: (e) => importFile(ctx, e.target.files[0]) }))),
     tournaments.length === 0
       ? h('p', { class: 'muted' }, 'No tournaments saved on this device yet.')
+      // Deleting is only possible in Manage, behind its password.
       : h('ul', { class: 'list' }, tournaments.map((t) => h('li', {},
         h('button', { class: 'link', onclick: () => ctx.open(t) },
           h('strong', {}, t.name),
-          h('span', { class: 'muted' }, ` · ${t.players?.length ?? 0} players · ${new Date(t.createdAt).toLocaleDateString()}`)),
-        h('button', {
-          class: 'danger small',
-          onclick: () => {
-            if (!confirm(`Delete "${t.name}" from this device?`)) return;
-            ctx.store.remove(t.id);
-            ctx.render();
-          },
-        }, 'Delete')))),
+          h('span', { class: 'muted' }, ` · ${t.players?.length ?? 0} players · ${new Date(t.createdAt).toLocaleDateString()}`))))),
   );
 }
 

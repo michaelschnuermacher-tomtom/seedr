@@ -96,7 +96,8 @@ Everything that changes or reveals the draw is in **Manage**, which can ask for 
 - **Players**: the players by skill; **Edit names** corrects names, **Player leaves…** withdraws players and redraws the remaining rounds.
 - **Draw quality**: average and biggest edge; **Details** shows all figures and, before the first result, **Redraw schedule**.
 - **Tournament summary**: fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player.
-- **Print & export**: the printout (summary, player skills, standings and all revealed rounds) and the `.seedr.json` export. The password only keeps players from peeking: it can be read in the app's source.
+- **Print & export**: the printout (summary, player skills, standings and all revealed rounds) and the `.seedr.json` export.
+- **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.
 
 ## Keeping data safe
 
