@@ -66,9 +66,16 @@ test('clearing a result recomputes everything (no stale bonus)', () => {
   assert.equal(rows.p1.wins, 0);
 });
 
-test('rows are sorted by points, then weaker skill first, then name', () => {
+test('rows are sorted by points, then edge, then weaker skill first, then name', () => {
   const rows = computeStandings(players, schedule, { '1-1': 1 });
   assert.deepEqual(rows.map((r) => r.id), ['p2', 'p1', 'p5', 'p4', 'p3']); // Ben (5) before Anna (1), David (4) before Carla (3)
+});
+
+test('on equal points the lowest edge comes first, before the skill', () => {
+  const rows = computeStandings(players, schedule, { '1-1': 1, '2-1': 2 });
+  const tied = rows.filter((r) => r.points === 1);
+  assert.deepEqual(tied.map((r) => [r.name, r.edge]), [['Anna', -1.625], ['Carla', 1.625]], 'Anna (skill 1) before Carla (skill 3)');
+  assert.deepEqual(tied.map((r) => r.rank), [2, 2], 'they still share the rank');
 });
 
 test('a withdrawn player keeps wins but gets no bonus and no rank, and is listed last', () => {

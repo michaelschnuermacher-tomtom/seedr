@@ -76,20 +76,27 @@ If repeated partners or unbalanced matches can't be avoided (team value gap of 3
 
 ### Standings
 
-A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed weaker skill first, so the better player comes last. *Edge* is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one.
+A win gives each player in the team 1 point. Players with fewer games than the most games played get 0.5 bonus points per missing game, so sitting out more doesn't cost them. Games and bonus only count rounds where all results have been entered. Players with equal points share a rank and are listed lowest edge first (the one who won with less help from the draw), then weaker skill first. *Edge* is the average gap between the two team values in a player's games, from their side: in each match it counts as an advantage (+) for the stronger team and a disadvantage (−) for the weaker one. So + means the player mostly played in the stronger team, − mostly in the weaker one.
 
 ### When a player leaves
 
-If a player can't continue, open **Manage → Player leaves**, tick the players and choose **Withdraw and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
+If a player can't continue, open **Manage → Players → Player leaves…**, tick the players and choose **Withdraw and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
 - it avoids partners players already had;
 - it counts the opponents players already met, so they meet others first;
 - whoever has sat out least so far sits out first, and games stay spread out.
 
-Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, remove players with **Edit settings** instead.
+Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, remove players with **Manage → Tournament → Edit → Change courts, rounds & times…** instead.
 
 ## Manage
 
-Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. In Manage, **Rounds & display** reveals the next round(s), starts swapping players, and prints the standings followed by all revealed rounds. Below it, the **Tournament summary** turns the results into fun highlights (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more); it also opens the printout. The password only keeps players from peeking: it can be read in the app's source.
+Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. Manage lists everything read-only, and changes happen on a sub-page that an **Edit** button opens, with Save and Cancel:
+
+- **Rounds**: how many rounds are revealed, with **Reveal round(s)** and **Swap players**.
+- **Tournament**: name and settings; **Edit** changes the name, and before the first result also courts, rounds and times (in the setup, which draws again).
+- **Players**: the players by skill; **Edit names** corrects names, **Player leaves…** withdraws players and redraws the remaining rounds.
+- **Draw quality**: average and biggest edge; **Details** shows all figures and, before the first result, **Redraw schedule**.
+- **Tournament summary**: fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player.
+- **Print & export**: the printout (summary, player skills, standings and all revealed rounds) and the `.seedr.json` export. The password only keeps players from peeking: it can be read in the app's source.
 
 ## Keeping data safe
 

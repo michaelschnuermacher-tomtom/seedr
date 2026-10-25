@@ -36,6 +36,7 @@ export function tournamentScreen(ctx) {
         onclick: () => {
           // Manage holds every option that changes or reveals the draw: password each time.
           if (key === 'manage' && view.tab !== 'manage' && !askPassword(ctx, 'Password for Manage:')) return;
+          if (key === 'manage') view.manage = null; // always open on the list
           view.tab = key;
           ctx.render();
         },
@@ -244,17 +245,171 @@ function fact(label, value) {
   return [h('dt', {}, label), h('dd', {}, String(value))];
 }
 
+// Manage lists everything read-only; changes happen on a sub-page (view.manage) that an
+// Edit button opens, with Save and Cancel. Actions that change nothing stay direct buttons.
+function manageTab(ctx, t) {
+  const pages = { tournament: tournamentPage, players: playersPage, withdraw: withdrawPage, quality: qualityPage };
+  const page = pages[ctx.state.view.manage];
+  return page ? page(ctx, t) : manageOverview(ctx, t);
+}
+
+function openPage(ctx, name) {
+  ctx.state.view.manage = name;
+  ctx.state.message = null;
+  ctx.render();
+}
+
+// Back to the Manage list; edits not saved are dropped.
+function closePage(ctx) {
+  Object.assign(ctx.state.view, { manage: null, names: null, withdraw: null });
+  ctx.render();
+}
+
+// One part of Manage: a title, what is set now, and its buttons.
+function section(title, content, buttons = []) {
+  const shown = buttons.filter(Boolean);
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, title),
+    content,
+    shown.length ? h('div', { class: 'actions' }, shown) : h('div', { style: 'height: 12px' }));
+}
+
+// A sub-page of Manage: its own buttons (e.g. Save), then Cancel (or Back when nothing is edited).
+function subPage(ctx, title, content, buttons = [], close = 'Cancel') {
+  const shown = buttons.filter(Boolean);
+  return [
+    h('button', { class: 'back-link', onclick: () => closePage(ctx) }, '← Manage'),
+    section(title, content, [...shown, h('button', { onclick: () => closePage(ctx) }, shown.length ? close : 'Back')]),
+  ];
+}
+
+function manageOverview(ctx, t) {
+  const s = t.settings;
+  const view = ctx.state.view;
+  const hidden = s.rounds - t.revealedRounds;
+  const step = s.revealBatch === 'all' ? hidden : Math.min(s.revealBatch, hidden);
+  const from = t.revealedRounds + 1;
+  const reveal = hidden > 0 ? h('button', {
+    class: 'primary',
+    onclick: () => {
+      ctx.save(revealNext(t));
+      ctx.state.message = step === 1 ? `Round ${from} is revealed.` : `Rounds ${from}–${from + step - 1} are revealed.`;
+      ctx.render();
+    },
+  }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
+  const swap = h('button', {
+    onclick: () => {
+      view.swapping = true;
+      view.swapPick = null;
+      view.tab = 'rounds';
+      ctx.render();
+    },
+  }, 'Swap players');
+  const withdrawn = t.players.length - t.players.filter(isActive).length;
+  const quality = revealedQuality(t);
+  return [
+    section('Rounds', h('p', { class: 'muted' }, hidden > 0
+      ? `Rounds 1–${t.revealedRounds} of ${s.rounds} are revealed.`
+      : `All ${s.rounds} rounds are revealed.`), [reveal, swap]),
+    section('Tournament', h('dl', { class: 'facts' },
+      fact('Name', t.name),
+      fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),
+      fact('Rounds', s.rounds),
+      fact('Match length', `${s.matchMinutes} min`),
+      fact('Break', `${s.breakMinutes} min`),
+      fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)),
+    [h('button', { onclick: () => openPage(ctx, 'tournament') }, 'Edit')]),
+    section('Players', [
+      h('p', { class: 'muted' }, `${t.players.length - withdrawn} players${withdrawn ? ` (${withdrawn} withdrew)` : ''}. Skill 1 is the best, 10 the weakest.`),
+      skillFacts(t)],
+    [h('button', { onclick: () => openPage(ctx, 'players') }, 'Edit names'),
+      h('button', { onclick: () => openPage(ctx, 'withdraw') }, 'Player leaves…')]),
+    section('Draw quality', [quality.warnings, quality.q
+      ? h('dl', { class: 'facts' },
+        fact('Average edge', formatValue(Math.round(quality.q.avgGap * 100) / 100)),
+        fact('Biggest edge', quality.q.worst ? formatValue(quality.q.worst.gap) : '–'))
+      : h('p', { class: 'muted' }, 'Shown once the first round is revealed.')],
+    [h('button', { onclick: () => openPage(ctx, 'quality') }, 'Details')]),
+    summaryCard(t),
+    section('Print & export', h('p', { class: 'muted' }, 'The printout has the summary, the player skills, the standings and all revealed rounds. The export is a file to keep the tournament safe or move it to another device.'), [
+      h('button', { onclick: () => printAll(ctx) }, 'Print'),
+      h('button', { onclick: () => exportTournament(t) }, 'Export (.seedr.json)')]),
+    h('div', { class: 'actions' }, h('button', {
+      class: 'danger',
+      onclick: () => {
+        if (!confirm(`Delete "${t.name}" from this device? Export it first if you want to keep it.`)) return;
+        ctx.store.remove(t.id);
+        ctx.state.tournament = null;
+        ctx.go('home');
+      },
+    }, 'Delete tournament')),
+  ];
+}
+
+// The tournament name can be changed at any time; courts, rounds and times only before
+// the first result, in the setup (which draws again).
+function tournamentPage(ctx, t) {
+  const locked = hasResults(t);
+  const input = h('input', { type: 'text', value: t.name });
+  const save = () => {
+    try {
+      if (input.value.trim() !== t.name) ctx.save(renameTournament(t, input.value));
+      closePage(ctx);
+    } catch (error) {
+      ctx.state.message = error.message;
+      ctx.render();
+    }
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+  return subPage(ctx, 'Tournament', [
+    h('label', { class: 'field' }, h('span', {}, 'Name'), input),
+    h('p', { class: 'muted' }, locked
+      ? 'Courts, rounds and times can only be changed before the first result is entered.'
+      : 'Courts, rounds, times and the player list are changed in the setup, which draws the schedule again.'),
+    h('div', { class: 'actions' }, h('button', {
+      disabled: locked,
+      onclick: () => {
+        ctx.state.view.manage = null;
+        ctx.state.draft = draftFromTournament(t);
+        ctx.go('setup');
+      },
+    }, 'Change courts, rounds & times…')),
+  ], [h('button', { class: 'primary', onclick: save }, 'Save')]);
+}
+
+// Names can be corrected at any time; the draw and the results stay as they are.
+function playersPage(ctx, t) {
+  // Edits not saved yet, by player id; kept when saving fails.
+  const edits = (ctx.state.view.names ??= {});
+  const save = () => {
+    const names = Object.fromEntries(Object.entries(edits).filter(([id, name]) => t.players.find((p) => p.id === id)?.name !== name.trim()));
+    try {
+      if (Object.keys(names).length) ctx.save(renamePlayers(t, names));
+      closePage(ctx);
+    } catch (error) {
+      ctx.state.message = error.message;
+      ctx.render();
+    }
+  };
+  return subPage(ctx, 'Player names', [
+    h('p', { class: 'muted' }, 'Correct names at any time. The draw and the results stay as they are.'),
+    h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
+      h('span', {}, `Skill ${p.skill}${isActive(p) ? '' : ' · withdrew'}`),
+      h('input', { type: 'text', value: edits[p.id] ?? p.name, oninput: (e) => { edits[p.id] = e.target.value; } })))),
+  ], [h('button', { class: 'primary', onclick: save }, 'Save')]);
+}
+
 // A player who cannot go on: keep the rounds played so far and draw the rest again.
-function withdrawCard(ctx, t) {
+function withdrawPage(ctx, t) {
   const from = firstRedrawableRound(t);
   const last = t.settings.rounds;
   const active = t.players.filter(isActive);
   const chosen = (ctx.state.view.withdraw ??= new Set());
   const canRedraw = hasResults(t) && from <= last;
   const rounds = from === last ? `round ${last}` : `rounds ${from}–${last}`;
-  const button = h('button', {
+  const button = canRedraw ? h('button', {
     class: 'primary',
-    disabled: !canRedraw || chosen.size === 0 || active.length - chosen.size < 4,
+    disabled: chosen.size === 0 || active.length - chosen.size < 4,
     onclick: (e) => {
       const names = active.filter((p) => chosen.has(p.id)).map((p) => p.name).join(', ');
       if (!confirm(`Withdraw ${names} and redraw ${rounds}? This cannot be undone.`)) return;
@@ -263,20 +418,18 @@ function withdrawCard(ctx, t) {
       setTimeout(() => { // let the browser paint "Drawing…" first
         try {
           ctx.save(withdrawPlayers(t, [...chosen], newSeed()));
-          ctx.state.view.withdraw = null;
-          ctx.state.view.tab = 'rounds';
+          Object.assign(ctx.state.view, { manage: null, withdraw: null, tab: 'rounds' });
         } catch (error) {
           ctx.state.message = error.message;
         }
         ctx.render();
       }, 20);
     },
-  }, `Withdraw and redraw ${rounds}`);
-  const note = !hasResults(t) ? 'Before the first result, remove players with Edit settings.'
+  }, `Withdraw and redraw ${rounds}`) : null;
+  const note = !hasResults(t) ? 'Before the first result, remove players in Tournament → Edit → Change courts, rounds & times.'
     : from > last ? 'All rounds have results, there is nothing left to redraw.'
       : `${from === 2 ? 'Round 1 stays' : `Rounds 1–${from - 1} stay`} as played; ${rounds} will be drawn again without the chosen players. At least 4 players must remain.`;
-  return h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, 'Player leaves'),
+  return subPage(ctx, 'Player leaves', [
     h('p', { class: 'muted' }, note),
     canRedraw ? h('div', { class: 'options withdraw' }, active.map((p) => h('label', { class: 'option' },
       h('input', {
@@ -289,95 +442,68 @@ function withdrawCard(ctx, t) {
         },
       }),
       h('span', {}, p.name)))) : null,
-    canRedraw ? h('div', { class: 'actions' }, button) : null);
+  ], [button]);
 }
 
-// Names can be corrected at any time; the draw and the results stay as they are.
-// The tournament name can be changed at any time.
-function nameCard(ctx, t) {
-  const input = h('input', { type: 'text', value: t.name });
-  const save = () => {
-    if (input.value.trim() === t.name) return;
-    ctx.state.message = null;
-    try {
-      ctx.save(renameTournament(t, input.value));
-    } catch (error) {
-      ctx.state.message = error.message;
-    }
-    ctx.render();
-  };
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-  return h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, 'Tournament name'),
-    h('div', { class: 'row' }, input, h('button', { class: 'primary', onclick: save }, 'Save name')));
-}
-
-function renameCard(ctx, t) {
-  // Edits not saved yet, by player id; kept when saving fails.
-  const edits = (ctx.state.view.names ??= {});
-  const save = () => {
-    const names = Object.fromEntries(Object.entries(edits).filter(([id, name]) => t.players.find((p) => p.id === id)?.name !== name.trim()));
-    if (Object.keys(names).length === 0) return;
-    ctx.state.message = null;
-    try {
-      ctx.save(renamePlayers(t, names));
-      ctx.state.view.names = null;
-    } catch (error) {
-      ctx.state.message = error.message;
-    }
-    ctx.render();
-  };
-  return h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, 'Player names'),
-    h('p', { class: 'muted' }, 'Correct names at any time. The draw and the results stay as they are.'),
-    h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
-      h('span', {}, `Skill ${p.skill}${isActive(p) ? '' : ' · withdrew'}`),
-      h('input', { type: 'text', value: edits[p.id] ?? p.name, oninput: (e) => { edits[p.id] = e.target.value; } })))),
-    h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: save }, 'Save names')));
-}
-
-// How even and how varied the draw is, over the revealed rounds only: repeated
-// pairings would otherwise give away hidden rounds.
-function qualityCard(t) {
-  // Warnings look at the whole draw, but only say that something is off, not where.
+// How even and how varied the draw is, over the revealed rounds only: repeated pairings
+// would otherwise give away hidden rounds. Warnings look at the whole draw, but only say
+// that something is off, not where.
+function revealedQuality(t) {
   const warnings = drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning' }, w));
   const revealed = t.schedule.slice(0, t.revealedRounds);
-  if (revealed.length === 0) {
-    return warnings.length ? h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Draw quality'), warnings) : null;
-  }
-  const q = drawQuality(t.players, revealed);
-  const one = (x) => (Math.round(x * 10) / 10).toString();
-  const scope = revealed.length < t.schedule.length ? ` (rounds 1–${revealed.length} of ${t.schedule.length}, the revealed ones)` : '';
-  return h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, 'Draw quality'),
-    warnings,
-    h('p', { class: 'muted' }, `Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread)${scope}.`),
-    h('dl', { class: 'facts' },
-      fact('Average edge', formatValue(Math.round(q.avgGap * 100) / 100)),
-      fact('Biggest edge', q.worst ? `${formatValue(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
-      fact('Different partners', `${one(q.partners.distinct)} per player${q.partners.repeats ? `, ${q.partners.repeats} repeated` : ', none repeated'}`),
-      fact('Different opponents', `${one(q.opponents.distinct)} per player`),
-      fact('Repeated opponents', q.opponents.repeats
-        ? `${q.opponents.repeats} meeting(s) again${q.opponents.thirds ? `, ${q.opponents.thirds} a third time or more` : ''}`
-        : 'none'),
-      q.opponents.most.length ? fact('Most often opponents', q.opponents.most.map((m) => `${m.names.join(' & ')} ${m.times}×`).join(', ')) : null,
-      fact('Sitting out twice in a row', q.sitOuts.backToBack ? `${q.sitOuts.backToBack}×, longest ${q.sitOuts.longestRun} rounds` : 'never')),
-    h('div', { style: 'height: 12px' }));
+  return { warnings, revealed, q: revealed.length ? drawQuality(t.players, revealed) : null };
 }
 
-// Everything that changes or reveals the draw, behind the Manage password.
-// Fun highlights of the results so far (Manage and the top of the printout).
-// How the players were assessed, for the printout: one line per skill, like the player list.
-function skillsCard(t) {
+function qualityPage(ctx, t) {
+  const { warnings, revealed, q } = revealedQuality(t);
+  const locked = hasResults(t);
+  const one = (x) => (Math.round(x * 10) / 10).toString();
+  const scope = revealed.length < t.schedule.length ? ` (rounds 1–${revealed.length} of ${t.schedule.length}, the revealed ones)` : '';
+  return subPage(ctx, 'Draw quality', [
+    warnings,
+    q ? [
+      h('p', { class: 'muted' }, `Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread)${scope}.`),
+      h('dl', { class: 'facts' },
+        fact('Average edge', formatValue(Math.round(q.avgGap * 100) / 100)),
+        fact('Biggest edge', q.worst ? `${formatValue(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
+        fact('Different partners', `${one(q.partners.distinct)} per player${q.partners.repeats ? `, ${q.partners.repeats} repeated` : ', none repeated'}`),
+        fact('Different opponents', `${one(q.opponents.distinct)} per player`),
+        fact('Repeated opponents', q.opponents.repeats
+          ? `${q.opponents.repeats} meeting(s) again${q.opponents.thirds ? `, ${q.opponents.thirds} a third time or more` : ''}`
+          : 'none'),
+        q.opponents.most.length ? fact('Most often opponents', q.opponents.most.map((m) => `${m.names.join(' & ')} ${m.times}×`).join(', ')) : null,
+        fact('Sitting out twice in a row', q.sitOuts.backToBack ? `${q.sitOuts.backToBack}×, longest ${q.sitOuts.longestRun} rounds` : 'never')),
+    ] : h('p', { class: 'muted' }, 'The figures are shown once the first round is revealed.'),
+    h('p', { class: 'muted' }, locked
+      ? 'The schedule can only be drawn again before the first result is entered.'
+      : 'Drawing again replaces the whole schedule with a new one.'),
+  ], [h('button', {
+    disabled: locked,
+    onclick: () => {
+      if (!confirm('Draw a completely new schedule?')) return;
+      ctx.save(redraw(t, newSeed()));
+      ctx.render();
+    },
+  }, 'Redraw schedule')], 'Back');
+}
+
+// How the players were assessed: one line per skill, like the player list.
+function skillFacts(t) {
   const skills = [...new Set(t.players.map((p) => p.skill))].sort((a, b) => a - b);
+  return h('dl', { class: 'facts' }, skills.map((skill) => fact(`Skill ${skill}`, t.players.filter((p) => p.skill === skill)
+    .map((p) => (isActive(p) ? p.name : `${p.name} (withdrew)`)).join(', '))));
+}
+
+// The player skills for the printout.
+function skillsCard(t) {
   return h('section', { class: 'card skills' },
     h('h2', { class: 'card-title' }, 'Player skills'),
     h('p', { class: 'muted' }, 'Skill 1 is the best, 10 the weakest.'),
-    h('dl', { class: 'facts' }, skills.map((skill) => fact(`Skill ${skill}`, t.players.filter((p) => p.skill === skill)
-      .map((p) => (isActive(p) ? p.name : `${p.name} (withdrew)`)).join(', ')))),
+    skillFacts(t),
     h('div', { style: 'height: 12px' }));
 }
 
+// Fun highlights of the results so far (Manage and the top of the printout).
 function summaryCard(t) {
   const highlights = tournamentSummary(t);
   return h('section', { class: 'card summary' },
@@ -388,83 +514,4 @@ function summaryCard(t) {
         h('span', {}, h('strong', {}, x.title), ' ', x.text))))
       : h('p', { class: 'muted' }, 'The highlights appear once the first round has all its results.'),
     h('div', { style: 'height: 12px' }));
-}
-
-function roundsOptionsCard(ctx, t) {
-  const view = ctx.state.view;
-  const hidden = t.settings.rounds - t.revealedRounds;
-  const step = t.settings.revealBatch === 'all' ? hidden : Math.min(t.settings.revealBatch, hidden);
-  const from = t.revealedRounds + 1;
-  const reveal = hidden > 0 ? h('button', {
-    class: 'primary',
-    onclick: () => {
-      ctx.save(revealNext(t));
-      ctx.state.message = step === 1 ? `Round ${from} is revealed.` : `Rounds ${from}–${from + step - 1} are revealed.`;
-      ctx.render();
-    },
-  }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
-  return h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, 'Rounds & display'),
-    h('p', { class: 'muted' }, hidden > 0
-      ? `Rounds 1–${t.revealedRounds} of ${t.settings.rounds} are revealed.`
-      : `All ${t.settings.rounds} rounds are revealed.`),
-    h('div', { class: 'actions' },
-      reveal,
-      h('button', {
-        onclick: () => {
-          view.swapping = true;
-          view.swapPick = null;
-          view.tab = 'rounds';
-          ctx.render();
-        },
-      }, 'Swap players'),
-      h('button', { onclick: () => printAll(ctx) }, 'Print standings & rounds')));
-}
-
-function manageTab(ctx, t) {
-  const s = t.settings;
-  const locked = hasResults(t);
-  const withdrawn = t.players.length - t.players.filter(isActive).length;
-  return [
-    roundsOptionsCard(ctx, t),
-    summaryCard(t),
-    nameCard(ctx, t),
-    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Settings'), h('dl', { class: 'facts' },
-      fact('Players', withdrawn ? `${t.players.length - withdrawn} (${withdrawn} withdrew)` : t.players.length),
-      fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),
-      fact('Rounds', s.rounds),
-      fact('Match length', `${s.matchMinutes} min`),
-      fact('Break', `${s.breakMinutes} min`),
-      fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)), h('div', { style: 'height: 12px' })),
-    h('div', { class: 'actions' },
-      h('button', { class: 'primary', onclick: () => exportTournament(t) }, 'Export (.seedr.json)'),
-      h('button', {
-        disabled: locked,
-        onclick: () => {
-          ctx.state.draft = draftFromTournament(t);
-          ctx.go('setup');
-        },
-      }, 'Edit settings'),
-      h('button', {
-        disabled: locked,
-        onclick: () => {
-          if (!confirm('Draw a completely new schedule?')) return;
-          ctx.save(redraw(t, newSeed()));
-          ctx.render();
-        },
-      }, 'Redraw schedule'),
-      h('button', {
-        class: 'danger',
-        onclick: () => {
-          if (!confirm(`Delete "${t.name}" from this device? Export it first if you want to keep it.`)) return;
-          ctx.store.remove(t.id);
-          ctx.state.tournament = null;
-          ctx.go('home');
-        },
-      }, 'Delete tournament')),
-    locked ? h('p', { class: 'muted' }, 'Settings and the draw can only be changed before the first result is entered.') : null,
-    qualityCard(t),
-    renameCard(ctx, t),
-    withdrawCard(ctx, t),
-  ];
 }
