@@ -55,11 +55,11 @@ test('every player who played is mentioned at least once', () => {
 
 test('players without a highlight are grouped into fun categories', () => {
   const s = summary({ '1-1': 2, '2-1': 1 });
-  assert.match(s['One to remember'], /^David \(with Carla in round 1\) and Anna \(with Carla in round 2\) each have a win to celebrate\./);
+  assert.match(s['One to remember'], /^Carla & David \(round 1\) and Anna & Carla \(round 2\) each had a win to celebrate\./);
   assert.match(s['Saving the best for later'], /^Eva is still warming up/);
 });
 
-test('ties: Still smiling names the lowest skill number, Underdog of the day the highest', () => {
+test('ties: players with the same statistic are named together', () => {
   // Four players, two rounds; Anna (1) and David (5) both lose twice.
   const four = [
     { id: 'a', name: 'Anna', skill: 1 },
@@ -72,6 +72,7 @@ test('ties: Still smiling names the lowest skill number, Underdog of the day the
     { round: 2, matches: [{ court: 1, team1: ['a', 'd'], team2: ['c', 'b'] }], sitOuts: [] },
   ];
   const s = Object.fromEntries(tournamentSummary({ players: four, schedule: rounds, results: { '1-1': 2, '2-1': 2 } }).map((x) => [x.title, x.text]));
-  assert.match(s['Still smiling'], /^Anna played 2 games with no wins yet/, 'Anna (skill 1) rather than David (skill 5)');
-  assert.match(s['Underdog of the day'], /^Ben won 2 games/, 'Ben and Carla tie; skill 9 both, then by name');
+  assert.match(s['Still smiling'], /^David and Anna played 2 games each with no wins yet/, 'in standings order');
+  assert.match(s['Underdog of the day'], /^Ben and Carla won 2 games each although their teams were usually the weaker one/);
+  assert.ok(!('Saving the best for later' in s), 'nobody with the same record is left over');
 });

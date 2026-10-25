@@ -28,9 +28,10 @@ export function tournamentSummary(t) {
   if (matches.length === 0) return [];
 
   const rows = computeStandings(t.players, t.schedule, t.results).filter((r) => !r.withdrawn && r.games > 0);
-  // Ties: Underdog of the day and Luck of the draw name the player with the highest skill
-  // number, Still smiling the one with the lowest (skill 1 is the best).
-  const weakestFirst = (a, b) => b.skill - a.skill || a.name.localeCompare(b.name);
+  // A highlight about a statistic names everyone who shares it; edges count as equal when
+  // they show the same in the standings.
+  const and = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
+  const shown = (x) => Math.round(x * 10);
   const out = [];
   const mentioned = new Set();
   const add = (icon, title, text, ids = []) => { out.push({ icon, title, text }); ids.forEach((id) => mentioned.add(id)); };
@@ -45,11 +46,12 @@ export function tournamentSummary(t) {
   }
 
   // Underdog of the day: most wins with a negative edge.
-  const underdog = rows.filter((r) => r.edge < 0 && r.wins > 0)
-    .sort((a, b) => b.wins - a.wins || a.edge - b.edge || weakestFirst(a, b))[0];
+  const underdogs = rows.filter((r) => r.edge < 0 && r.wins > 0);
+  const underdog = [...underdogs].sort((a, b) => b.wins - a.wins || shown(a.edge) - shown(b.edge))[0];
   if (underdog) {
-    add('🐶', 'Underdog of the day', `${underdog.name} won ${plural(underdog.wins, 'game')} although their team was usually the weaker one`
-      + ` (edge ${edge(underdog.edge)}).`, [underdog.id]);
+    const all = underdogs.filter((r) => r.wins === underdog.wins && shown(r.edge) === shown(underdog.edge));
+    add('🐶', 'Underdog of the day', `${and(all.map((r) => r.name))} won ${plural(underdog.wins, 'game')}${all.length > 1 ? ' each' : ''}`
+      + ` although ${all.length > 1 ? 'their teams were' : 'their team was'} usually the weaker one (edge ${edge(underdog.edge)}).`, all.map((r) => r.id));
   }
 
   // Dream team: the partnership with the most wins together. The draw never repeats
@@ -106,41 +108,45 @@ export function tournamentSummary(t) {
   }
 
   // Luck of the draw: the strongest teams on average.
-  const lucky = [...rows].sort((a, b) => b.edge - a.edge || weakestFirst(a, b))[0];
-  if (lucky && lucky.edge > 0) {
-    add('🍀', 'Luck of the draw', `${lucky.name}'s teams were the strongest on average (edge ${edge(lucky.edge)}).`, [lucky.id]);
+  const lucky = [...rows].sort((a, b) => shown(b.edge) - shown(a.edge))[0];
+  if (lucky && shown(lucky.edge) > 0) {
+    const all = rows.filter((r) => shown(r.edge) === shown(lucky.edge));
+    add('🍀', 'Luck of the draw', all.length > 1
+      ? `The teams of ${and(all.map((r) => r.name))} were the strongest on average (edge ${edge(lucky.edge)}).`
+      : `${lucky.name}'s teams were the strongest on average (edge ${edge(lucky.edge)}).`, all.map((r) => r.id));
   }
 
   // Still smiling: most games, fewest wins.
-  const smiling = [...rows].sort((a, b) => a.wins - b.wins || b.games - a.games || a.skill - b.skill || b.edge - a.edge || a.name.localeCompare(b.name))[0];
-  if (smiling && smiling !== top[0] && smiling.games >= 2) {
-    add('😄', 'Still smiling', `${smiling.name} played ${plural(smiling.games, 'game')} with ${smiling.wins === 0 ? 'no wins yet' : plural(smiling.wins, 'win')}: there is always the next round!`, [smiling.id]);
+  const smiling = [...rows].sort((a, b) => a.wins - b.wins || b.games - a.games)[0];
+  if (smiling && !top.includes(smiling) && smiling.games >= 2) {
+    const all = rows.filter((r) => r.wins === smiling.wins && r.games === smiling.games);
+    add('😄', 'Still smiling', `${and(all.map((r) => r.name))} played ${plural(smiling.games, 'game')}${all.length > 1 ? ' each' : ''}`
+      + ` with ${smiling.wins === 0 ? 'no wins yet' : plural(smiling.wins, 'win')}: there is always the next round!`, all.map((r) => r.id));
   }
 
   // Everyone not mentioned yet lands in one of these, so the summary covers every player.
-  const and = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
-  const rest = rows.filter((x) => !mentioned.has(x.id));
-  const winsOf = (r) => matches.filter((m) => m.won.includes(r.id));
-  const partner = (r, m) => name(m.won.find((id) => id !== r.id));
-  const slayers = rest.filter((r) => winsOf(r).some((m) => m.gap > 0));
-  if (slayers.length) {
-    const told = slayers.map((r) => {
-      const m = winsOf(r).filter((x) => x.gap > 0).sort((a, b) => b.gap - a.gap)[0];
-      return `${r.name} (with ${partner(r, m)} in round ${m.round})`;
-    });
-    add('🗡️', slayers.length === 1 ? 'Giant slayer' : 'Giant slayers',
-      `${and(told)} ${slayers.length === 1 ? 'was' : 'were'} on the weaker team and won anyway.`, slayers.map((r) => r.id));
+  // Wins are told per team: "Henri & Hugo (round 4)".
+  const unmentioned = () => rows.filter((x) => !mentioned.has(x.id));
+  const fresh = (m) => m.won.some((id) => !mentioned.has(id));
+  const teamWins = (list) => and(list.map((m) => `${names(m.won)} (round ${m.round})`));
+  const byRound = (a, b) => a.round - b.round || a.court - b.court;
+  // Giant slayers: the other upsets, as long as they bring in someone new.
+  const slayed = upsets.filter((m) => m !== upset && fresh(m)).sort(byRound);
+  if (slayed.length) {
+    add('🗡️', 'Giant slayers',`${teamWins(slayed)} won as the weaker team.`, slayed.flatMap((m) => m.won));
   }
-  const steady = rest.filter((r) => !slayers.includes(r) && r.wins >= 2);
+  const steady = unmentioned().filter((r) => r.wins >= 2);
   if (steady.length) {
     add('💪', 'Steady hands', `${and(steady.map((r) => `${r.name} (${r.wins} of ${r.games})`))} kept the wins coming.`, steady.map((r) => r.id));
   }
-  const once = rest.filter((r) => !slayers.includes(r) && r.wins === 1);
-  if (once.length) {
-    add('🎉', 'One to remember', `${and(once.map((r) => `${r.name} (with ${partner(r, winsOf(r)[0])} in round ${winsOf(r)[0].round})`))}`
-      + ` ${once.length === 1 ? 'has' : 'each have'} a win to celebrate.`, once.map((r) => r.id));
+  // One to remember: the single win of each player still missing, one entry per team.
+  const remembered = [...new Set(unmentioned().filter((r) => r.wins === 1)
+    .map((r) => matches.find((m) => m.won.includes(r.id))))].sort(byRound);
+  if (remembered.length) {
+    add('🎉', 'One to remember', `${teamWins(remembered)} ${remembered.length === 1 ? 'had a win' : 'each had a win'} to celebrate.`,
+      remembered.flatMap((m) => m.won));
   }
-  const warming = rest.filter((r) => r.wins === 0);
+  const warming = unmentioned().filter((r) => r.wins === 0);
   if (warming.length) {
     add('🌱', 'Saving the best for later', `${and(warming.map((r) => r.name))} ${warming.length === 1 ? 'is' : 'are'} still warming up:`
       + ' the first win is just around the corner.', warming.map((r) => r.id));
