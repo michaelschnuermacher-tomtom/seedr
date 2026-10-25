@@ -131,6 +131,7 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 16px; background: var(--surface-2); border-radius: 12px; }
 .tabs button { border: none; background: transparent; min-height: 40px; color: var(--muted); }
 .tabs button.current { background: var(--surface); color: var(--strong); box-shadow: var(--shadow); }
+.tabs .lock { font-size: .8em; margin-right: 5px; }
 
 /* Matches */
 .match { display: flex; flex-direction: column; gap: 8px; padding: 14px; }

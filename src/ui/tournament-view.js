@@ -39,7 +39,7 @@ export function tournamentScreen(ctx) {
           view.tab = key;
           ctx.render();
         },
-      }, label))),
+      }, key === 'manage' ? h('span', { class: 'lock', 'aria-hidden': 'true' }, '🔒') : null, label))),
     body);
 }
 
