@@ -45,6 +45,20 @@ test('edges are shown like in the standings, and a single win together is no dre
   assert.match(s['Luck of the draw'] ?? '', /edge \+\d\.\d\)/);
 });
 
+test('every player who played is mentioned at least once', () => {
+  for (const r of [results, { '1-1': 2 }, { '1-1': 2, '2-1': 1 }, { '1-1': 1, '2-1': 1, '3-1': 2 }]) {
+    const all = tournamentSummary({ players, schedule, results: r }).map((x) => `${x.title} ${x.text}`).join(' ');
+    const played = Object.keys(r).flatMap((k) => { const m = schedule[Number(k[0]) - 1].matches[0]; return [...m.team1, ...m.team2]; });
+    for (const p of players.filter((x) => played.includes(x.id))) assert.ok(all.includes(p.name), `${p.name} missing in: ${all}`);
+  }
+});
+
+test('players without a highlight are grouped into fun categories', () => {
+  const s = summary({ '1-1': 2, '2-1': 1 });
+  assert.match(s['One to remember'], /^David \(with Carla in round 1\) and Anna \(with Carla in round 2\) each have a win to celebrate\./);
+  assert.match(s['Saving the best for later'], /^Eva is still warming up/);
+});
+
 test('ties: Still smiling names the lowest skill number, Underdog of the day the highest', () => {
   // Four players, two rounds; Anna (1) and David (5) both lose twice.
   const four = [

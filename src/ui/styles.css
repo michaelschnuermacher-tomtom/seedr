@@ -132,10 +132,6 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .tabs button { border: none; background: transparent; min-height: 40px; color: var(--muted); }
 .tabs button.current { background: var(--surface); color: var(--strong); box-shadow: var(--shadow); }
 
-/* Round navigation and progress */
-.progress { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin: 6px 0 14px; }
-.progress > span { display: block; height: 100%; background: var(--win); border-radius: inherit; transition: width .3s; }
-
 /* Matches */
 .match { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
 .court { font-size: .75rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
@@ -143,7 +139,6 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .court .gaps { float: right; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .team { min-height: 56px; justify-content: flex-start; text-align: left; background: color-mix(in srgb, var(--surface-2) 40%, transparent); border-color: transparent; font-weight: 500; }
 .team .names { flex: 1; overflow-wrap: break-word; min-width: 0; }
-.team .edge { flex: none; color: var(--muted); font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .team.winner { background: color-mix(in srgb, var(--win-soft) 75%, transparent); border-color: var(--win); color: var(--text); font-weight: 650; }
 .team.loser { opacity: .55; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -239,10 +234,15 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   /* Summary and skills get the same chapter headings as Standings and Rounds. */
   .summary .card-title, .skills .card-title { display: none; }
   .summary, .skills { padding-block: 12px; }
-  .highlights { font-size: 9.5pt; gap: 6px; }
-  .skills .facts { font-size: 9.5pt; gap: 3px 16px; }
-  .skills .muted { font-size: 9pt; margin-top: 0; }
-  .no-print, nav.tabs, .actions, .banner, .progress { display: none !important; }
+  /* Three sizes in print: 9.5pt text, 12pt chapter headings, 7.5pt small labels. */
+  .screen, .screen .muted { font-size: 9.5pt; }
+  .highlights { gap: 6px; }
+  .skills .facts { gap: 3px 16px; }
+  .skills .muted { margin-top: 0; }
+  .standings th { font-size: 7.5pt; padding: 2mm 3mm; }
+  .standings td { padding: 1.5mm 3mm; }
+  .rank-badge { min-width: 5.5mm; height: 5.5mm; font-size: 9.5pt; }
+  .no-print, nav.tabs, .actions, .banner { display: none !important; }
   /* A little room inside the court area at the top and bottom of every page. */
   .screen { max-width: 160mm; margin: 0 auto; padding: 4mm 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
   .top h1 { font-size: 2rem; }
@@ -262,10 +262,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
   .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
-  .overview-round h3 { margin: 0 0 1.5mm; font-size: 10.5pt; }
+  .overview-round h3 { margin: 0 0 1.5mm; font-size: 9.5pt; }
   .mini-match { gap: 1.5mm; margin-bottom: 1.5mm; }
-  .mini-match .court { font-size: 6.5pt; }
-  .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9pt; border-radius: 2mm; }
-  .mini-match .team .edge { font-size: 7.5pt; }
-  .overview-round > p.muted { margin: 1mm 0 0; font-size: 8pt; line-height: 1.3; }
+  .mini-match .court, .mini-match .vs, .mini-match .court .gaps { font-size: 7.5pt; }
+  .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9.5pt; border-radius: 2mm; }
+  .overview-round > p.muted { margin: 1mm 0 0; font-size: 7.5pt; line-height: 1.3; }
 }

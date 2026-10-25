@@ -90,15 +90,14 @@ function teamButton(ctx, t, round, match, n) {
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
-  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]),
-    // The stronger team shows its edge, e.g. +0.5.
-    match.favoured === n ? h('span', { class: 'edge' }, `+${formatValue(match.valueGap)}`) : null);
+  }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]));
 }
 
-// Court label; says Even when neither team has an edge (otherwise the stronger team shows it).
+// Court label, with the team that has the edge (e.g. "Felix & Gesa +0.5"), or Even.
 function courtLine(tag, m) {
+  const favoured = m.favoured === 1 ? m.team1 : m.favoured === 2 ? m.team2 : null;
   return h(tag, { class: 'court' }, `Court ${m.court}`,
-    m.favoured ? null : h('span', { class: 'gaps' }, 'Even'));
+    h('span', { class: 'gaps' }, favoured ? `${favoured.members.join(' & ')} +${formatValue(m.valueGap)}` : 'Even'));
 }
 
 // Manage asks for this password every time it is opened. It
@@ -124,17 +123,12 @@ function askPassword(ctx, question) {
 // All revealed rounds; revealing, swapping and the team values are set in Manage.
 function roundsTab(ctx, t, view) {
   const rounds = roundsOverview(t);
-  const hint = h('p', { class: 'muted no-print' }, 'Tap the winning team. Tap again to clear.');
-  const done = t.schedule.filter((r) => roundComplete(t, r)).length;
-  const progress = h('div', { class: 'progress', title: `${done} of ${t.settings.rounds} rounds finished` },
-    h('span', { style: `width: ${Math.round((100 * done) / t.settings.rounds)}%` }));
   const hidden = t.settings.rounds - t.revealedRounds;
   const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
   const swapping = Boolean(view.swapping);
   return [
     h('h2', { class: 'print-only' }, 'Rounds'),
-    progress,
-    swapping ? swapHeader(ctx, t, view) : hint,
+    swapping ? swapHeader(ctx, t, view) : null,
     h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
       h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
       swapping ? swapRound(ctx, t, view, r) : r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
