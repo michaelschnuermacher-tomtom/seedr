@@ -11,6 +11,7 @@ export function tournamentSummary(t) {
   const names = (ids) => ids.map(name).join(' & ');
   const value = (team) => teamValue(byId.get(team[0]).skill, byId.get(team[1]).skill);
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
   const fmt = (x) => (Math.round(x * 100) / 100).toString();
 
   // Matches of complete rounds, with winner and loser.
@@ -136,7 +137,7 @@ export function tournamentSummary(t) {
   const history = new Map(rows.map((r) => [r.id, []])); // each player's games, in order
   for (const m of matches) {
     for (const [team, other, won] of [[m.won, m.lost, true], [m.lost, m.won, false]]) {
-      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other });
+      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other, partner: team.find((x) => x !== id) });
     }
   }
   const games = (r) => history.get(r.id);
@@ -246,21 +247,78 @@ export function tournamentSummary(t) {
     const list = matches.filter((m) => ageGap(m) === widestAge);
     offer('👨‍👦', 'Across generations', list.flatMap((m) => m.won), `${teams(list)} won together: the biggest age difference in a winning team.`);
   }
+  // Close behind: everyone on the rank right after the leaders.
+  const ranked = rows.filter((r) => r.rank != null);
+  const second = Math.min(...ranked.filter((r) => r.rank > 1).map((r) => r.rank));
+  if (Number.isFinite(second)) {
+    const list = ranked.filter((r) => r.rank === second);
+    offer('🥈', 'Close behind', ids(list), `${who(list)} ${list.length > 1 ? (done ? 'finished' : 'are') : (done ? 'finished' : 'is')} right behind ${top.length > 1 ? 'the leaders' : 'the leader'}`
+      + ` with ${list[0].points} ${list[0].points === 1 ? 'point' : 'points'}.`);
+  }
+  // Champion's partner: won a game together with one of the leaders.
+  const isTop = (id) => top.some((x) => x.id === id);
+  const partners = rows.filter((r) => !isTop(r.id) && games(r).some((g) => g.won && isTop(g.partner)));
+  offer('🤝', "Champion's partner", ids(partners), `${who(partners)} won alongside ${top.length > 1 ? 'one of the leaders' : 'the leader'}.`);
+  // Bounce back: won the game right after a loss.
+  const bouncers = rows.filter((r) => games(r).some((g, i) => i > 0 && g.won && !games(r)[i - 1].won));
+  offer('🔄', 'Bounce back', ids(bouncers), `${who(bouncers)} answered a loss with a win straight away.`);
+  // Punching above their weight: the furthest ahead of the place their skill suggests.
+  const bySkill = (r) => 1 + ranked.filter((x) => x.skill < r.skill).length; // the place by skill alone
+  const ahead = (r) => bySkill(r) - r.rank;
+  const furthest = Math.max(0, ...ranked.map(ahead));
+  if (furthest >= 3) {
+    const list = ranked.filter((r) => ahead(r) === furthest);
+    offer('🧗', 'Punching above their weight', ids(list), `${and(list.map((r) => `${r.name} (skill ${r.skill}) ${done ? 'finished' : 'is'} in ${ordinal(r.rank)} place`))}:`
+      + ` far ahead of what the skill suggests.`);
+  }
+  // Toughest luck: the lowest edge, i.e. usually in the weaker team (the opposite of Luck of the draw).
+  const unlucky = [...regulars].sort((a, b) => shown(a.edge) - shown(b.edge))[0];
+  if (unlucky && shown(unlucky.edge) < 0) {
+    const list = regulars.filter((r) => shown(r.edge) === shown(unlucky.edge));
+    offer('🎲', 'Toughest luck', ids(list), list.length > 1
+      ? `The teams of ${who(list)} were usually the weaker ones.`
+      : `${unlucky.name}'s teams were usually the weaker ones.`);
+  }
 
   const limit = Math.ceil(rows.length / 3);
   for (const g of pool.filter((x) => x.members.length <= limit).sort((a, b) => a.members.length - b.members.length)) {
     if (g.members.some((id) => !mentioned.has(id))) add(g.icon, g.title, g.text, g.members);
   }
-  // Anyone still missing gets the win tally, so the summary covers every player.
-  const left = rows.filter((r) => !mentioned.has(r.id));
-  // Full sentences, so a name like "Max" never reads as "at most".
-  if (left.length) {
-    const winning = left.filter((r) => r.wins > 0);
-    const none = left.filter((r) => r.wins === 0);
-    add('🎾', 'Win tally', [
-      winning.length ? `${and(winning.map((r) => `${r.name} won ${plural(r.wins, 'game')}`))}.` : '',
-      none.length ? `${who(none)} ${none.length > 1 ? 'have' : 'has'} no win${yet}.` : '',
-    ].filter(Boolean).join(' '), ids(left));
+  // Anyone still missing gets a friendly joke about their name, so the summary covers
+  // every player. Each kind names everyone it fits; letters vs. wins fits everyone.
+  const missing = () => rows.filter((r) => !mentioned.has(r.id));
+  const initial = (id) => name(id).trim()[0]?.toUpperCase();
+  const letters = (r) => r.name.replace(/[^\p{L}]/gu, '').length;
+  // Same initial: a winning team whose names start with the same letter.
+  const sameInitial = matches.filter((m) => initial(m.won[0]) === initial(m.won[1]) && m.won.some((id) => !mentioned.has(id)));
+  if (sameInitial.length) {
+    add('🔤', 'Same initial', `${and(sameInitial.map((m) => `${names(m.won)} won round ${m.round}: the ${initial(m.won[0])}-team strikes`))}.`, sameInitial.flatMap((m) => m.won));
+  }
+  // Palindrome: a name that reads the same backwards (Anna, Otto).
+  const palindromes = missing().filter((r) => { const x = r.name.toLowerCase().replace(/[^\p{L}]/gu, ''); return x.length >= 3 && x === [...x].reverse().join(''); });
+  if (palindromes.length) {
+    add('🔁', 'Palindrome', `${who(palindromes)} ${palindromes.length > 1 ? 'read' : 'reads'} the same from both sides. Try it!`, ids(palindromes));
+  }
+  // Alphabet: first or last of all players.
+  const alphabetical = [...rows].sort((x, y) => x.name.localeCompare(y.name));
+  const [first, last] = [alphabetical[0], alphabetical.at(-1)];
+  if (first && !mentioned.has(first.id)) add('🅰️', 'Alphabet', `${first.name} leads the alphabet. The table may follow.`, [first.id]);
+  if (last && last !== first && !mentioned.has(last.id)) add('🔚', 'Last word', `${last.name} has the last word, at least in the alphabet.`, [last.id]);
+  // Short and sweet: the shortest name with a win.
+  const winnersLeft = missing().filter((r) => r.wins > 0);
+  if (winnersLeft.length) {
+    const shortest = Math.min(...rows.filter((r) => r.wins > 0).map(letters));
+    const list = winnersLeft.filter((r) => letters(r) === shortest);
+    if (list.length) add('📏', 'Short and sweet', `${who(list)}: ${shortest} letters, and every one of them a winner.`, ids(list));
+  }
+  // Letters vs. wins: fits everyone who is still missing.
+  const rest = missing();
+  if (rest.length) {
+    add('🧮', 'Letters vs. wins', rest.map((r) => (r.wins === 0
+      ? `${r.name} has ${letters(r)} letters and no win${yet}${done ? '.' : ': plenty of room to grow.'}`
+      : r.wins >= letters(r)
+        ? `${r.name} has more wins than letters!`
+        : `${r.name} has ${letters(r)} letters and ${plural(r.wins, 'win')}.${done ? '' : ` Only ${letters(r) - r.wins} to go!`}`)).join(' '), ids(rest));
   }
 
   // By the numbers: how often the stronger team won.
