@@ -1,6 +1,12 @@
 import { computeStandings, resultKey } from './standings.js';
 import { teamValue, edgeLevel } from './schedule.js';
 
+// English Scrabble letter values, for the last name joke.
+const SCRABBLE = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 };
+
+// Comments on a name read backwards.
+const BACKWARDS = ['sounds like a secret weapon.', 'a perfect name for a robot.', 'definitely a dance move.', 'clearly a spell from a wizard school.', 'the name of a planet nobody has found yet.'];
+
 // A fun summary of the results so far: highlights like the champion, the underdog of the
 // day or the upset of the tournament. Only rounds with all results entered count, as in
 // the standings. Each highlight is { icon, title, text }; one only appears when there is
@@ -122,7 +128,7 @@ export function tournamentSummary(t) {
 
   // Still smiling: everyone without a win, or else the fewest wins in the most games.
   const smiling = [...rows].sort((a, b) => a.wins - b.wins || b.games - a.games)[0];
-  if (smiling && !top.includes(smiling) && smiling.games >= 2) {
+  if (smiling && !top.includes(smiling) && (smiling.wins === 0 || smiling.games >= 2)) {
     const all = smiling.wins === 0 ? rows.filter((r) => r.wins === 0)
       : rows.filter((r) => r.wins === smiling.wins && r.games === smiling.games);
     add('😄', 'Still smiling', smiling.wins === 0
@@ -241,6 +247,25 @@ export function tournamentSummary(t) {
       offer('🐣', 'Young guns', ids(young), `${who(young)} ${young.length > 1 ? 'were the youngest players' : 'was the youngest player'} to win a game.`);
     }
   }
+  // Youngest and oldest: the youngest and the oldest player of the tournament in one team.
+  // Always told when it happens, like the main highlights.
+  const withYear = rows.filter((r) => born(r.id) != null);
+  if (withYear.length >= 4) {
+    const years = withYear.map((r) => born(r.id));
+    const youngest = withYear.filter((r) => born(r.id) === Math.max(...years));
+    const oldest = withYear.filter((r) => born(r.id) === Math.min(...years));
+    if (youngest.length === 1 && oldest.length === 1) {
+      const [y, o] = [youngest[0].id, oldest[0].id];
+      const together = matches.filter((m) => [m.won, m.lost].some((team) => team.includes(y) && team.includes(o)));
+      if (together.length) {
+        const result = (m) => (m.won.includes(y) ? 'won' : 'lost');
+        add('🧒', 'Youngest and oldest', `${name(y)}, the youngest, and ${name(o)}, the oldest, teamed up `
+          + (together.length === 1
+            ? `in round ${together[0].round} and ${result(together[0])}.`
+            : `${together.length === 2 ? 'twice' : `${together.length} times`}: in ${and(together.map((m) => `round ${m.round} (${result(m)})`))}.`), [y, o]);
+      }
+    }
+  }
   const ageGap = (m) => (m.won.every((id) => born(id) != null) ? Math.abs(born(m.won[0]) - born(m.won[1])) : -1);
   const widestAge = Math.max(-1, ...matches.map(ageGap));
   if (widestAge >= 15) {
@@ -288,7 +313,7 @@ export function tournamentSummary(t) {
   // every player. Each kind names everyone it fits; letters vs. wins fits everyone.
   const missing = () => rows.filter((r) => !mentioned.has(r.id));
   const initial = (id) => name(id).trim()[0]?.toUpperCase();
-  const letters = (r) => r.name.replace(/[^\p{L}]/gu, '').length;
+  const letters = (r) => r.name.replace(/[^\p{L}]/gu, '').length; // for Short and sweet
   // Same initial: a winning team whose names start with the same letter.
   const sameInitial = matches.filter((m) => initial(m.won[0]) === initial(m.won[1]) && m.won.some((id) => !mentioned.has(id)));
   if (sameInitial.length) {
@@ -311,14 +336,36 @@ export function tournamentSummary(t) {
     const list = winnersLeft.filter((r) => letters(r) === shortest);
     if (list.length) add('📏', 'Short and sweet', `${who(list)}: ${shortest} letters, and every one of them a winner.`, ids(list));
   }
-  // Letters vs. wins: fits everyone who is still missing.
-  const rest = missing();
-  if (rest.length) {
-    add('🧮', 'Letters vs. wins', rest.map((r) => (r.wins === 0
-      ? `${r.name} has ${letters(r)} letters and no win${yet}${done ? '.' : ': plenty of room to grow.'}`
-      : r.wins >= letters(r)
-        ? `${r.name} has more wins than letters!`
-        : `${r.name} has ${letters(r)} letters and ${plural(r.wins, 'win')}.${done ? '' : ` Only ${letters(r) - r.wins} to go!`}`)).join(' '), ids(rest));
+  // Scrabble: the highest-scoring name still missing, against the points here. Letters
+  // with accents count as the plain letter.
+  const tiles = (r) => [...r.name.normalize('NFD').toLowerCase()].filter((c) => SCRABBLE[c]);
+  const worth = (r) => tiles(r).reduce((sum, c) => sum + SCRABBLE[c], 0);
+  const wordiest = [...missing()].sort((x, y) => worth(y) - worth(x))[0];
+  if (wordiest) {
+    const value = worth(wordiest);
+    const best = [...tiles(wordiest)].sort((x, y) => SCRABBLE[y] - SCRABBLE[x])[0];
+    const tile = best && SCRABBLE[best] >= 8 ? ` The ${best.toUpperCase()} alone is worth ${SCRABBLE[best]}.` : '';
+    const points = `${wordiest.points} ${wordiest.points === 1 ? 'point' : 'points'}`;
+    add('🔠', 'Scrabble', value > wordiest.points
+      ? `${wordiest.name} is worth ${value} points in Scrabble, but ${points} here.${done ? ' The name wins this one.' : ' The name is still ahead!'}${tile}`
+      : `${wordiest.name} has ${points} here, more than the name is worth in Scrabble (${value}).${tile}`, [wordiest.id]);
+  }
+  // Backwards: the longest name still missing, read backwards.
+  const longName = [...missing()].sort((x, y) => letters(y) - letters(x) || x.name.localeCompare(y.name))[0];
+  if (longName) {
+    const reversed = [...longName.name.toLowerCase()].reverse().join('');
+    const comment = BACKWARDS[letters(longName) % BACKWARDS.length];
+    add('🔀', 'Backwards', `${longName.name} backwards is ${reversed[0].toUpperCase()}${reversed.slice(1)}: ${comment}`, [longName.id]);
+  }
+  // Vowels: the most vowels among the names still missing.
+  const vowels = (r) => [...r.name.normalize('NFD').toLowerCase()].filter((c) => 'aeiouy'.includes(c)).length;
+  const singer = [...missing()].sort((x, y) => vowels(y) - vowels(x) || x.name.localeCompare(y.name))[0];
+  if (singer && vowels(singer) >= 3) add('🔡', 'Vowels', `${singer.name} has ${vowels(singer)} vowels in one name: a voice made for cheering.`, [singer.id]);
+  // Victory chant: the initials of a winning team with someone still missing.
+  const chanted = matches.find((m) => m.won.some((id) => !mentioned.has(id)));
+  if (chanted) {
+    const [x, y] = chanted.won.map(initial);
+    add('🎤', 'Victory chant', `${names(chanted.won)} (round ${chanted.round}): ${x}-${y}, ${x}-${y}, what a pair to see!`, chanted.won);
   }
 
   // By the numbers: how often the stronger team won.

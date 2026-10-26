@@ -274,7 +274,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
 @media print {
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-only { display: block; }
-  .page-break { break-before: page; }
+
   /* A chapter that would only start at the bottom of a page moves to the next one:
      headings stay with what follows, and a table keeps at least 4 rows on each page. */
   h2.print-only { break-after: avoid; }

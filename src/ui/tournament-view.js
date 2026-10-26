@@ -207,7 +207,7 @@ function swapRound(ctx, t, view, round) {
 // One printout: the standings, then all revealed rounds from a new page, without buttons
 // and controls (see @media print). Shows them, prints, and comes back to Manage.
 // The sections of the printout, in this order, as chosen on the Print page.
-const PRINT_PARTS = [['summary', 'Tournament summary'], ['skills', 'Player skills'], ['standings', 'Standings'], ['rounds', 'Rounds']];
+const PRINT_PARTS = [['summary', 'Tournament summary'], ['standings', 'Standings'], ['rounds', 'Rounds'], ['skills', 'Player skills']];
 
 // Everything by default. The summary only exists once the tournament is finished.
 function defaultPrintParts() {
@@ -222,12 +222,13 @@ function printableParts(t) {
 function printout(ctx, t, view) {
   const chosen = view.printParts ?? defaultPrintParts();
   const parts = Object.fromEntries(printableParts(t).map(([key]) => [key, chosen[key]]));
-  const before = parts.summary || parts.skills || parts.standings;
+  // No forced page breaks: a section starts on the same page when its heading and first
+  // block (e.g. the first two rounds) still fit, otherwise on the next one.
   return [
     parts.summary ? [h('h2', { class: 'print-only' }, 'Tournament summary'), summaryCard(t)] : null,
-    parts.skills ? [h('h2', { class: 'print-only' }, 'Player skills'), skillsCard(t)] : null,
     parts.standings ? standingsTab(t) : null,
-    parts.rounds ? [before ? h('div', { class: 'page-break' }) : null, roundsTab(ctx, t, { ...view, swapping: false })] : null,
+    parts.rounds ? roundsTab(ctx, t, { ...view, swapping: false }) : null,
+    parts.skills ? [h('h2', { class: 'print-only' }, 'Player skills'), skillsCard(t)] : null,
   ];
 }
 
@@ -412,7 +413,7 @@ function manageOverview(ctx, t) {
         fact('Biggest edge', quality.q.worst ? formatValue(quality.q.worst.gap) : '–'))
       : h('p', { class: 'muted' }, 'Shown once the first round is revealed.')],
     [h('button', { onclick: () => openPage(ctx, 'quality') }, 'Details')]),
-    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the player skills, the standings, all revealed rounds and, once the tournament is finished, the summary: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
+    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all revealed rounds and the player skills: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
       h('button', { onclick: () => openPage(ctx, 'print') }, 'Print…'),
       h('button', { onclick: () => exportBackup(ctx) }, 'Export backup')]),
     h('div', { class: 'actions' }, h('button', {

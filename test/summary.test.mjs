@@ -128,7 +128,7 @@ test('players who withdrew are mentioned, and only the rounds before they left c
 
 test('in a real-size tournament, every player who played is mentioned and no property names more than a third', () => {
   const fixed = new Set(['Champion', 'Champions', 'Underdog of the day', 'Dream team', 'Upset of the tournament', 'Perfect record',
-    'Rivals', 'Luck of the draw', 'Still smiling', 'Same initial', 'Palindrome', 'Alphabet', 'Last word', 'Short and sweet', 'Letters vs. wins', 'By the numbers']);
+    'Rivals', 'Luck of the draw', 'Still smiling', 'Same initial', 'Palindrome', 'Alphabet', 'Last word', 'Short and sweet', 'Scrabble', 'By the numbers']);
   const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
   const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
   for (const [seed, played] of [[3, 5], [8, 9], [11, 3], [5, 7]]) {
@@ -172,28 +172,30 @@ test('once finished, the summary speaks of the result', () => {
   assert.match(s['Still smiling'], /have no wins: there is always the next tournament!$/);
 });
 
-test('name jokes count letters and wins correctly', () => {
+test('the Scrabble joke adds up the letters and compares with the points', () => {
+  const values = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 };
+  const worth = (name) => [...name.toLowerCase()].reduce((sum, c) => sum + (values[c] ?? 0), 0);
   const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
   const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
-  let jokes = 0;
+  let checked = 0;
   for (let seed = 1; seed <= 10; seed++) {
     const t = createTournament({ id: 'x', name: 'x', seed, now: new Date(), players: names.map((name, i) => ({ name, skill: skills[i] })),
       settings: { courts: 2, rounds: 9, lastRoundCourts: 1, matchMinutes: 21, breakMinutes: 5, revealBatch: 'all' } });
     let k = seed;
     const results = {};
     for (const r of t.schedule.slice(0, 5)) for (const m of r.matches) { k = (k * 31 + 7) % 97; results[`${r.round}-${m.court}`] = (k % 2) + 1; }
-    const wins = new Map(names.map((n) => [n, 0]));
-    for (const [key, w] of Object.entries(results)) {
-      const [round, court] = key.split('-').map(Number);
-      const m = t.schedule[round - 1].matches.find((x) => x.court === court);
-      for (const id of w === 1 ? m.team1 : m.team2) wins.set(t.players.find((p) => p.id === id).name, wins.get(t.players.find((p) => p.id === id).name) + 1);
-    }
     const s = Object.fromEntries(tournamentSummary({ ...t, results }).map((x) => [x.title, x.text]));
-    for (const [, name, n, w] of (s['Letters vs. wins'] ?? '').matchAll(/(\p{L}+) has (\d+) letters and (no win|\d+ wins?)/gu)) {
-      assert.equal(Number(n), name.length, `${name}: letters`);
-      assert.equal(w === 'no win' ? 0 : parseInt(w, 10), wins.get(name), `${name}: wins`);
-      jokes++;
+    for (const [, name, n] of (s.Scrabble ?? '').matchAll(/(\p{L}+) is worth (\d+) points in Scrabble/gu)) {
+      assert.equal(Number(n), worth(name), name);
+      checked++;
     }
   }
-  assert.ok(jokes > 0, 'the jokes were checked at least once');
+  assert.ok(checked > 0, 'the joke was checked at least once');
+  assert.equal(worth('Max'), 12);
+});
+
+test('the youngest and the oldest player in one team are always told', () => {
+  const aged = players.map((p) => ({ ...p, birthYear: { p1: 1950, p2: 2005, p3: 1980, p4: 1985, p5: 1990 }[p.id] }));
+  const s = Object.fromEntries(tournamentSummary({ players: aged, schedule, results: { '1-1': 1, '2-1': 2, '3-1': 1 } }).map((x) => [x.title, x.text]));
+  assert.equal(s['Youngest and oldest'], 'Ben, the youngest, and Anna, the oldest, teamed up twice: in round 1 (won) and round 3 (won).');
 });
