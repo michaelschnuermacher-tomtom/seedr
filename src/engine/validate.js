@@ -16,7 +16,8 @@ export function validateTournament(value) {
 
 function checkTournament(t) {
   if (!isObject(t) || !('version' in t)) fail('This is not a Seedr tournament file');
-  if (t.version !== 2) fail(`Unsupported file version: ${t.version}`);
+  // Tournaments linked to people in place kept version 1; their content is the same as 2.
+  if (t.version !== 1 && t.version !== 2) fail(`Unsupported file version: ${t.version}`);
   if (typeof t.id !== 'string' || !t.id) fail('Missing tournament id');
   if (typeof t.name !== 'string') fail('Missing tournament name');
   if (typeof t.createdAt !== 'string') fail('Missing creation date');

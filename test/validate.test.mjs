@@ -73,7 +73,7 @@ test('player links and years of birth are checked', () => {
   assert.equal(validateTournament(t).ok, true);
   assert.match(validateTournament({ ...t, players: t.players.map((p, i) => (i ? p : { ...p, personId: '' })) }).error, /player link/);
   assert.match(validateTournament({ ...t, players: t.players.map((p, i) => (i ? p : { ...p, birthYear: 'old' })) }).error, /year of birth/);
-  assert.match(validateTournament({ ...t, version: 1 }).error, /Unsupported file version: 1/);
+  assert.equal(validateTournament({ ...t, version: 1 }).ok, true, 'tournaments linked in place kept version 1');
 });
 
 test('the last round may not use more courts than set', () => {
