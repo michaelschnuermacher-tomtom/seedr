@@ -18,7 +18,7 @@ export function homeScreen(ctx) {
       : h('ul', { class: 'list' }, tournaments.map((t) => h('li', {},
         h('button', { class: 'link', onclick: () => ctx.open(t) },
           h('strong', {}, t.name),
-          h('span', { class: 'muted' }, ` · ${t.players?.length ?? 0} players · ${new Date(t.createdAt).toLocaleDateString()}`))))),
+          h('span', { class: 'muted' }, ` · ${t.players?.length ?? 0} players · ${new Date(t.createdAt).toLocaleDateString()}${t.finishedAt ? ' · finished' : ''}`))))),
     h('section', { class: 'card backup' },
       h('h2', { class: 'card-title' }, 'Backup'),
       h('p', { class: 'muted' }, 'Browser storage can be lost. A backup is one file with all players and tournaments on this device; importing it adds them to another device or brings them back. Older tournament files can be imported too.'),

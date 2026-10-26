@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -225,4 +225,20 @@ test('renameTournament changes the name at any time but not to an empty one', ()
   assert.equal(renameTournament(t, '  Tenerife Cup ').name, 'Tenerife Cup');
   assert.deepEqual(renameTournament(t, 'x').schedule, t.schedule);
   assert.throws(() => renameTournament(t, '   '), /cannot be empty/);
+});
+
+test('a finished tournament is locked until it is reopened', () => {
+  const t = setResult(make(), 1, 1, 1);
+  const done = finishTournament(t, new Date('2026-10-26T20:00:00Z'));
+  assert.equal(done.finishedAt, '2026-10-26T20:00:00.000Z');
+  assert.ok(isFinished(done) && !isFinished(t));
+  assert.equal(validateTournament(done).ok, true);
+  for (const change of [() => setResult(done, 1, 2, 1), () => revealNext(done), () => redraw(done, 2), () => withdrawPlayers(done, ['p1'], 2),
+    () => swapPlayers(done, 1, 'p1', 'p2'), () => finishTournament(done, new Date())]) {
+    assert.throws(change, /finished/);
+  }
+  assert.equal(renameTournament(done, 'Final').name, 'Final', 'names can still be corrected');
+  const open = reopenTournament(done);
+  assert.ok(!('finishedAt' in open));
+  assert.deepEqual(setResult(open, 1, 2, 2).results, { '1-1': 1, '1-2': 2 });
 });

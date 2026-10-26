@@ -98,6 +98,8 @@ button, .button {
 button:hover, .button:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 button:focus-visible, .button:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: default; }
+/* A finished tournament: the round cards stay fully readable, only tapping is off. */
+.team:disabled:not(.loser) { opacity: 1; }
 button.primary { background: var(--strong); border-color: var(--strong); color: var(--strong-text); }
 button.primary:hover { background: color-mix(in srgb, var(--strong) 85%, black); }
 button.danger { color: var(--danger); }
@@ -162,6 +164,12 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .tabs button { border: none; background: transparent; min-height: 40px; color: var(--muted); }
 .tabs button.current { background: var(--surface); color: var(--strong); box-shadow: var(--shadow); }
 .tabs .lock { font-size: .8em; margin-right: 5px; }
+/* Four tabs (with Summary) still fit on one line on a phone. */
+@media (max-width: 480px) {
+  .tabs { display: flex; flex-wrap: nowrap; }
+  .tabs button { flex: 1 1 auto; padding: 8px 6px; font-size: .9rem; }
+  .tabs .lock { margin-right: 3px; }
+}
 
 /* Matches */
 .match { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
@@ -291,7 +299,14 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
      the court fills the printable area, so the margins stay white. */
   body::before, .top .eyebrow { display: none; }
   /* A table across pages: each part gets its own border, and the column headings repeat. */
-  .table-wrap { -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  /* A table across pages: the background sits on the cells, not on a card around the
+     table, so a page ends right after its last row instead of with an empty strip. */
+  .table-wrap { background: none; border: none; border-radius: 0; padding: 0; overflow: visible; }
+  table.standings { border: 1px solid var(--line); }
+  .standings td, .standings th { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+  .standings tr.rank-1 td { background: linear-gradient(color-mix(in srgb, #e9c75b 16%, transparent) 0 0), color-mix(in srgb, var(--surface) 70%, transparent); }
+  .standings tr.rank-2 td { background: linear-gradient(color-mix(in srgb, #aab4bd 16%, transparent) 0 0), color-mix(in srgb, var(--surface) 70%, transparent); }
+  .standings tr.rank-3 td { background: linear-gradient(color-mix(in srgb, #dcae85 18%, transparent) 0 0), color-mix(in srgb, var(--surface) 70%, transparent); }
   .card, .match, .overview-round, .table-wrap { box-shadow: none; }
   .card, .match, .overview-round, .standings tr { break-inside: avoid; }
   .team { min-height: 0; }

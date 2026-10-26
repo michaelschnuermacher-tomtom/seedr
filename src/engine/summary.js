@@ -12,8 +12,6 @@ export function tournamentSummary(t) {
   const value = (team) => teamValue(byId.get(team[0]).skill, byId.get(team[1]).skill);
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const fmt = (x) => (Math.round(x * 100) / 100).toString();
-  // Edge as in the standings: one decimal, with + or a real minus sign.
-  const edge = (x) => { const v = Math.round(x * 10) / 10; return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1); };
 
   // Matches of complete rounds, with winner and loser.
   const matches = [];
@@ -26,6 +24,10 @@ export function tournamentSummary(t) {
     });
   }
   if (matches.length === 0) return [];
+  // Once finished, the summary speaks of the result rather than of the tournament so far.
+  const done = Boolean(t.finishedAt);
+  const yet = done ? '' : ' yet';
+  const next = done ? 'there is always the next tournament!' : 'there is always the next round!';
 
   // Everyone who played, including players who withdrew later.
   const rows = computeStandings(t.players, t.schedule, t.results).filter((r) => r.games > 0);
@@ -42,7 +44,7 @@ export function tournamentSummary(t) {
   if (top.length) {
     const r = top[0];
     add('🏆', top.length === 1 ? 'Champion' : 'Champions',
-      `${top.map((x) => x.name).join(', ')} ${top.length === 1 ? 'leads' : 'share first place'} with ${r.points} ${r.points === 1 ? 'point' : 'points'}`
+      `${top.map((x) => x.name).join(', ')} ${top.length === 1 ? (done ? 'wins' : 'leads') : (done ? 'share the win' : 'share first place')} with ${r.points} ${r.points === 1 ? 'point' : 'points'}`
       + ` (${plural(r.wins, 'win')} from ${plural(r.games, 'game')}).`, top.map((x) => x.id));
   }
 
@@ -52,7 +54,7 @@ export function tournamentSummary(t) {
   if (underdog) {
     const all = underdogs.filter((r) => r.wins === underdog.wins && shown(r.edge) === shown(underdog.edge));
     add('🐶', 'Underdog of the day', `${and(all.map((r) => r.name))} won ${plural(underdog.wins, 'game')}${all.length > 1 ? ' each' : ''}`
-      + ` although ${all.length > 1 ? 'their teams were' : 'their team was'} usually the weaker one (edge ${edge(underdog.edge)}).`, all.map((r) => r.id));
+      + ` although ${all.length > 1 ? 'their teams were' : 'their team was'} usually the weaker one.`, all.map((r) => r.id));
   }
 
   // Dream team: the partnership with the most wins together. The draw rarely repeats
@@ -85,7 +87,7 @@ export function tournamentSummary(t) {
   // Perfect record: won every game, at least two.
   const perfect = rows.filter((r) => r.games >= 2 && r.wins === r.games);
   if (perfect.length) {
-    add('🛡️', 'Perfect record', `${perfect.map((r) => r.name).join(', ')} won every game so far.`, perfect.map((r) => r.id));
+    add('🛡️', 'Perfect record', `${perfect.map((r) => r.name).join(', ')} won every game.`, perfect.map((r) => r.id));
   }
 
   // Rivals: the two players who faced each other most often.
@@ -113,8 +115,8 @@ export function tournamentSummary(t) {
   if (lucky && shown(lucky.edge) > 0) {
     const all = rows.filter((r) => shown(r.edge) === shown(lucky.edge));
     add('🍀', 'Luck of the draw', all.length > 1
-      ? `The teams of ${and(all.map((r) => r.name))} were the strongest on average (edge ${edge(lucky.edge)}).`
-      : `${lucky.name}'s teams were the strongest on average (edge ${edge(lucky.edge)}).`, all.map((r) => r.id));
+      ? `The teams of ${and(all.map((r) => r.name))} were the strongest on average.`
+      : `${lucky.name}'s teams were the strongest on average.`, all.map((r) => r.id));
   }
 
   // Still smiling: everyone without a win, or else the fewest wins in the most games.
@@ -123,9 +125,9 @@ export function tournamentSummary(t) {
     const all = smiling.wins === 0 ? rows.filter((r) => r.wins === 0)
       : rows.filter((r) => r.wins === smiling.wins && r.games === smiling.games);
     add('😄', 'Still smiling', smiling.wins === 0
-      ? `${and(all.map((r) => r.name))} ${all.length > 1 ? 'have' : 'has'} no wins yet: there is always the next round!`
+      ? `${and(all.map((r) => r.name))} ${all.length > 1 ? 'have' : 'has'} no wins${yet}: ${next}`
       : `${and(all.map((r) => r.name))} played ${plural(smiling.games, 'game')}${all.length > 1 ? ' each' : ''}`
-        + ` with ${plural(smiling.wins, 'win')}: there is always the next round!`, all.map((r) => r.id));
+        + ` with ${plural(smiling.wins, 'win')}: ${next}`, all.map((r) => r.id));
   }
 
   // More properties that tell players apart. Each names everyone who has it; the rarest come
@@ -134,7 +136,7 @@ export function tournamentSummary(t) {
   const history = new Map(rows.map((r) => [r.id, []])); // each player's games, in order
   for (const m of matches) {
     for (const [team, other, won] of [[m.won, m.lost, true], [m.lost, m.won, false]]) {
-      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other, court: m.court });
+      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other });
     }
   }
   const games = (r) => history.get(r.id);
@@ -157,10 +159,6 @@ export function tournamentSummary(t) {
   // Flying start: won the first game.
   const flying = rows.filter((r) => games(r)[0]?.won);
   offer('🌅', 'Flying start', ids(flying), `${who(flying)} won the very first game.`);
-  // Strong finish: won in the latest round played.
-  const lastRound = Math.max(...matches.map((m) => m.round));
-  const finish = matches.filter((m) => m.round === lastRound);
-  offer('🎬', 'Strong finish', finish.flatMap((m) => m.won), `${and(finish.map((m) => names(m.won)))} won in round ${lastRound}, the latest round.`);
   // Rollercoaster: win and loss alternate in every game.
   const roller = rows.filter((r) => games(r).length >= 4 && games(r).every((g, i) => i === 0 || g.won !== games(r)[i - 1].won));
   offer('🎢', 'Rollercoaster', ids(roller), `${who(roller)} alternated wins and losses in every game.`);
@@ -203,7 +201,7 @@ export function tournamentSummary(t) {
   offer('😬', 'So close', close.flatMap((m) => m.won), `${teams(close)} lost although their team was the stronger one.`);
   // Perfectly balanced: their matches were even on average.
   const balanced = regulars.filter((r) => shown(r.edge) === 0);
-  offer('⚖️', 'Perfectly balanced', ids(balanced), `${who(balanced)} played perfectly balanced matches on average (edge 0.0).`);
+  offer('⚖️', 'Perfectly balanced', ids(balanced), `${who(balanced)} played perfectly balanced matches on average.`);
   // Bench warmer and iron player: sat out the most rounds, or none at all.
   // Rounds a player could have played: players who withdrew only count until they left.
   const roundsDone = [...new Set(matches.map((m) => m.round))];
@@ -214,7 +212,7 @@ export function tournamentSummary(t) {
     const bench = rows.filter((r) => rested(r) === most);
     offer('🪑', 'Bench warmer', ids(bench), `${who(bench)} sat out ${plural(most, 'round')}: well rested for what comes next!`);
     const iron = played >= 2 ? rows.filter((r) => rested(r) === 0) : [];
-    offer('⚙️', 'Iron player', ids(iron), `${who(iron)} played every round so far without a break.`);
+    offer('⚙️', 'Iron player', ids(iron), `${who(iron)} played every round without a break.`);
   }
   // Giant killer: beat the strongest team anyone has beaten (lowest team value).
   const strongest = Math.min(...matches.map((m) => value(m.lost)));
@@ -228,19 +226,6 @@ export function tournamentSummary(t) {
     return g.length >= 4 && g.slice(-half).filter((x) => x.won).length > g.slice(0, half).filter((x) => x.won).length;
   });
   offer('🌱', 'Late bloomer', ids(bloomers), `${who(bloomers)} won more games in the second half than in the first.`);
-  // Court regular: the most games on one and the same court.
-  if (new Set(matches.map((m) => m.court)).size > 1) {
-    const favourite = (r) => {
-      const counts = new Map();
-      for (const g of games(r)) counts.set(g.court, (counts.get(g.court) ?? 0) + 1);
-      return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0] ?? [0, 0];
-    };
-    const most = Math.max(...rows.map((r) => favourite(r)[1]));
-    if (most >= 3) {
-      const list = rows.filter((r) => favourite(r)[1] === most);
-      offer('📍', 'Court regular', ids(list), `${and(list.map((r) => `${r.name} (court ${favourite(r)[0]})`))} played ${most} games on the same court.`);
-    }
-  }
   // Age, in words only: the oldest and youngest players with a win, and the winning team
   // with the biggest age difference. Only players with a year of birth count.
   const born = (id) => byId.get(id).birthYear;
@@ -268,7 +253,15 @@ export function tournamentSummary(t) {
   }
   // Anyone still missing gets the win tally, so the summary covers every player.
   const left = rows.filter((r) => !mentioned.has(r.id));
-  if (left.length) add('🎾', 'Win tally', `${and(left.map((r) => `${r.name} ${plural(r.wins, 'win')}`))}.`, ids(left));
+  // Full sentences, so a name like "Max" never reads as "at most".
+  if (left.length) {
+    const winning = left.filter((r) => r.wins > 0);
+    const none = left.filter((r) => r.wins === 0);
+    add('🎾', 'Win tally', [
+      winning.length ? `${and(winning.map((r) => `${r.name} won ${plural(r.wins, 'game')}`))}.` : '',
+      none.length ? `${who(none)} ${none.length > 1 ? 'have' : 'has'} no win${yet}.` : '',
+    ].filter(Boolean).join(' '), ids(left));
+  }
 
   // By the numbers: how often the stronger team won.
   const decided = matches.filter((m) => m.gap !== 0);

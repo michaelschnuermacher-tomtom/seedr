@@ -40,10 +40,11 @@ test('highlights only appear when there is something to tell', () => {
   assert.match(s['By the numbers'], /1 match played\. The stronger team won 1 of 1 \(even matches not counted\); 0 upsets\./);
 });
 
-test('edges are shown like in the standings, and a single win together is no dream team', () => {
+test('no plain edge values, and a single win together is no dream team', () => {
   const s = summary({ '1-1': 1, '2-1': 1, '3-1': 2 });
   assert.ok(!('Dream team' in s), 'no pair won twice together');
-  assert.match(s['Luck of the draw'] ?? '', /edge \+\d\.\d\)/);
+  assert.match(s['Luck of the draw'], /were the strongest on average\.$/);
+  assert.ok(Object.values(s).every((text) => !/edge [+−]?\d/.test(text)), 'no edge numbers');
 });
 
 test('every player who played is mentioned at least once', () => {
@@ -54,7 +55,7 @@ test('every player who played is mentioned at least once', () => {
   }
 });
 
-test('age, giant killer, late bloomer and court regular name exactly the right players', () => {
+test('age, giant killer and late bloomer name exactly the right players', () => {
   const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
   const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
   const years = [1960, 1975, 1980, 1990, 1999, 1955, 1970, 2005, 1985, 1992, 1978, 1966, 2001, 1988, 1995, 1972, 1950];
@@ -94,10 +95,10 @@ test('age, giant killer, late bloomer and court regular name exactly the right p
         assert.deepEqual(namedIn(s['Across generations']), [...new Set(winning.filter((team) => gap(team) === widest).flat().map((id) => byId.get(id).name))].sort());
         seen.add('Across generations');
       }
-      for (const title of ['Giant killer', 'Late bloomer', 'Court regular']) if (s[title]) seen.add(title);
+      for (const title of ['Giant killer', 'Late bloomer']) if (s[title]) seen.add(title);
     }
   }
-  assert.deepEqual([...seen].sort(), ['Across generations', 'Court regular', 'Giant killer', 'Late bloomer', 'Old hands', 'Young guns']);
+  assert.deepEqual([...seen].sort(), ['Across generations', 'Giant killer', 'Late bloomer', 'Old hands', 'Young guns']);
 });
 
 test('without years of birth there are no age highlights', () => {
@@ -163,4 +164,10 @@ test('ties: players with the same statistic are named together', () => {
   assert.match(s['Still smiling'], /^David and Anna have no wins yet/, 'in standings order');
   assert.match(s['Underdog of the day'], /^Ben and Carla won 2 games each although their teams were usually the weaker one/);
   assert.ok(!('Saving the best for later' in s), 'nobody with the same record is left over');
+});
+
+test('once finished, the summary speaks of the result', () => {
+  const s = Object.fromEntries(tournamentSummary({ players, schedule, results: { '1-1': 2, '2-1': 1 }, finishedAt: '2026-10-26T20:00:00.000Z' }).map((x) => [x.title, x.text]));
+  assert.match(s.Champion, /^Carla wins with 2 points/);
+  assert.match(s['Still smiling'], /have no wins: there is always the next tournament!$/);
 });

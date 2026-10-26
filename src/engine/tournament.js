@@ -89,6 +89,7 @@ export function createTournament({ id, name, players, settings, seed, now }) {
 }
 
 export function revealNext(t) {
+  checkOpen(t);
   const { rounds, revealBatch } = t.settings;
   const step = revealBatch === 'all' ? rounds : revealBatch;
   return { ...t, revealedRounds: Math.min(rounds, t.revealedRounds + step) };
@@ -99,6 +100,7 @@ export function hasResults(t) {
 }
 
 export function redraw(t, seed) {
+  checkOpen(t);
   if (hasResults(t)) throw new Error('Cannot redraw after results have been entered');
   // Without results, players who withdrew earlier have nothing left to keep.
   const players = t.players.filter(isActive);
@@ -108,6 +110,7 @@ export function redraw(t, seed) {
 // New name, players or settings for a tournament that has not started: draws a new
 // schedule and keeps id and creation date.
 export function updateSettings(t, { name, players, settings }, seed) {
+  checkOpen(t);
   if (hasResults(t)) throw new Error('Cannot change settings after results have been entered');
   const withIds = numberPlayers(players);
   return {
@@ -121,6 +124,26 @@ export function updateSettings(t, { name, players, settings }, seed) {
     revealedRounds: initialReveal(settings),
     results: {},
   };
+}
+
+// A finished tournament (`finishedAt`) is locked: no results, swaps, reveals, withdrawals or
+// redraws until it is reopened. Names can still be corrected.
+export function isFinished(t) {
+  return Boolean(t.finishedAt);
+}
+
+function checkOpen(t) {
+  if (isFinished(t)) throw new Error('This tournament is finished. Reopen it in Manage to change it.');
+}
+
+export function finishTournament(t, now) {
+  checkOpen(t);
+  return { ...t, finishedAt: now.toISOString() };
+}
+
+export function reopenTournament(t) {
+  const { finishedAt, ...rest } = t;
+  return rest;
 }
 
 // Players who withdrew keep their entry (for the rounds they played) with
@@ -138,6 +161,7 @@ export function firstRedrawableRound(t) {
 // Takes players out of a running tournament: the rounds played so far stay as they are,
 // the remaining rounds are drawn again without them.
 export function withdrawPlayers(t, ids, seed) {
+  checkOpen(t);
   if (!hasResults(t)) throw new Error('Before the first result, change the players with Edit settings');
   const from = firstRedrawableRound(t);
   if (from > t.settings.rounds) throw new Error('There are no rounds left to redraw');
@@ -166,6 +190,7 @@ export function renameTournament(t, name) {
 // Swaps two players within a round: between the teams of a match, between courts, or
 // with a player who sits out. Matches that already have a result cannot change.
 export function swapPlayers(t, round, a, b) {
+  checkOpen(t);
   const r = t.schedule[round - 1];
   if (!r) throw new Error(`Unknown round ${round}`);
   if (round > t.revealedRounds) throw new Error('Only revealed rounds can be changed');
@@ -196,6 +221,7 @@ export function swapPlayersAcross(t, roundA, a, roundB, b) {
 }
 
 export function setResult(t, round, court, winner) {
+  checkOpen(t);
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
   if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);
   const results = { ...t.results };

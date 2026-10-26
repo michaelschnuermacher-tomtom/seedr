@@ -20,6 +20,7 @@ function checkTournament(t) {
   if (typeof t.id !== 'string' || !t.id) fail('Missing tournament id');
   if (typeof t.name !== 'string') fail('Missing tournament name');
   if (typeof t.createdAt !== 'string') fail('Missing creation date');
+  if ('finishedAt' in t && typeof t.finishedAt !== 'string') fail('Invalid finishing date');
   checkSettings(t.settings);
   const ids = checkPlayers(t.players);
   if (!isInt(t.seed)) fail('Invalid seed');
