@@ -333,13 +333,14 @@ export function edgeLevel(gap) {
   return x < 0.25 ? 'even' : x < 0.75 ? 'slight' : x < 1.5 ? 'clear' : 'big';
 }
 
-export function drawWarnings(stats) {
+// `unit`: calibrated units per skill step of the tournament, to show gaps in its own steps.
+export function drawWarnings(stats, unit = 1) {
   const warnings = [];
   if (stats.partnerRepeats > 0) {
     warnings.push(`Some players team up twice (${stats.partnerRepeats} repeated pairing(s)): with these players, that keeps the matches more balanced.`);
   }
   if (stats.maxAbsDiff >= UNBALANCED_GAP) {
-    warnings.push(`Some matches are unbalanced (team value gap up to ${formatValue(stats.maxAbsDiff)}). With few players or very different skill levels, not every match can be balanced.`);
+    warnings.push(`Some matches are unbalanced (team value gap up to ${formatValue(Math.round((stats.maxAbsDiff / unit) * 100) / 100)} skill steps). With few players or very different skill levels, not every match can be balanced.`);
   }
   return warnings;
 }

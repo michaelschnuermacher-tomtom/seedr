@@ -1,3 +1,5 @@
+import { scaleOf, scaleProblem, isSkill } from './scale.js';
+
 const isInt = (v) => Number.isInteger(v);
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -23,7 +25,7 @@ function checkTournament(t) {
   if (typeof t.createdAt !== 'string') fail('Missing creation date');
   if ('finishedAt' in t && typeof t.finishedAt !== 'string') fail('Invalid finishing date');
   checkSettings(t.settings);
-  const ids = checkPlayers(t.players);
+  const ids = checkPlayers(t.players, scaleOf(t.settings));
   if (!isInt(t.seed)) fail('Invalid seed');
   checkSchedule(t.schedule, t.settings, ids);
   if (!isInt(t.revealedRounds) || t.revealedRounds < 0 || t.revealedRounds > t.settings.rounds) fail('Invalid number of revealed rounds');
@@ -37,10 +39,11 @@ function checkSettings(s) {
   if (!isInt(s.matchMinutes) || s.matchMinutes < 1) fail('Invalid match length');
   if (!isInt(s.breakMinutes) || s.breakMinutes < 0) fail('Invalid break length');
   if (!(s.revealBatch === 'all' || (isInt(s.revealBatch) && s.revealBatch >= 1))) fail('Invalid reveal batch');
+  if ('scale' in s && scaleProblem(s.scale)) fail(scaleProblem(s.scale));
   if ('lastRoundCourts' in s && (!isInt(s.lastRoundCourts) || s.lastRoundCourts < 1 || s.lastRoundCourts >= s.courts)) fail('Invalid number of courts in the last round');
 }
 
-function checkPlayers(players) {
+function checkPlayers(players, scale) {
   if (!Array.isArray(players) || players.length < 4) fail('At least 4 players are required');
   // A player refers to a person (personId); name and year of birth belong to the person.
   // Players without a person (tests) have a name instead.
@@ -52,7 +55,7 @@ function checkPlayers(players) {
     const label = p.name ?? p.id;
     if ('personId' in p && (typeof p.personId !== 'string' || !p.personId)) fail(`Invalid player link for ${label}`);
     if (!p.personId && (typeof p.name !== 'string' || !p.name.trim())) fail('Invalid player entry');
-    if (!isInt(p.skill) || p.skill < 1 || p.skill > 10) fail(`Invalid skill for ${label}`);
+    if (!isSkill(p.skill, scale)) fail(`Invalid skill for ${label}`);
     if (ids.has(p.id)) fail(`Duplicate player id ${p.id}`);
     if (p.personId && people.has(p.personId)) fail(`The same player appears twice (${label})`);
     if (!p.personId) {

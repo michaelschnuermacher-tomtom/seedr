@@ -152,8 +152,9 @@ test('drawWarnings', () => {
   const base = { partnerRepeats: 0, maxAbsDiff: 2 };
   assert.deepEqual(drawWarnings(base), []);
   assert.match(drawWarnings({ ...base, partnerRepeats: 2 })[0], /team up twice \(2 repeated pairing/);
-  assert.match(drawWarnings({ ...base, maxAbsDiff: 3 })[0], /unbalanced.*up to 3\)/);
-  assert.match(drawWarnings({ ...base, maxAbsDiff: 3.25 })[0], /up to 3.25/);
+  assert.match(drawWarnings({ ...base, maxAbsDiff: 3 })[0], /unbalanced.*up to 3 skill steps\)/);
+  assert.match(drawWarnings({ ...base, maxAbsDiff: 3.25 })[0], /up to 3.25 skill steps/);
+  assert.match(drawWarnings({ ...base, maxAbsDiff: 4.5 }, 2.25)[0], /up to 2 skill steps/, 'in the tournament’s own steps');
 });
 
 test('small groups stay reasonably balanced (no stuck draw)', () => {

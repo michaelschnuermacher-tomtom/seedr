@@ -4,21 +4,26 @@ import { sortPeople, usage, addPerson, updatePerson, deletePerson, splitPerson }
 
 // The players known on this device: listed first, changed on a sub-page that Edit or Add
 // opens (`peopleView.page`). Names and years of birth are shared by all tournaments.
-// `peopleReturn` is the screen to go back to (the setup, when opened from there).
-export function peopleScreen(ctx) {
+// Shown in the Players tab of the home screen, and as a screen of its own from the setup
+// (`peopleReturn`), with a way back.
+export function peoplePanel(ctx, leave = null) {
   const view = (ctx.state.peopleView ??= { page: null, id: null });
   const people = sortPeople(ctx.people());
   const tournaments = ctx.store.list();
+  const person = people.find((p) => p.id === view.id);
+  const pages = { add: addPage, edit: editPage, split: splitPage };
+  const page = pages[view.page];
+  return page && (view.page === 'add' || person) ? page(ctx, view, person, people, tournaments) : listPage(ctx, view, people, tournaments, leave);
+}
+
+export function peopleScreen(ctx) {
   const leave = () => {
     const to = ctx.state.peopleReturn ?? 'home';
     ctx.state.peopleView = null;
     ctx.state.peopleReturn = null;
     ctx.go(to);
   };
-  const person = people.find((p) => p.id === view.id);
-  const pages = { add: addPage, edit: editPage, split: splitPage };
-  const page = pages[view.page];
-  const body = page && (view.page === 'add' || person) ? page(ctx, view, person, people, tournaments) : listPage(ctx, view, people, tournaments, leave);
+  const body = peoplePanel(ctx, leave);
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
       h('div', { class: 'titles' },
@@ -51,7 +56,7 @@ function listPage(ctx, view, people, tournaments, leave) {
     h('p', { class: 'muted' }, 'Names and years of birth are shared by all tournaments: a correction here shows everywhere. The skill is set for each tournament in its setup.'),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => showPage(ctx, view, 'add') }, 'Add player'),
-      h('button', { onclick: leave }, ctx.state.peopleReturn === 'setup' ? 'Back to the setup' : 'Done')),
+      leave ? h('button', { onclick: leave }, 'Back to the setup') : null),
     h('section', { class: 'card' },
       h('h2', { class: 'card-title' }, people.length === 1 ? '1 player' : `${people.length} players`),
       people.length === 0 ? h('p', { class: 'muted' }, 'No players yet.') : h('ul', { class: 'people' }, people.map((p) => h('li', {},

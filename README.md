@@ -22,17 +22,28 @@ Tournament data stays on the device. The host only serves the empty app.
 
 ## Players
 
-Players are kept on the device and shared by all tournaments. A tournament only refers to its players (by an internal id) and keeps what belongs to the tournament, the skill; name and year of birth are always taken from the player: **Players** on the home
+Players are kept on the device and shared by all tournaments. A tournament only refers to its players (by an internal id) and keeps what belongs to the tournament, the skill; name and year of birth are always taken from the player: the **Players** tab of the home
 screen lists them with name and (optional) year of birth. The list comes first; **Edit**
 and **Add player** open a page to change them. A correction shows in every tournament of
 that player, old ones included. A player can only be deleted while they are in no
 tournament. If two different people ended up as one (e.g. two "Max"), **Split…** gives
 the chosen tournaments a player of their own.
 
-The skill (1 = best, 10 = weakest) belongs to each tournament: in the setup, tick who
-plays and set their skill. A new tournament starts with the players of the most recent
-one ticked, with their skill there; **Add or edit players…** leads to the Players page
-and back.
+## Setting up a tournament
+
+The setup is a sequence of decisions, and each step appears once the one before is made:
+name, skill scale, players, courts and break, total time, rounds and match length, how
+many rounds are revealed at a time, and finally **Draw schedule**.
+
+- **Skill scale**: any whole-number range from 0 to 100 (e.g. 1–5 or 1–10), and whether
+  a lower or a higher skill is better. The draw is calibrated for 1–10 (1 = best); every
+  scale is mapped onto it, so all scales draw alike. Skills, edges and gaps are always
+  shown in the tournament's own scale and steps.
+- **Players per skill**: one dropdown per player at each skill level, and an empty one to
+  add the next; only players not chosen yet are offered. Scales with up to 11 levels show
+  every level; larger ones show the levels in use, and **Add a skill level** adds one.
+  There are no default skills: they are set here, or later in Manage → Edit skills.
+  **Add or edit players…** leads to the Players page and back.
 
 The year of birth is only used for the tournament summary, in words ("the oldest player
 to win a game"); ages and years are never printed.
@@ -43,7 +54,7 @@ to win a game"); ages and years are never printed.
 
 | Setting | What it does |
 |---|---|
-| Players and skill | Skill 1 is the best, 10 the weakest. A team's *value* is the sum of both skills plus a quarter of their difference (the *spread*), since opponents can play to the weaker partner: 3 + 6 → 9.75, 1 + 9 → 12. Lower is stronger. |
+| Players and skill | On the calibrated scale skill 1 is the best, 10 the weakest (see Setting up a tournament). A team's *value* is the sum of both skills plus a quarter of their difference (the *spread*), since opponents can play to the weaker partner: 3 + 6 → 9.75, 1 + 9 → 12. Lower is stronger. |
 | Courts | Up to 4 players per court play each round. With fewer than `4 × courts` players, only as many courts are used as there are full groups of 4. |
 | Total time, break | From these, Seedr works out every number of rounds that fits: match length = total time ÷ rounds − break, rounded down, at least 5 minutes. |
 | Rounds and match length | Chosen from a dropdown of these options only. Options where everyone plays the same number of games come first. If leaving courts empty in the last round means fewer players get fewer games, that is offered as an extra option, e.g. "9 rounds (last round on 1 court)". Only the number of rounds affects the draw. Match length and break are only used for the time plan. |
@@ -106,9 +117,8 @@ Fun highlights of the results (champion, underdog of the day, upset of the tourn
 
 ## Keeping data safe
 
-Browser storage can be lost (clearing Safari data, a new device). **Export backup** (home
-screen or Manage) saves one file with all players and all tournaments, e.g.
-`seedr-backup-2026-10-26.json` (to Dropbox or iCloud Drive). **Import** on the home screen
+Browser storage can be lost (clearing Safari data, a new device). **Export backup** (Backup tab of the home screen, or Manage) saves one file with all players and all tournaments, e.g.
+`seedr-backup-2026-10-26.json` (to Dropbox or iCloud Drive). **Import** in the **Backup** tab of the home screen
 merges it into any device: players are matched by id, then by name, and existing players
 and tournaments are only replaced after a confirmation.
 

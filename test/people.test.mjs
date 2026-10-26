@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   personProblem, addPerson, updatePerson, deletePerson, splitPerson, usage, withPeople, withoutPeople,
-  rememberSkills, makeBackup, readBackup, mergeBackup,
+  makeBackup, readBackup, mergeBackup,
 } from '../src/engine/people.js';
 import { createTournament } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
@@ -64,11 +64,6 @@ test('splitting gives the chosen tournaments a person of their own', () => {
   assert.equal(usage([a, ...result.tournaments], 'd').length, 1);
   assert.throws(() => splitPerson(people, [a, b], 'd', [], { name: 'Max C.' }, () => 'x'), /at least one tournament/);
   assert.throws(() => splitPerson(people, [a, b], 'd', ['b'], { name: 'Ada' }, () => 'x'), /already a player/);
-});
-
-test('the last skill is remembered for the next tournament', () => {
-  const people = rememberSkills([{ id: 'a', name: 'Seb', lastSkill: 2 }, { id: 'b', name: 'Lia' }], [{ personId: 'a', skill: 1 }, { personId: 'b', skill: 4 }]);
-  assert.deepEqual(people.map((p) => p.lastSkill), [1, 4]);
 });
 
 test('a backup round-trips all people and tournaments, without names in the tournaments', () => {

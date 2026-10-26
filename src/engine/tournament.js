@@ -1,5 +1,6 @@
 import { generateSchedule } from './schedule.js';
 import { resultKey } from './standings.js';
+import { scaleOf, calibratePlayers, isSkill } from './scale.js';
 
 // Version 2: players link to a person (`personId`) and may have a year of birth.
 export const FORMAT_VERSION = 2;
@@ -67,9 +68,10 @@ function initialReveal(settings) {
   return settings.revealBatch === 'all' ? settings.rounds : Math.min(settings.rounds, settings.revealBatch);
 }
 
+// The draw works on calibrated skills (see scale.js); the tournament keeps its own.
 function drawSchedule(players, settings, seed) {
   const { courts, rounds, lastRoundCourts } = settings;
-  return generateSchedule({ players, courts, rounds, lastRoundCourts, seed }).schedule;
+  return generateSchedule({ players: calibratePlayers(players, scaleOf(settings)), courts, rounds, lastRoundCourts, seed }).schedule;
 }
 
 export function createTournament({ id, name, players, settings, seed, now }) {
@@ -178,8 +180,10 @@ export function withdrawPlayers(t, ids, seed) {
 // Rounds from `from` on are drawn again for the active players; earlier rounds count but stay.
 function redrawFrom(t, players, from, seed) {
   const past = t.schedule.slice(0, from - 1);
+  const scale = scaleOf(t.settings);
   const { schedule } = generateSchedule({
-    players: players.filter(isActive), courts: t.settings.courts, lastRoundCourts: t.settings.lastRoundCourts, rounds: t.settings.rounds - past.length, seed, past, pastPlayers: players,
+    players: calibratePlayers(players.filter(isActive), scale), courts: t.settings.courts, lastRoundCourts: t.settings.lastRoundCourts,
+    rounds: t.settings.rounds - past.length, seed, past, pastPlayers: calibratePlayers(players, scale),
   });
   return { ...t, players, schedule: [...past, ...schedule] };
 }
@@ -188,9 +192,10 @@ function redrawFrom(t, players, from, seed) {
 // values, edges and the summary follow the new skills. See redrawRemaining.
 export function setSkills(t, skills) {
   checkOpen(t);
+  const scale = scaleOf(t.settings);
   for (const [id, skill] of Object.entries(skills)) {
     if (!t.players.some((p) => p.id === id)) throw new Error(`Unknown player ${id}`);
-    if (!Number.isInteger(skill) || skill < 1 || skill > 10) throw new Error('Skills must be whole numbers from 1 to 10');
+    if (!isSkill(skill, scale)) throw new Error(`Skills must be whole numbers from ${scale.min} to ${scale.max}`);
   }
   return { ...t, players: t.players.map((p) => (p.id in skills ? { ...p, skill: skills[p.id] } : p)) };
 }

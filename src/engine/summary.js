@@ -1,5 +1,6 @@
 import { computeStandings, resultKey } from './standings.js';
 import { teamValue, edgeLevel } from './schedule.js';
+import { scaleOf, calibrated, calibratePlayers } from './scale.js';
 
 // English Scrabble letter values, for the last name joke.
 const SCRABBLE = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 };
@@ -15,10 +16,12 @@ export function tournamentSummary(t) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const name = (id) => byId.get(id).name;
   const names = (ids) => ids.map(name).join(' & ');
-  const value = (team) => teamValue(byId.get(team[0]).skill, byId.get(team[1]).skill);
+  // Calculations use calibrated skills (see scale.js); texts show the tournament's own.
+  const scale = scaleOf(t.settings);
+  const level = (id) => calibrated(byId.get(id).skill, scale);
+  const value = (team) => teamValue(level(team[0]), level(team[1]));
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
-  const fmt = (x) => (Math.round(x * 100) / 100).toString();
 
   // Matches of complete rounds, with winner and loser.
   const matches = [];
@@ -37,7 +40,7 @@ export function tournamentSummary(t) {
   const next = done ? 'there is always the next tournament!' : 'there is always the next round!';
 
   // Everyone who played, including players who withdrew later.
-  const rows = computeStandings(t.players, t.schedule, t.results).filter((r) => r.games > 0);
+  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results).filter((r) => r.games > 0);
   // A highlight about a statistic names everyone who shares it; edges count as equal when
   // they show the same in the standings.
   const and = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
@@ -170,7 +173,7 @@ export function tournamentSummary(t) {
   const roller = rows.filter((r) => games(r).length >= 4 && games(r).every((g, i) => i === 0 || g.won !== games(r)[i - 1].won));
   offer('🎢', 'Rollercoaster', ids(roller), `${who(roller)} alternated wins and losses in every game.`);
   // Odd couple: the biggest skill difference in a winning team.
-  const skillGap = (m) => Math.abs(byId.get(m.won[0]).skill - byId.get(m.won[1]).skill);
+  const skillGap = (m) => Math.abs(level(m.won[0]) - level(m.won[1]));
   const widest = Math.max(0, ...matches.map(skillGap));
   if (widest >= 3) {
     const list = matches.filter((m) => skillGap(m) === widest);
@@ -182,7 +185,7 @@ export function tournamentSummary(t) {
   const regulars = rows.filter((r) => games(r).length >= 2);
   const toughest = Math.min(...regulars.map(against));
   const tough = regulars.filter((r) => against(r) === toughest);
-  offer('🏔️', 'Toughest draw', ids(tough), `${who(tough)} faced the strongest opponents on average (team value ${fmt(toughest / 10)}).`);
+  offer('🏔️', 'Toughest draw', ids(tough), `${who(tough)} faced the strongest opponents on average.`);
   // Champion beater: beat a team with one of the leaders.
   if (top.length < rows.length) {
     const beaters = rows.filter((r) => !top.includes(r) && matches.some((m) => m.won.includes(r.id) && m.lost.some((id) => top.some((x) => x.id === id))));
@@ -293,7 +296,7 @@ export function tournamentSummary(t) {
   const furthest = Math.max(0, ...ranked.map(ahead));
   if (furthest >= 3) {
     const list = ranked.filter((r) => ahead(r) === furthest);
-    offer('🧗', 'Punching above their weight', ids(list), `${and(list.map((r) => `${r.name} (skill ${r.skill}) ${done ? 'finished' : 'is'} in ${ordinal(r.rank)} place`))}:`
+    offer('🧗', 'Punching above their weight', ids(list), `${and(list.map((r) => `${r.name} (skill ${byId.get(r.id).skill}) ${done ? 'finished' : 'is'} in ${ordinal(r.rank)} place`))}:`
       + ` far ahead of what the skill suggests.`);
   }
   // Toughest luck: the lowest edge, i.e. usually in the weaker team (the opposite of Luck of the draw).

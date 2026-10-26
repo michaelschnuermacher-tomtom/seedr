@@ -6,6 +6,7 @@ import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
 import { tournamentSummary } from '../engine/summary.js';
+import { scaleOf, calibrated, calibratePlayers, stepUnit, levels, describeScale } from '../engine/scale.js';
 import { exportBackup } from './backup.js';
 import { draftFromTournament } from './setup.js';
 
@@ -45,8 +46,9 @@ export function tournamentScreen(ctx) {
 // Display data for all revealed rounds; hidden rounds are never included.
 export function roundsOverview(t) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
+  const scale = scaleOf(t.settings);
   const team = (ids) => {
-    const skills = ids.map((id) => byId.get(id).skill);
+    const skills = ids.map((id) => calibrated(byId.get(id).skill, scale));
     return {
       names: ids.map((id) => byId.get(id).name).join(' + '),
       members: ids.map((id) => byId.get(id).name),
@@ -267,7 +269,8 @@ function printAll(ctx) {
 }
 
 function standingsTab(t) {
-  const rows = computeStandings(t.players, t.schedule, t.results);
+  const scale = scaleOf(t.settings);
+  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results);
   // The Bonus column only appears once someone has bonus points.
   const bonus = rows.some((r) => r.bonus);
   const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'Edge'].filter(Boolean);
@@ -282,7 +285,7 @@ function standingsTab(t) {
         h('td', {}, r.wins),
         bonus ? h('td', {}, r.bonus ? `+${r.bonus}` : '') : null,
         h('td', { class: 'points' }, r.points),
-        h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge))))))),
+        h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge / stepUnit(scale)))))))),
     h('p', { class: 'muted' },
       'Games count only rounds with all results entered. ',
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
@@ -402,14 +405,14 @@ function manageOverview(ctx, t) {
       fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)),
     [h('button', { onclick: () => openPage(ctx, 'tournament') }, 'Edit')]),
     section('Players', [
-      h('p', { class: 'muted' }, `${t.players.length - withdrawn} players${withdrawn ? ` (${withdrawn} withdrew)` : ''}. Skill 1 is the best, 10 the weakest.`),
+      h('p', { class: 'muted' }, `${t.players.length - withdrawn} players${withdrawn ? ` (${withdrawn} withdrew)` : ''}. ${describeScale(scaleOf(t.settings))}`),
       skillFacts(t)],
     [finished ? null : h('button', { onclick: () => openPage(ctx, 'skills') }, 'Edit skills'),
       finished ? null : h('button', { onclick: () => openPage(ctx, 'withdraw') }, 'Player leaves…')]),
     section('Draw quality', [quality.warnings, quality.q
       ? h('dl', { class: 'facts' },
-        fact('Average edge', formatValue(Math.round(quality.q.avgGap * 100) / 100)),
-        fact('Biggest edge', quality.q.worst ? formatValue(quality.q.worst.gap) : '–'))
+        fact('Average edge', formatValue(Math.round((quality.q.avgGap / quality.unit) * 100) / 100)),
+        fact('Biggest edge', quality.q.worst ? formatValue(Math.round((quality.q.worst.gap / quality.unit) * 100) / 100) : '–'))
       : h('p', { class: 'muted' }, 'Shown once the first round is revealed.')],
     [h('button', { onclick: () => openPage(ctx, 'quality') }, 'Details')]),
     section('Print & export', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all revealed rounds and the player skills: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
@@ -484,12 +487,12 @@ function skillsPage(ctx, t) {
   };
   const skillSelect = (p) => {
     const select = h('select', { onchange: (e) => { edits[p.id] = Number(e.target.value); } },
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => h('option', { value: n }, `Skill ${n}`)));
+      levels(scaleOf(t.settings)).map((n) => h('option', { value: n }, `Skill ${n}`)));
     select.value = String(edits[p.id] ?? p.skill);
     return select;
   };
   return subPage(ctx, 'Skills', [
-    h('p', { class: 'muted' }, 'Skills belong to this tournament (1 = best, 10 = weakest). Team values, edges, the standings and the summary follow the new skills.'
+    h('p', { class: 'muted' }, `Skills belong to this tournament. ${describeScale(scaleOf(t.settings))} Team values, edges, the standings and the summary follow the new skills.`
       + (from <= last ? ` The schedule was drawn for the old skills: ${hasResults(t) ? `${rounds} can be drawn again (rounds with results stay)` : 'it can be drawn again'}.` : '')
       + ' Names and years of birth are changed on the Players page (home screen).'),
     h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
@@ -551,23 +554,25 @@ function withdrawPage(ctx, t) {
 // would otherwise give away hidden rounds. Warnings look at the whole draw, but only say
 // that something is off, not where.
 function revealedQuality(t) {
-  const warnings = drawWarnings(scheduleStats(t.players, t.schedule)).map((w) => h('p', { class: 'warning' }, w));
+  const scale = scaleOf(t.settings);
+  const players = calibratePlayers(t.players, scale);
+  const warnings = drawWarnings(scheduleStats(players, t.schedule), stepUnit(scale)).map((w) => h('p', { class: 'warning' }, w));
   const revealed = t.schedule.slice(0, t.revealedRounds);
-  return { warnings, revealed, q: revealed.length ? drawQuality(t.players, revealed) : null };
+  return { warnings, revealed, q: revealed.length ? drawQuality(players, revealed) : null, unit: stepUnit(scale) };
 }
 
 function qualityPage(ctx, t) {
-  const { warnings, revealed, q } = revealedQuality(t);
+  const { warnings, revealed, q, unit } = revealedQuality(t);
   const locked = hasResults(t) || isFinished(t);
   const one = (x) => (Math.round(x * 10) / 10).toString();
   const scope = revealed.length < t.schedule.length ? ` (rounds 1–${revealed.length} of ${t.schedule.length}, the revealed ones)` : '';
   return subPage(ctx, 'Draw quality', [
     warnings,
     q ? [
-      h('p', { class: 'muted' }, `Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread)${scope}.`),
+      h('p', { class: 'muted' }, `Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread), in skill steps${scope}.`),
       h('dl', { class: 'facts' },
-        fact('Average edge', formatValue(Math.round(q.avgGap * 100) / 100)),
-        fact('Biggest edge', q.worst ? `${formatValue(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
+        fact('Average edge', formatValue(Math.round((q.avgGap / unit) * 100) / 100)),
+        fact('Biggest edge', q.worst ? `${formatValue(Math.round((q.worst.gap / unit) * 100) / 100)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
         fact('Different partners', `${one(q.partners.distinct)} per player${q.partners.repeats ? `, ${q.partners.repeats} repeated` : ', none repeated'}`),
         fact('Different opponents', `${one(q.opponents.distinct)} per player`),
         fact('Repeated opponents', q.opponents.repeats
@@ -591,7 +596,8 @@ function qualityPage(ctx, t) {
 
 // How the players were assessed: one line per skill, like the player list.
 function skillFacts(t) {
-  const skills = [...new Set(t.players.map((p) => p.skill))].sort((a, b) => a - b);
+  const present = new Set(t.players.map((p) => p.skill));
+  const skills = levels(scaleOf(t.settings)).filter((skill) => present.has(skill)); // best first
   return h('dl', { class: 'facts' }, skills.map((skill) => fact(`Skill ${skill}`, t.players.filter((p) => p.skill === skill)
     .map((p) => (isActive(p) ? p.name : `${p.name} (withdrew)`)).join(', '))));
 }
@@ -600,7 +606,7 @@ function skillFacts(t) {
 function skillsCard(t) {
   return h('section', { class: 'card skills' },
     h('h2', { class: 'card-title' }, 'Player skills'),
-    h('p', { class: 'muted' }, 'Skill 1 is the best, 10 the weakest.'),
+    h('p', { class: 'muted' }, describeScale(scaleOf(t.settings))),
     skillFacts(t),
     h('div', { style: 'height: 12px' }));
 }

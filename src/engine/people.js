@@ -1,7 +1,6 @@
 import { validateTournament } from './validate.js';
 
-// The people known on this device, shared by all tournaments: { id, name, birthYear?,
-// lastSkill? }. A tournament player only refers to a person (`personId`) and keeps what
+// The people known on this device, shared by all tournaments: { id, name, birthYear? }. A tournament player only refers to a person (`personId`) and keeps what
 // belongs to the tournament: skill and withdrawal. Name and year of birth are looked up
 // from the person when a tournament is read (withPeople) and left out when it is stored
 // (withoutPeople), so a correction to a person shows everywhere at once.
@@ -23,9 +22,10 @@ export function personProblem(people, { id, name, birthYear }, now = new Date())
   return null;
 }
 
+// Skills belong to tournaments: a remembered skill from earlier versions is dropped.
 function cleanPerson(person) {
   const { birthYear, lastSkill, ...rest } = person;
-  return { ...rest, name: rest.name.trim(), ...(birthYear != null ? { birthYear } : {}), ...(lastSkill != null ? { lastSkill } : {}) };
+  return { ...rest, name: rest.name.trim(), ...(birthYear != null ? { birthYear } : {}) };
 }
 
 export function sortPeople(people) {
@@ -87,12 +87,6 @@ export function splitPerson(people, tournaments, id, tournamentIds, { name, birt
     ...t, players: t.players.map((p) => (p.personId === id ? { ...p, personId: person.id } : p)),
   }));
   return { people: next, person, tournaments: changed };
-}
-
-// Remembers each player's skill, to suggest it for the next tournament.
-export function rememberSkills(people, players) {
-  const skills = new Map(players.filter((p) => p.personId).map((p) => [p.personId, p.skill]));
-  return people.map((p) => (skills.has(p.id) ? { ...p, lastSkill: skills.get(p.id) } : p));
 }
 
 export function makeBackup(people, tournaments, now = new Date()) {
