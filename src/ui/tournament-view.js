@@ -1,12 +1,11 @@
 import { h, formatSigned } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament } from '../engine/tournament.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
 import { tournamentSummary } from '../engine/summary.js';
-import { updatePerson } from '../engine/people.js';
 import { exportBackup } from './backup.js';
 import { draftFromTournament } from './setup.js';
 
@@ -299,7 +298,7 @@ function fact(label, value) {
 // Manage lists everything read-only; changes happen on a sub-page (view.manage) that an
 // Edit button opens, with Save and Cancel. Actions that change nothing stay direct buttons.
 function manageTab(ctx, t) {
-  const pages = { tournament: tournamentPage, players: playersPage, withdraw: withdrawPage, quality: qualityPage, print: printPage };
+  const pages = { tournament: tournamentPage, skills: skillsPage, withdraw: withdrawPage, quality: qualityPage, print: printPage };
   const page = pages[ctx.state.view.manage];
   return page ? page(ctx, t) : manageOverview(ctx, t);
 }
@@ -312,7 +311,7 @@ function openPage(ctx, name) {
 
 // Back to the Manage list; edits not saved are dropped.
 function closePage(ctx) {
-  Object.assign(ctx.state.view, { manage: null, names: null, withdraw: null, printChoice: null });
+  Object.assign(ctx.state.view, { manage: null, skills: null, withdraw: null, printChoice: null });
   ctx.render();
 }
 
@@ -405,7 +404,7 @@ function manageOverview(ctx, t) {
     section('Players', [
       h('p', { class: 'muted' }, `${t.players.length - withdrawn} players${withdrawn ? ` (${withdrawn} withdrew)` : ''}. Skill 1 is the best, 10 the weakest.`),
       skillFacts(t)],
-    [h('button', { onclick: () => openPage(ctx, 'players') }, 'Edit names'),
+    [finished ? null : h('button', { onclick: () => openPage(ctx, 'skills') }, 'Edit skills'),
       finished ? null : h('button', { onclick: () => openPage(ctx, 'withdraw') }, 'Player leaves…')]),
     section('Draw quality', [quality.warnings, quality.q
       ? h('dl', { class: 'facts' },
@@ -459,39 +458,47 @@ function tournamentPage(ctx, t) {
   ], [h('button', { class: 'primary', onclick: save }, 'Save')]);
 }
 
-// Names can be corrected at any time; the draw and the results stay as they are. Names
-// belong to the people, so a correction shows in all their tournaments.
-function playersPage(ctx, t) {
-  // Edits not saved yet, by player id; kept when saving fails.
-  const edits = (ctx.state.view.names ??= {});
-  const save = () => {
+// Skills belong to this tournament and can change while it runs. Team values, edges, the
+// standings and the summary follow at once; the schedule was drawn for the old skills, so
+// what has no result yet can be drawn again. Names are changed on the Players page.
+function skillsPage(ctx, t) {
+  // Changes not saved yet, by player id; kept when saving fails.
+  const edits = (ctx.state.view.skills ??= {});
+  const last = t.settings.rounds;
+  const from = hasResults(t) ? firstRedrawableRound(t) : 1;
+  const rounds = from === last ? `round ${last}` : `rounds ${from}–${last}`;
+  const save = (redrawToo) => {
+    const changed = Object.fromEntries(Object.entries(edits).filter(([id, skill]) => t.players.find((p) => p.id === id)?.skill !== skill));
+    if (redrawToo && !confirm(hasResults(t)
+      ? `Save the skills and draw ${rounds} again? Rounds with results stay as they are.`
+      : 'Save the skills and draw a completely new schedule?')) return;
     try {
-      let people = ctx.people();
-      let tournaments = ctx.store.list();
-      const changed = new Map();
-      for (const [id, name] of Object.entries(edits)) {
-        const player = t.players.find((p) => p.id === id);
-        if (!player || player.name === name.trim()) continue;
-        const person = people.find((p) => p.id === player.personId);
-        if (!person) throw new Error(`${player.name} is not on the Players page.`);
-        const result = updatePerson(people, tournaments, person.id, { name, birthYear: person.birthYear ?? null });
-        people = result.people;
-        for (const x of result.tournaments) changed.set(x.id, x);
-        tournaments = tournaments.map((x) => changed.get(x.id) ?? x);
-      }
-      ctx.savePeople(people, [...changed.values()]);
+      let next = setSkills(t, changed);
+      if (redrawToo) next = redrawRemaining(next, newSeed());
+      ctx.save(next);
       closePage(ctx);
     } catch (error) {
       ctx.state.message = error.message;
       ctx.render();
     }
   };
-  return subPage(ctx, 'Player names', [
-    h('p', { class: 'muted' }, 'Correct names at any time. The draw and the results stay as they are, and the correction shows in all tournaments of the player. Years of birth are on the Players page (home screen).'),
+  const skillSelect = (p) => {
+    const select = h('select', { onchange: (e) => { edits[p.id] = Number(e.target.value); } },
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => h('option', { value: n }, `Skill ${n}`)));
+    select.value = String(edits[p.id] ?? p.skill);
+    return select;
+  };
+  return subPage(ctx, 'Skills', [
+    h('p', { class: 'muted' }, 'Skills belong to this tournament (1 = best, 10 = weakest). Team values, edges, the standings and the summary follow the new skills.'
+      + (from <= last ? ` The schedule was drawn for the old skills: ${hasResults(t) ? `${rounds} can be drawn again (rounds with results stay)` : 'it can be drawn again'}.` : '')
+      + ' Names and years of birth are changed on the Players page (home screen).'),
     h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
-      h('span', {}, `Skill ${p.skill}${isActive(p) ? '' : ' · withdrew'}`),
-      h('input', { type: 'text', value: edits[p.id] ?? p.name, oninput: (e) => { edits[p.id] = e.target.value; } })))),
-  ], [h('button', { class: 'primary', onclick: save }, 'Save')]);
+      h('span', {}, `${p.name}${isActive(p) ? '' : ' · withdrew'}`),
+      skillSelect(p)))),
+  ], [
+    from <= last ? h('button', { class: 'primary', onclick: () => save(true) }, hasResults(t) ? `Save and redraw ${rounds}` : 'Save and redraw') : null,
+    h('button', { class: from <= last ? '' : 'primary', onclick: () => save(false) }, 'Save only'),
+  ]);
 }
 
 // A player who cannot go on: keep the rounds played so far and draw the rest again.

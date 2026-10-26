@@ -22,7 +22,7 @@ Tournament data stays on the device. The host only serves the empty app.
 
 ## Players
 
-Players are kept on the device and shared by all tournaments: **Players** on the home
+Players are kept on the device and shared by all tournaments. A tournament only refers to its players (by an internal id) and keeps what belongs to the tournament, the skill; name and year of birth are always taken from the player: **Players** on the home
 screen lists them with name and (optional) year of birth. The list comes first; **Edit**
 and **Add player** open a page to change them. A correction shows in every tournament of
 that player, old ones included. A player can only be deleted while they are in no
@@ -95,7 +95,7 @@ Everything that changes or reveals the draw is in **Manage**, which can ask for 
 - **Finish**: when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Names can still be corrected.
 - **Rounds**: how many rounds are revealed, with **Reveal round(s)** and **Swap players**.
 - **Tournament**: name and settings; **Edit** changes the name, and before the first result also courts, rounds and times (in the setup, which draws again).
-- **Players**: the players by skill; **Edit names** corrects names, **Player leaves…** withdraws players and redraws the remaining rounds.
+- **Players**: the players by skill; **Edit skills** changes skills for this tournament (team values, edges, standings and summary follow; **Save and redraw** draws again what has no result yet), **Player leaves…** withdraws players and redraws the remaining rounds. Names and years of birth are only changed on the Players page.
 - **Draw quality**: average and biggest edge; **Details** shows all figures and, before the first result, **Redraw schedule**.
 - **Print & export**: **Print…** asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, all revealed rounds and player skills. A section starts on the same page when it still fits, and **Export backup**.
 - **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.

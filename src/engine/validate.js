@@ -42,19 +42,28 @@ function checkSettings(s) {
 
 function checkPlayers(players) {
   if (!Array.isArray(players) || players.length < 4) fail('At least 4 players are required');
+  // A player refers to a person (personId); name and year of birth belong to the person.
+  // Players without a person (tests) have a name instead.
   const ids = new Map();
+  const people = new Set();
   const names = new Set();
   for (const p of players) {
-    if (!isObject(p) || typeof p.id !== 'string' || typeof p.name !== 'string' || !p.name.trim()) fail('Invalid player entry');
-    if (!isInt(p.skill) || p.skill < 1 || p.skill > 10) fail(`Invalid skill for ${p.name}`);
+    if (!isObject(p) || typeof p.id !== 'string') fail('Invalid player entry');
+    const label = p.name ?? p.id;
+    if ('personId' in p && (typeof p.personId !== 'string' || !p.personId)) fail(`Invalid player link for ${label}`);
+    if (!p.personId && (typeof p.name !== 'string' || !p.name.trim())) fail('Invalid player entry');
+    if (!isInt(p.skill) || p.skill < 1 || p.skill > 10) fail(`Invalid skill for ${label}`);
     if (ids.has(p.id)) fail(`Duplicate player id ${p.id}`);
-    const key = p.name.trim().toLowerCase();
-    if (names.has(key)) fail(`Duplicate player name ${p.name}`);
-    if ('personId' in p && (typeof p.personId !== 'string' || !p.personId)) fail(`Invalid player link for ${p.name}`);
-    if ('birthYear' in p && (!isInt(p.birthYear) || p.birthYear < 1900 || p.birthYear > 2100)) fail(`Invalid year of birth for ${p.name}`);
-    if ('withdrawnAfter' in p &&(!isInt(p.withdrawnAfter) || p.withdrawnAfter < 0)) fail(`Invalid withdrawal for ${p.name}`);
+    if (p.personId && people.has(p.personId)) fail(`The same player appears twice (${label})`);
+    if (!p.personId) {
+      const key = p.name.trim().toLowerCase();
+      if (names.has(key)) fail(`Duplicate player name ${p.name}`);
+      names.add(key);
+    }
+    if ('birthYear' in p && (!isInt(p.birthYear) || p.birthYear < 1900 || p.birthYear > 2100)) fail(`Invalid year of birth for ${label}`);
+    if ('withdrawnAfter' in p &&(!isInt(p.withdrawnAfter) || p.withdrawnAfter < 0)) fail(`Invalid withdrawal for ${label}`);
     ids.set(p.id, p.withdrawnAfter ?? Infinity);
-    names.add(key);
+    if (p.personId) people.add(p.personId);
   }
   return ids;
 }

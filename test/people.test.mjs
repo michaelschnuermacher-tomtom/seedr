@@ -1,17 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  personProblem, addPerson, updatePerson, deletePerson, splitPerson, usage, linkTournament, syncTournament,
+  personProblem, addPerson, updatePerson, deletePerson, splitPerson, usage, withPeople, withoutPeople,
   rememberSkills, makeBackup, readBackup, mergeBackup,
 } from '../src/engine/people.js';
 import { createTournament } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
-const ids = () => { let n = 0; return () => `n${++n}`; };
 const SETTINGS = { courts: 1, rounds: 2, matchMinutes: 10, breakMinutes: 2, revealBatch: 'all' };
-// A tournament whose players are not linked to people yet (linkTournament links them).
-const oldTournament = (id, names, createdAt = '2026-01-01T00:00:00.000Z') =>
-  createTournament({ id, name: id, seed: 1, now: new Date(createdAt), settings: SETTINGS, players: names.map((name, i) => ({ name, skill: i + 1 })) });
+const person = (id, name, more = {}) => ({ id, name, ...more });
+// A stored tournament: its players only refer to people.
+const stored = (id, people) => withoutPeople(createTournament({ id, name: id, seed: 1, now: new Date('2026-01-01T00:00:00Z'), settings: SETTINGS,
+  players: people.map((p, i) => ({ personId: p.id, name: p.name, skill: i + 1 })) }));
+const four = [person('a', 'Seb', { birthYear: 1990 }), person('b', 'Micha'), person('c', 'Lia'), person('d', 'Max')];
 
 test('names must be unique and years of birth plausible', () => {
   const people = [{ id: 'a', name: 'Seb' }];
@@ -23,55 +24,46 @@ test('names must be unique and years of birth plausible', () => {
   assert.equal(personProblem(people, { name: 'Ana', birthYear: 1990 }), null);
 });
 
-test('linking gives every player a person, by name, and keeps the tournament valid', () => {
-  const t = oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']);
-  const { t: linked, people } = linkTournament(t, [{ id: 'p-seb', name: 'seb', birthYear: 1990 }], ids());
-  assert.deepEqual(linked.players.map((p) => p.personId), ['p-seb', 'n1', 'n2', 'n3']);
-  assert.equal(linked.players[0].name, 'seb', 'the person’s spelling is copied in');
-  assert.equal(linked.players[0].birthYear, 1990);
-  assert.equal(people.length, 4);
-  assert.deepEqual([linked.schedule, linked.results], [t.schedule, t.results]);
-  assert.equal(validateTournament(linked).ok, true);
+test('stored tournaments only refer to people; names and years of birth come from the people', () => {
+  const t = stored('t', four);
+  assert.deepEqual(t.players[0], { id: 'p1', personId: 'a', skill: 1 });
+  assert.equal(validateTournament(t).ok, true);
+  const shown = withPeople(t, four);
+  assert.deepEqual(shown.players[0], { id: 'p1', personId: 'a', skill: 1, name: 'Seb', birthYear: 1990 });
+  assert.deepEqual(withoutPeople(shown), t, 'storing drops them again');
+  assert.equal(withPeople(t, four.slice(1)).players[0].name, 'Unknown player');
 });
 
-test('a correction to a person shows in all their tournaments', () => {
-  const next = ids();
-  let { t: a, people } = linkTournament(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']), [], next);
-  let b;
-  ({ t: b, people } = linkTournament(oldTournament('b', ['Seb', 'Ada', 'Hugo', 'Anne']), people, next));
-  const seb = people.find((p) => p.name === 'Seb');
-  const result = updatePerson(people, [a, b], seb.id, { name: 'Sebastian', birthYear: 1985 });
-  assert.equal(result.people.find((p) => p.id === seb.id).name, 'Sebastian');
-  assert.equal(result.tournaments.length, 2);
-  for (const t of result.tournaments) assert.deepEqual(t.players.find((p) => p.personId === seb.id), { ...t.players[0], name: 'Sebastian', birthYear: 1985 });
-  assert.throws(() => updatePerson(people, [a, b], seb.id, { name: 'micha' }), /already a player/);
-  const ada = people.find((p) => p.name === 'Ada');
-  assert.equal(updatePerson(people, [a, b], ada.id, { name: 'Ada', birthYear: 1970 }).tournaments.length, 1, 'only tournaments of the person change');
+test('a correction to a person shows in every tournament without changing it', () => {
+  const t = stored('t', four);
+  const people = updatePerson(four, 'a', { name: 'Sebastian', birthYear: 1985 });
+  assert.deepEqual(people[0], { id: 'a', name: 'Sebastian', birthYear: 1985 });
+  assert.equal(withPeople(t, people).players[0].name, 'Sebastian');
+  assert.throws(() => updatePerson(four, 'a', { name: 'micha' }), /already a player/);
+  assert.throws(() => updatePerson(four, 'x', { name: 'Zoe' }), /Unknown player/);
 });
 
 test('a person can only be deleted while they play in no tournament', () => {
-  const { t, people } = linkTournament(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']), [], ids());
-  const { people: more, person } = addPerson(people, { name: 'Zoe', birthYear: 2001 }, () => 'zoe');
-  assert.deepEqual(person, { id: 'zoe', name: 'Zoe', birthYear: 2001 });
+  const t = stored('t', four);
+  const { people: more, person: zoe } = addPerson(four, { name: 'Zoe', birthYear: 2001 }, () => 'zoe');
+  assert.deepEqual(zoe, { id: 'zoe', name: 'Zoe', birthYear: 2001 });
   assert.equal(usage([t], 'zoe').length, 0);
   assert.equal(deletePerson(more, [t], 'zoe').length, 4);
-  assert.throws(() => deletePerson(more, [t], people[0].id), /part of a tournament/);
+  assert.throws(() => deletePerson(more, [t], 'a'), /part of a tournament/);
 });
 
 test('splitting gives the chosen tournaments a person of their own', () => {
-  const next = ids();
-  let { t: a, people } = linkTournament(oldTournament('a', ['Max', 'Micha', 'Lia', 'Seb']), [], next);
-  let b;
-  ({ t: b, people } = linkTournament(oldTournament('b', ['Max', 'Ada', 'Hugo', 'Anne']), people, next));
-  const max = people.find((p) => p.name === 'Max');
-  assert.equal(usage([a, b], max.id).length, 2);
-  const result = splitPerson(people, [a, b], max.id, ['b'], { name: 'Max B.', birthYear: null }, next);
+  const a = stored('a', four);
+  const b = stored('b', [four[3], person('e', 'Ada'), person('f', 'Hugo'), person('g', 'Anne')]);
+  const people = [...four, person('e', 'Ada'), person('f', 'Hugo'), person('g', 'Anne')];
+  assert.equal(usage([a, b], 'd').length, 2);
+  const result = splitPerson(people, [a, b], 'd', ['b'], { name: 'Max B.', birthYear: null }, () => 'new');
   assert.equal(result.tournaments.length, 1);
-  const moved = result.tournaments[0].players.find((p) => p.personId === result.person.id);
-  assert.equal(moved.name, 'Max B.');
-  assert.equal(usage([a, ...result.tournaments], max.id).length, 1);
-  assert.throws(() => splitPerson(people, [a, b], max.id, [], { name: 'Max C.' }, next), /at least one tournament/);
-  assert.throws(() => splitPerson(people, [a, b], max.id, ['b'], { name: 'Ada' }, next), /already a player/);
+  assert.equal(result.tournaments[0].players[0].personId, 'new');
+  assert.equal(withPeople(result.tournaments[0], result.people).players[0].name, 'Max B.');
+  assert.equal(usage([a, ...result.tournaments], 'd').length, 1);
+  assert.throws(() => splitPerson(people, [a, b], 'd', [], { name: 'Max C.' }, () => 'x'), /at least one tournament/);
+  assert.throws(() => splitPerson(people, [a, b], 'd', ['b'], { name: 'Ada' }, () => 'x'), /already a player/);
 });
 
 test('the last skill is remembered for the next tournament', () => {
@@ -79,34 +71,33 @@ test('the last skill is remembered for the next tournament', () => {
   assert.deepEqual(people.map((p) => p.lastSkill), [1, 4]);
 });
 
-test('a backup round-trips all people and tournaments', () => {
-  const { t, people } = linkTournament(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']), [{ id: 'x', name: 'Zoe', birthYear: 2001 }], ids());
-  const backup = JSON.parse(JSON.stringify(makeBackup(people, [t], new Date('2026-10-26T10:00:00Z'))));
+test('a backup round-trips all people and tournaments, without names in the tournaments', () => {
+  const t = withPeople(stored('a', four), four); // as held in the app
+  const backup = JSON.parse(JSON.stringify(makeBackup(four, [t], new Date('2026-10-26T10:00:00Z'))));
   assert.deepEqual([backup.format, backup.version, backup.exportedAt], ['seedr-backup', 2, '2026-10-26T10:00:00.000Z']);
-  const read = readBackup(backup);
-  assert.deepEqual(read, { people, tournaments: [t] });
+  assert.ok(backup.tournaments[0].players.every((p) => !('name' in p)));
+  assert.deepEqual(readBackup(backup), { people: four, tournaments: [stored('a', four)] });
   assert.throws(() => readBackup({ ...backup, version: 9 }), /Unsupported backup version/);
   assert.throws(() => readBackup({ ...backup, people: [{ id: 'a', name: 'X' }, { id: 'a', name: 'Y' }] }), /invalid player/);
+  assert.throws(() => readBackup({ ...backup, people: four.slice(1) }), /not in the backup/);
   assert.throws(() => readBackup({ format: 'nope' }), /not a Seedr backup/);
-  assert.throws(() => readBackup(t), /not a Seedr backup/, 'a single tournament is no backup');
 });
 
-test('importing merges by id, then by name', () => {
-  const next = ids();
-  const local = linkTournament(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']), [], next);
-  const seb = local.people.find((p) => p.name === 'Seb');
+test('older backups with names in the tournaments are read; the names are dropped', () => {
+  const t = withPeople(stored('a', four), four);
+  const old = { format: 'seedr-backup', version: 2, exportedAt: 'x', people: four, tournaments: [t] };
+  assert.deepEqual(readBackup(old).tournaments[0], stored('a', four));
+});
+
+test('importing merges people by id, then by name', () => {
+  const local = { people: four, tournaments: [stored('a', four)] };
   // From another device: Seb under another id with a year of birth, plus a new tournament.
-  const other = linkTournament(oldTournament('b', ['Seb', 'Ada', 'Hugo', 'Anne']), [{ id: 'remote-seb', name: 'Seb', birthYear: 1990 }], () => `r${Math.random()}`);
-  const merged = mergeBackup({ people: local.people, tournaments: [local.t] }, readBackup(makeBackup(other.people, [other.t])), next);
+  const remote = [person('r-seb', 'Seb', { birthYear: 1980 }), person('e', 'Ada'), person('f', 'Hugo'), person('g', 'Anne')];
+  const merged = mergeBackup(local, readBackup(makeBackup(remote, [stored('b', remote)])));
   assert.equal(merged.people.filter((p) => p.name === 'Seb').length, 1, 'one Seb');
-  assert.equal(merged.people.find((p) => p.name === 'Seb').birthYear, 1990);
-  const b = merged.tournaments.find((t) => t.id === 'b');
-  assert.equal(b.players.find((p) => p.name === 'Seb').personId, seb.id, 'linked to the local Seb');
-  assert.ok(merged.tournaments.some((t) => t.id === 'a' && t.players[0].birthYear === 1990), 'the local tournament gets the year too');
+  assert.equal(merged.people.find((p) => p.name === 'Seb').birthYear, 1980);
+  assert.equal(merged.tournaments.find((t) => t.id === 'b').players[0].personId, 'a', 'linked to the local Seb');
   assert.deepEqual(merged.replaced, { people: 1, tournaments: 0 });
-});
-
-test('syncTournament leaves a tournament alone when nothing changed', () => {
-  const { t, people } = linkTournament(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']), [], ids());
-  assert.equal(syncTournament(t, people), t);
+  const again = mergeBackup({ people: merged.people, tournaments: [...local.tournaments, ...merged.tournaments] }, readBackup(makeBackup(four, [stored('a', four)])));
+  assert.equal(again.replaced.tournaments, 1);
 });

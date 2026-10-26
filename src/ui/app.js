@@ -1,6 +1,7 @@
 import { h, newId } from './dom.js';
 import { createStore, STORAGE_PREFIX, PEOPLE_KEY } from './store.js';
 import { validateTournament } from '../engine/validate.js';
+import { withPeople, withoutPeople } from '../engine/people.js';
 import { homeScreen } from './home.js';
 import { peopleScreen } from './people-view.js';
 import { installCourtBackground } from './court.js';
@@ -37,20 +38,20 @@ const ctx = {
     state.message = message;
     render();
   },
+  // The open tournament carries the names and years of birth of its players; stored, it
+  // only refers to the people.
   save(t) {
-    state.tournament = t;
-    if (!store.save(t)) state.message = 'Could not save on this device. Use Export backup to keep your data.';
+    state.tournament = withPeople(t, ctx.people());
+    if (!store.save(withoutPeople(t))) state.message = 'Could not save on this device. Use Export backup to keep your data.';
   },
   people() {
     return store.people() ?? [];
   },
-  // Saves the people and the tournaments that changed with them (names copied into them).
+  // Saves the people, and tournaments that changed with them (e.g. after splitting a person).
   savePeople(people, tournaments = []) {
     let ok = store.savePeople(people);
-    for (const t of tournaments) {
-      ok = store.save(t) && ok;
-      if (state.tournament?.id === t.id) state.tournament = t;
-    }
+    for (const t of tournaments) ok = store.save(withoutPeople(t)) && ok;
+    if (state.tournament) state.tournament = withPeople(store.get(state.tournament.id) ?? state.tournament, people);
     if (!ok) state.message = 'Could not save on this device. Use Export backup to keep your data.';
   },
   open(t) {
@@ -59,7 +60,7 @@ const ctx = {
       ctx.flash(`Cannot open this tournament: ${check.error}`);
       return;
     }
-    state.tournament = t;
+    state.tournament = withPeople(t, ctx.people());
     state.view = null;
     ctx.go('tournament');
   },
@@ -84,7 +85,7 @@ window.addEventListener('storage', (event) => {
   if (state.tournament) {
     const fresh = store.get(state.tournament.id);
     if (fresh) {
-      state.tournament = fresh;
+      state.tournament = withPeople(fresh, ctx.people());
     } else {
       state.tournament = null;
       state.screen = 'home';

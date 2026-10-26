@@ -1,4 +1,3 @@
-import { newId } from './dom.js';
 import { saveFile, downloadFile } from './export.js';
 import { makeBackup, readBackup, mergeBackup } from '../engine/people.js';
 
@@ -20,7 +19,7 @@ export async function importBackup(ctx, file) {
     ctx.flash(`Import failed: ${error instanceof SyntaxError ? 'this file is not a Seedr file.' : error.message}`);
     return;
   }
-  const merged = mergeBackup({ people: ctx.people(), tournaments: ctx.store.list() }, incoming, newId);
+  const merged = mergeBackup({ people: ctx.people(), tournaments: ctx.store.list() }, incoming);
   const { people, tournaments } = merged.replaced;
   const replacing = [tournaments ? `${tournaments} tournament${tournaments === 1 ? '' : 's'}` : '', people ? `${people} player${people === 1 ? '' : 's'}` : ''].filter(Boolean);
   if (replacing.length && !confirm(`This replaces ${replacing.join(' and ')} on this device. Continue?`)) return;

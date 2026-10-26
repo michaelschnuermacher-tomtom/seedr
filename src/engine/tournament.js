@@ -171,13 +171,38 @@ export function withdrawPlayers(t, ids, seed) {
     if (!t.players.some((p) => p.id === id && isActive(p))) throw new Error(`Unknown or already withdrawn player ${id}`);
   }
   const players = t.players.map((p) => (leaving.has(p.id) ? { ...p, withdrawnAfter: from - 1 } : p));
-  const remaining = players.filter(isActive);
-  if (remaining.length < 4) throw new Error('At least 4 players must remain');
+  if (players.filter(isActive).length < 4) throw new Error('At least 4 players must remain');
+  return redrawFrom(t, players, from, seed);
+}
+
+// Rounds from `from` on are drawn again for the active players; earlier rounds count but stay.
+function redrawFrom(t, players, from, seed) {
   const past = t.schedule.slice(0, from - 1);
   const { schedule } = generateSchedule({
-    players: remaining, courts: t.settings.courts, lastRoundCourts: t.settings.lastRoundCourts, rounds: t.settings.rounds - past.length, seed, past, pastPlayers: players,
+    players: players.filter(isActive), courts: t.settings.courts, lastRoundCourts: t.settings.lastRoundCourts, rounds: t.settings.rounds - past.length, seed, past, pastPlayers: players,
   });
   return { ...t, players, schedule: [...past, ...schedule] };
+}
+
+// New skills for this tournament, as { player id: skill }. The draw stays as it is; team
+// values, edges and the summary follow the new skills. See redrawRemaining.
+export function setSkills(t, skills) {
+  checkOpen(t);
+  for (const [id, skill] of Object.entries(skills)) {
+    if (!t.players.some((p) => p.id === id)) throw new Error(`Unknown player ${id}`);
+    if (!Number.isInteger(skill) || skill < 1 || skill > 10) throw new Error('Skills must be whole numbers from 1 to 10');
+  }
+  return { ...t, players: t.players.map((p) => (p.id in skills ? { ...p, skill: skills[p.id] } : p)) };
+}
+
+// Draws again what has no result yet: the whole schedule before the first result,
+// otherwise the rounds after the last one with a result (e.g. after skills changed).
+export function redrawRemaining(t, seed) {
+  checkOpen(t);
+  if (!hasResults(t)) return redraw(t, seed);
+  const from = firstRedrawableRound(t);
+  if (from > t.settings.rounds) throw new Error('There are no rounds left to redraw');
+  return redrawFrom(t, t.players, from, seed);
 }
 
 // The tournament name can change at any time.

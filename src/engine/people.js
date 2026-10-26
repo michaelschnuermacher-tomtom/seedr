@@ -1,9 +1,10 @@
 import { validateTournament } from './validate.js';
 
 // The people known on this device, shared by all tournaments: { id, name, birthYear?,
-// lastSkill? }. A tournament keeps a copy of name and year of birth for each player (so it
-// stays readable on its own and in a backup) and a link to the person (`personId`).
-// Changes to a person are copied into every tournament, old ones included.
+// lastSkill? }. A tournament player only refers to a person (`personId`) and keeps what
+// belongs to the tournament: skill and withdrawal. Name and year of birth are looked up
+// from the person when a tournament is read (withPeople) and left out when it is stored
+// (withoutPeople), so a correction to a person shows everywhere at once.
 
 export const BACKUP_FORMAT = 'seedr-backup';
 export const BACKUP_VERSION = 2;
@@ -43,30 +44,31 @@ export function usage(tournaments, id) {
   return tournaments.filter((t) => t.players.some((p) => p.personId === id));
 }
 
-// Copies name and year of birth of the linked people into a tournament. Returns the same
-// object when nothing changes.
-export function syncTournament(t, people) {
+// A tournament as shown: every player with the name and year of birth of their person.
+export function withPeople(t, people) {
   const byId = new Map(people.map((p) => [p.id, p]));
-  let changed = false;
-  const players = t.players.map((p) => {
-    const person = p.personId && byId.get(p.personId);
-    if (!person || (person.name === p.name && person.birthYear === p.birthYear)) return p;
-    changed = true;
-    const { birthYear, ...rest } = p;
-    return { ...rest, name: person.name, ...(person.birthYear != null ? { birthYear: person.birthYear } : {}) };
-  });
-  return changed ? { ...t, players } : t;
+  return {
+    ...t,
+    players: t.players.map(({ name, birthYear, ...p }) => {
+      const person = p.personId ? byId.get(p.personId) : null;
+      if (!person) return { ...p, name: name ?? 'Unknown player', ...(birthYear != null ? { birthYear } : {}) };
+      return { ...p, name: person.name, ...(person.birthYear != null ? { birthYear: person.birthYear } : {}) };
+    }),
+  };
 }
 
-// New name and year of birth for a person; returns the people and the tournaments that
-// changed (to be saved).
-export function updatePerson(people, tournaments, id, { name, birthYear = null }) {
+// A tournament as stored: players refer to their person; name and year of birth stay with
+// the person. Players without a person (only in tests) keep their name.
+export function withoutPeople(t) {
+  return { ...t, players: t.players.map(({ name, birthYear, ...p }) => (p.personId ? p : { ...p, name })) };
+}
+
+// New name and year of birth for a person.
+export function updatePerson(people, id, { name, birthYear = null }) {
   if (!people.some((p) => p.id === id)) throw new Error('Unknown player');
   const problem = personProblem(people, { id, name, birthYear });
   if (problem) throw new Error(problem);
-  const next = people.map((p) => (p.id === id ? cleanPerson({ ...p, name, birthYear }) : p));
-  const changed = tournaments.map((t) => syncTournament(t, next)).filter((t, i) => t !== tournaments[i]);
-  return { people: next, tournaments: changed };
+  return people.map((p) => (p.id === id ? cleanPerson({ ...p, name, birthYear }) : p));
 }
 
 // A person can only be deleted while they play in no tournament.
@@ -75,32 +77,16 @@ export function deletePerson(people, tournaments, id) {
   return people.filter((p) => p.id !== id);
 }
 
-// Two different people who ended up as one (e.g. two "Max"): the chosen tournaments get a
-// new person of their own.
+// Two different people who ended up as one (e.g. two "Max" merged on import): the chosen
+// tournaments refer to a new person of their own.
 export function splitPerson(people, tournaments, id, tournamentIds, { name, birthYear = null }, newId) {
   const chosen = new Set(tournamentIds);
   if (chosen.size === 0) throw new Error('Choose at least one tournament.');
   const { people: next, person } = addPerson(people, { name, birthYear }, newId);
-  const changed = tournaments.filter((t) => chosen.has(t.id)).map((t) => syncTournament({
+  const changed = tournaments.filter((t) => chosen.has(t.id)).map((t) => ({
     ...t, players: t.players.map((p) => (p.personId === id ? { ...p, personId: person.id } : p)),
-  }, next));
+  }));
   return { people: next, person, tournaments: changed };
-}
-
-// Links the players of a tournament without a person to the person with the same name,
-// or to a new one. Returns the linked tournament and the (possibly larger) people list.
-export function linkTournament(t, people, newId) {
-  let list = people;
-  const players = t.players.map((p) => {
-    if (p.personId && list.some((x) => x.id === p.personId)) return p;
-    let person = list.find((x) => key(x.name) === key(p.name));
-    if (!person) {
-      person = cleanPerson({ id: newId(), name: p.name, birthYear: p.birthYear ?? null });
-      list = [...list, person];
-    }
-    return { ...p, personId: person.id };
-  });
-  return { t: syncTournament({ ...t, players }, list), people: list };
 }
 
 // Remembers each player's skill, to suggest it for the next tournament.
@@ -110,10 +96,11 @@ export function rememberSkills(people, players) {
 }
 
 export function makeBackup(people, tournaments, now = new Date()) {
-  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: now.toISOString(), people, tournaments };
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: now.toISOString(), people, tournaments: tournaments.map(withoutPeople) };
 }
 
-// Reads an imported backup file.
+// Reads an imported backup file: valid people, valid tournaments, and every tournament
+// player refers to a person in the backup.
 export function readBackup(value) {
   if (value?.format !== BACKUP_FORMAT) throw new Error('This is not a Seedr backup.');
   if (value.version !== BACKUP_VERSION) throw new Error(`Unsupported backup version: ${value.version}`);
@@ -128,14 +115,15 @@ export function readBackup(value) {
   for (const t of value.tournaments) {
     const check = validateTournament(t);
     if (!check.ok) throw new Error(`Tournament "${t?.name}": ${check.error}`);
+    if (!t.players.every((p) => ids.has(p.personId))) throw new Error(`Tournament "${t.name}" refers to a player who is not in the backup.`);
   }
-  return { people: value.people.map(cleanPerson), tournaments: value.tournaments };
+  return { people: value.people.map(cleanPerson), tournaments: value.tournaments.map(withoutPeople) };
 }
 
 // Merges an imported backup into the device. People are matched by id, then by name;
 // imported entries replace the ones on the device. Returns everything to save and how many
 // existing entries are replaced.
-export function mergeBackup(local, incoming, newId) {
+export function mergeBackup(local, incoming) {
   let people = [...local.people];
   const idMap = new Map(); // imported person id → id on this device
   let replacedPeople = 0;
@@ -154,19 +142,7 @@ export function mergeBackup(local, incoming, newId) {
     people = people.map((x) => (x.id === same.id ? merged : x));
   }
   const localIds = new Set(local.tournaments.map((t) => t.id));
-  const tournaments = [];
-  for (const t of incoming.tournaments) {
-    const players = t.players.map(({ personId, ...p }) => (personId && idMap.has(personId) ? { ...p, personId: idMap.get(personId) } : p));
-    const linked = linkTournament({ ...t, players }, people, newId);
-    people = linked.people;
-    tournaments.push(linked.t);
-  }
+  const tournaments = incoming.tournaments.map((t) => ({ ...t, players: t.players.map((p) => ({ ...p, personId: idMap.get(p.personId) })) }));
   const replacedTournaments = tournaments.filter((t) => localIds.has(t.id)).length;
-  // Names may have changed: copy them into the tournaments already on the device.
-  for (const t of local.tournaments) {
-    if (tournaments.some((x) => x.id === t.id)) continue;
-    const synced = syncTournament(t, people);
-    if (synced !== t) tournaments.push(synced);
-  }
   return { people, tournaments, replaced: { people: replacedPeople, tournaments: replacedTournaments } };
 }

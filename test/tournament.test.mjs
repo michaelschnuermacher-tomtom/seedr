@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -241,4 +241,20 @@ test('a finished tournament is locked until it is reopened', () => {
   const open = reopenTournament(done);
   assert.ok(!('finishedAt' in open));
   assert.deepEqual(setResult(open, 1, 2, 2).results, { '1-1': 1, '1-2': 2 });
+});
+
+test('skills can change while the tournament runs; the remaining rounds can be drawn again', () => {
+  const t = setResult(make(), 1, 1, 1); // round 1 partly played
+  const changed = setSkills(t, { p1: 9, p2: 2 });
+  assert.deepEqual(changed.players.slice(0, 2).map((p) => p.skill), [9, 2]);
+  assert.deepEqual(changed.schedule, t.schedule, 'the draw stays without redrawing');
+  assert.throws(() => setSkills(t, { p1: 11 }), /1 to 10/);
+  assert.throws(() => setSkills(t, { x: 3 }), /Unknown player/);
+  const redrawn = redrawRemaining(changed, 9);
+  assert.deepEqual(redrawn.schedule[0], t.schedule[0], 'the round with a result stays');
+  assert.notDeepEqual(redrawn.schedule.slice(1), t.schedule.slice(1));
+  assert.equal(validateTournament(redrawn).ok, true);
+  const fresh = redrawRemaining(setSkills(make(), { p1: 9 }), 3);
+  assert.equal(fresh.seed, 3, 'before the first result the whole schedule is new');
+  assert.throws(() => setSkills(finishTournament(t, new Date()), { p1: 2 }), /finished/);
 });

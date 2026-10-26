@@ -99,8 +99,7 @@ function editPage(ctx, view, person, people, tournaments) {
   const used = usage(tournaments, person.id);
   const save = () => {
     try {
-      const result = updatePerson(people, tournaments, person.id, form.read());
-      ctx.savePeople(result.people, result.tournaments);
+      ctx.savePeople(updatePerson(people, person.id, form.read()));
       listPeople(ctx, view);
     } catch (error) {
       showError(ctx, error);
