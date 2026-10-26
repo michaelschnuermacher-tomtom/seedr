@@ -102,12 +102,12 @@ Everything that changes or reveals the draw is in **Manage**, which can ask for 
 - **Tournament**: name and settings; **Edit** changes the name, and before the first result also courts, rounds and times (in the setup, which draws again).
 - **Players**: the players by skill; **Edit names** corrects names, **Player leaves…** withdraws players and redraws the remaining rounds.
 - **Draw quality**: average and biggest edge; **Details** shows all figures and, before the first result, **Redraw schedule**.
-- **Print & export**: **Print…** asks which sections go into the printout (tournament summary, player skills, standings, all revealed rounds; the summary is only ticked by default once the tournament is finished), and **Export backup**.
+- **Print & export**: **Print…** asks which sections go into the printout (player skills, standings, all revealed rounds, and the tournament summary once the tournament is finished), and **Export backup**.
 - **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.
 
 ### Tournament summary
 
-Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they are not shown while the tournament runs (only in the printout): finishing the tournament adds a **Summary** tab for everyone.
+Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in a **Summary** tab for everyone, and as an option for the printout.
 
 ## Keeping data safe
 

@@ -212,13 +212,19 @@ function swapRound(ctx, t, view, round) {
 // The sections of the printout, in this order, as chosen on the Print page.
 const PRINT_PARTS = [['summary', 'Tournament summary'], ['skills', 'Player skills'], ['standings', 'Standings'], ['rounds', 'Rounds']];
 
-// Everything, except the summary while the tournament runs: it would give results away.
-function defaultPrintParts(t) {
-  return { summary: isFinished(t), skills: true, standings: true, rounds: true };
+// Everything by default. The summary only exists once the tournament is finished.
+function defaultPrintParts() {
+  return { summary: true, skills: true, standings: true, rounds: true };
+}
+
+// Only the sections that exist: no summary before the tournament is finished.
+function printableParts(t) {
+  return PRINT_PARTS.filter(([key]) => key !== 'summary' || isFinished(t));
 }
 
 function printout(ctx, t, view) {
-  const parts = view.printParts ?? defaultPrintParts(t);
+  const chosen = view.printParts ?? defaultPrintParts();
+  const parts = Object.fromEntries(printableParts(t).map(([key]) => [key, chosen[key]]));
   const before = parts.summary || parts.skills || parts.standings;
   return [
     parts.summary ? [h('h2', { class: 'print-only' }, 'Tournament summary'), summaryCard(t)] : null,
@@ -230,9 +236,10 @@ function printout(ctx, t, view) {
 
 // Choose the sections, then print.
 function printPage(ctx, t) {
-  const parts = (ctx.state.view.printChoice ??= { ...(ctx.state.view.printParts ?? defaultPrintParts(t)) });
+  const parts = (ctx.state.view.printChoice ??= { ...(ctx.state.view.printParts ?? defaultPrintParts()) });
+  const available = printableParts(t);
   const start = () => {
-    if (!PRINT_PARTS.some(([key]) => parts[key])) {
+    if (!available.some(([key]) => parts[key])) {
       ctx.state.message = 'Choose at least one section to print.';
       ctx.render();
       return;
@@ -243,8 +250,8 @@ function printPage(ctx, t) {
   return subPage(ctx, 'Print', [
     h('p', { class: 'muted' }, isFinished(t)
       ? 'Choose what goes into the printout.'
-      : 'Choose what goes into the printout. The tournament summary gives the results away, so it is only included while the tournament runs when ticked here.'),
-    h('div', { class: 'options' }, PRINT_PARTS.map(([key, label]) => h('label', { class: 'option' },
+      : 'Choose what goes into the printout. The tournament summary can be printed once the tournament is finished.'),
+    h('div', { class: 'options' }, available.map(([key, label]) => h('label', { class: 'option' },
       h('input', { type: 'checkbox', checked: parts[key], onchange: (e) => { parts[key] = e.target.checked; } }),
       h('span', {}, label)))),
   ], [h('button', { class: 'primary', onclick: start }, 'Print')]);
@@ -408,7 +415,7 @@ function manageOverview(ctx, t) {
         fact('Biggest edge', quality.q.worst ? formatValue(quality.q.worst.gap) : '–'))
       : h('p', { class: 'muted' }, 'Shown once the first round is revealed.')],
     [h('button', { onclick: () => openPage(ctx, 'quality') }, 'Details')]),
-    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the summary, the player skills, the standings and all revealed rounds: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
+    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the player skills, the standings, all revealed rounds and, once the tournament is finished, the summary: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
       h('button', { onclick: () => openPage(ctx, 'print') }, 'Print…'),
       h('button', { onclick: () => exportBackup(ctx) }, 'Export backup')]),
     h('div', { class: 'actions' }, h('button', {
