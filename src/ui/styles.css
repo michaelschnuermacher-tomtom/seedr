@@ -141,6 +141,20 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .option input { width: auto; accent-color: var(--accent); }
 .options.withdraw { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+/* Setup: tick who plays, with their skill for this tournament. */
+.pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 12px; margin: 10px 0; }
+.pick { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.pick.on { border-color: var(--accent); background: var(--accent-soft); }
+.pick-name { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; overflow-wrap: anywhere; }
+.pick-name input { width: auto; accent-color: var(--accent); }
+.pick select { width: auto; flex: none; min-height: 36px; padding: 4px 8px; }
+/* Home: the backup card below the tournament list */
+.backup { margin-top: 20px; }
+/* Players page */
+.people { list-style: none; padding: 0; margin: 0; }
+.people li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.people li:last-child { border-bottom: none; }
+.people .person { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .names-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 12px; }
 
 /* Segmented controls */

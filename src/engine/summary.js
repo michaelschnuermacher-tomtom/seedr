@@ -27,7 +27,8 @@ export function tournamentSummary(t) {
   }
   if (matches.length === 0) return [];
 
-  const rows = computeStandings(t.players, t.schedule, t.results).filter((r) => !r.withdrawn && r.games > 0);
+  // Everyone who played, including players who withdrew later.
+  const rows = computeStandings(t.players, t.schedule, t.results).filter((r) => r.games > 0);
   // A highlight about a statistic names everyone who shares it; edges count as equal when
   // they show the same in the standings.
   const and = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
@@ -133,7 +134,7 @@ export function tournamentSummary(t) {
   const history = new Map(rows.map((r) => [r.id, []])); // each player's games, in order
   for (const m of matches) {
     for (const [team, other, won] of [[m.won, m.lost, true], [m.lost, m.won, false]]) {
-      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other });
+      for (const id of team) history.get(id)?.push({ won, mine: value(team), theirs: value(other), opponents: other, court: m.court });
     }
   }
   const games = (r) => history.get(r.id);
@@ -204,14 +205,61 @@ export function tournamentSummary(t) {
   const balanced = regulars.filter((r) => shown(r.edge) === 0);
   offer('⚖️', 'Perfectly balanced', ids(balanced), `${who(balanced)} played perfectly balanced matches on average (edge 0.0).`);
   // Bench warmer and iron player: sat out the most rounds, or none at all.
-  const played = new Set(matches.map((m) => m.round)).size;
-  const rested = (r) => played - games(r).length;
+  // Rounds a player could have played: players who withdrew only count until they left.
+  const roundsDone = [...new Set(matches.map((m) => m.round))];
+  const played = roundsDone.length;
+  const rested = (r) => roundsDone.filter((n) => n <= (byId.get(r.id).withdrawnAfter ?? Infinity)).length - games(r).length;
   const most = Math.max(...rows.map(rested));
   if (most > 0) {
     const bench = rows.filter((r) => rested(r) === most);
     offer('🪑', 'Bench warmer', ids(bench), `${who(bench)} sat out ${plural(most, 'round')}: well rested for what comes next!`);
     const iron = played >= 2 ? rows.filter((r) => rested(r) === 0) : [];
     offer('⚙️', 'Iron player', ids(iron), `${who(iron)} played every round so far without a break.`);
+  }
+  // Giant killer: beat the strongest team anyone has beaten (lowest team value).
+  const strongest = Math.min(...matches.map((m) => value(m.lost)));
+  const giants = matches.filter((m) => value(m.lost) === strongest);
+  offer('🗡️', 'Giant killer', giants.flatMap((m) => m.won), `${and(giants.map((m) => `${names(m.won)} beat ${names(m.lost)} in round ${m.round}`))}:`
+    + ` the strongest team anyone has beaten.`);
+  // Late bloomer: more wins in the second half of their games than in the first.
+  const bloomers = rows.filter((r) => {
+    const g = games(r);
+    const half = Math.floor(g.length / 2);
+    return g.length >= 4 && g.slice(-half).filter((x) => x.won).length > g.slice(0, half).filter((x) => x.won).length;
+  });
+  offer('🌱', 'Late bloomer', ids(bloomers), `${who(bloomers)} won more games in the second half than in the first.`);
+  // Court regular: the most games on one and the same court.
+  if (new Set(matches.map((m) => m.court)).size > 1) {
+    const favourite = (r) => {
+      const counts = new Map();
+      for (const g of games(r)) counts.set(g.court, (counts.get(g.court) ?? 0) + 1);
+      return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0] ?? [0, 0];
+    };
+    const most = Math.max(...rows.map((r) => favourite(r)[1]));
+    if (most >= 3) {
+      const list = rows.filter((r) => favourite(r)[1] === most);
+      offer('📍', 'Court regular', ids(list), `${and(list.map((r) => `${r.name} (court ${favourite(r)[0]})`))} played ${most} games on the same court.`);
+    }
+  }
+  // Age, in words only: the oldest and youngest players with a win, and the winning team
+  // with the biggest age difference. Only players with a year of birth count.
+  const born = (id) => byId.get(id).birthYear;
+  const aged = rows.filter((r) => r.wins > 0 && born(r.id) != null);
+  if (aged.length >= 3) {
+    const years = aged.map((r) => born(r.id));
+    const [oldest, youngest] = [Math.min(...years), Math.max(...years)];
+    if (oldest !== youngest) {
+      const old = aged.filter((r) => born(r.id) === oldest);
+      const young = aged.filter((r) => born(r.id) === youngest);
+      offer('🧓', 'Old hands', ids(old), `${who(old)} ${old.length > 1 ? 'were the oldest players' : 'was the oldest player'} to win a game.`);
+      offer('🐣', 'Young guns', ids(young), `${who(young)} ${young.length > 1 ? 'were the youngest players' : 'was the youngest player'} to win a game.`);
+    }
+  }
+  const ageGap = (m) => (m.won.every((id) => born(id) != null) ? Math.abs(born(m.won[0]) - born(m.won[1])) : -1);
+  const widestAge = Math.max(-1, ...matches.map(ageGap));
+  if (widestAge >= 15) {
+    const list = matches.filter((m) => ageGap(m) === widestAge);
+    offer('👨‍👦', 'Across generations', list.flatMap((m) => m.won), `${teams(list)} won together: the biggest age difference in a winning team.`);
   }
 
   const limit = Math.ceil(rows.length / 3);

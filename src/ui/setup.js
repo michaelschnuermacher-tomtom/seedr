@@ -1,10 +1,11 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { parsePlayers, formatPlayers, createTournament, updateSettings, isActive, checkFewer } from '../engine/tournament.js';
-import { recommendOptions, gamesPerPlayer, fewerGamesCount, describeGames } from '../engine/timeplan.js';
+import { parsePlayers, createTournament, updateSettings, isActive } from '../engine/tournament.js';
+import { recommendOptions, gamesPerPlayer, describeGames } from '../engine/timeplan.js';
+import { sortPeople, rememberSkills } from '../engine/people.js';
 import { newSeed } from '../engine/rng.js';
 
-// The regular group, pre-filled for every new tournament: one line per skill.
+// The regular group: the first people on a new device, one line per skill.
 export const DEFAULT_PLAYERS = `1: Markus, Seb, Micha
 3: Uta, Vera
 4: Gesa, Henri, Lia
@@ -14,10 +15,31 @@ export const DEFAULT_PLAYERS = `1: Markus, Seb, Micha
 8: Max
 9: Anne`;
 
-export function newDraft() {
+// The default players as people (for a device without any, and for the tests).
+export function defaultPeople() {
+  return parsePlayers(DEFAULT_PLAYERS).players.map((p, i) => ({ id: `default-${i + 1}`, name: p.name, lastSkill: p.skill }));
+}
+
+const DEFAULT_SKILL = 5;
+
+// One row per known person: ticked when they play, with their skill for this tournament.
+// `chosen` maps person id → skill.
+function rowsFor(people, chosen) {
+  return sortPeople(people).map((p) => ({
+    personId: p.id, name: p.name, birthYear: p.birthYear ?? null,
+    skill: chosen.get(p.id) ?? p.lastSkill ?? DEFAULT_SKILL, selected: chosen.has(p.id),
+  }));
+}
+
+// A new tournament ticks the players of the most recent one, with their skill there;
+// without one, everyone with their last skill.
+export function newDraft(people = defaultPeople(), recent = null) {
+  const chosen = recent
+    ? new Map(recent.players.filter((p) => isActive(p) && p.personId).map((p) => [p.personId, p.skill]))
+    : new Map(people.map((p) => [p.id, p.lastSkill ?? DEFAULT_SKILL]));
   return {
     name: '',
-    playersText: DEFAULT_PLAYERS,
+    rows: rowsFor(people, chosen),
     courts: 2,
     totalMinutes: 240,
     breakMinutes: 5,
@@ -29,13 +51,16 @@ export function newDraft() {
 
 // Setup form for changing a tournament that has not started. The total time is set so
 // that the tournament's current rounds × match length is one of the offered options.
-export function draftFromTournament(t) {
+export function draftFromTournament(t, people = []) {
   const s = t.settings;
+  const active = t.players.filter(isActive);
+  // Without people (tests), the tournament's own players are the list.
+  const known = people.length ? people : t.players.map((p) => ({ id: p.personId ?? p.id, name: p.name, birthYear: p.birthYear }));
   return {
-    ...newDraft(),
+    ...newDraft(known),
+    rows: rowsFor(known, new Map(active.map((p) => [p.personId ?? p.id, p.skill]))),
     editingId: t.id,
     name: t.name,
-    playersText: formatPlayers(t.players.filter(isActive)),
     courts: s.courts,
     breakMinutes: s.breakMinutes,
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
@@ -45,12 +70,24 @@ export function draftFromTournament(t) {
   };
 }
 
+// Keeps the rows in step with the people (e.g. after adding a player on the Players page):
+// names follow, people who are new are added ticked, deleted ones disappear.
+export function syncRows(d, people) {
+  const old = new Map(d.rows.map((r) => [r.personId, r]));
+  d.rows = sortPeople(people).map((p) => {
+    const r = old.get(p.id);
+    return { personId: p.id, name: p.name, birthYear: p.birthYear ?? null, skill: r?.skill ?? p.lastSkill ?? DEFAULT_SKILL, selected: r ? r.selected : true };
+  });
+}
+
 const isWhole = (v, min) => Number.isInteger(v) && v >= min;
 
 export function evaluateDraft(d) {
-  const { players, errors } = parsePlayers(d.playersText);
-  const problems = [...errors];
-  if (players.length < 4) problems.push('Enter at least 4 players.');
+  const players = d.rows.filter((r) => r.selected).map((r) => ({
+    personId: r.personId, name: r.name, skill: r.skill, ...(r.birthYear != null ? { birthYear: r.birthYear } : {}),
+  }));
+  const problems = [];
+  if (players.length < 4) problems.push('Tick at least 4 players.');
   if (!isWhole(d.courts, 1)) problems.push('Courts must be a whole number of at least 1.');
   if (!isWhole(d.breakMinutes, 0)) problems.push('Break must be a whole number of minutes (0 or more).');
   let options = [];
@@ -66,13 +103,11 @@ export function evaluateDraft(d) {
       else plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes, ...(chosen.lastRoundCourts ? { lastRoundCourts: chosen.lastRoundCourts } : {}) };
     }
   }
-  if (plan) {
-    const problem = checkFewer(players, { courts: d.courts, rounds: plan.rounds, lastRoundCourts: plan.lastRoundCourts });
-    if (problem) problems.push(problem);
-  }
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
   return { players, problems, options, plan, games };
 }
+
+const SKILLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 function field(label, input) {
   return h('label', { class: 'field' }, h('span', {}, label), input);
@@ -85,7 +120,8 @@ function selectInput(value, choices, onchange) {
 }
 
 export function setupScreen(ctx) {
-  const d = (ctx.state.draft ??= newDraft());
+  const d = (ctx.state.draft ??= newDraft(ctx.people(), ctx.store.list()[0] ?? null));
+  syncRows(d, ctx.people());
   const preview = h('section', { class: 'preview' });
   const planBox = h('div', {});
   const refresh = () => {
@@ -98,26 +134,30 @@ export function setupScreen(ctx) {
     oninput: (e) => { d[key] = e.target.value === '' ? NaN : Number(e.target.value); refresh(); },
   });
 
-  const playersBox = h('textarea', {
-    rows: 10, value: d.playersText, placeholder: '1: Carla\n3: Anna, David\n7: Ben Miller',
-    oninput: (e) => { d.playersText = e.target.value; refresh(); },
-  });
-  const loadPlayers = async (file) => {
-    if (!file) return;
-    d.playersText = await file.text();
-    playersBox.value = d.playersText;
-    refresh();
-  };
+  const count = h('span', {});
+  const showCount = () => { count.textContent = `${d.rows.filter((r) => r.selected).length} of ${d.rows.length} ticked.`; };
+  const pickList = h('div', { class: 'pick-list' }, d.rows.map((row) => {
+    const line = h('div', { class: `pick${row.selected ? ' on' : ''}` },
+      h('label', { class: 'pick-name' },
+        h('input', { type: 'checkbox', checked: row.selected, onchange: (e) => { row.selected = e.target.checked; line.classList.toggle('on', row.selected); showCount(); refresh(); } }),
+        h('span', {}, row.name)),
+      selectInput(row.skill, SKILLS.map((n) => [String(n), `Skill ${n}`]), (e) => { row.skill = Number(e.target.value); refresh(); }));
+    return line;
+  }));
+  const tickAll = (on) => { d.rows.forEach((r) => { r.selected = on; }); ctx.render(); };
+  showCount();
 
   const card = (title, color, ...children) => h('section', { class: `card accent-${color}` }, h('h2', { class: 'card-title' }, title), ...children);
   const form = h('div', { class: 'form' },
     card('Tournament', 'ao',
       field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; } }))),
     card('Players', 'wim',
-      field('One line per skill (1 = best, 10 = weakest), e.g. "3: Anna, Ben". If games are uneven, a * after a name picks who plays fewer, e.g. "3: Anna, Ben*". Single players as "Anna: 3" work too.', playersBox),
+      h('p', { class: 'muted' }, 'Tick who plays and set their skill for this tournament (1 = best, 10 = weakest). ', count),
+      pickList,
       h('div', { class: 'actions' },
-        h('label', { class: 'button' }, 'Load players file',
-          h('input', { type: 'file', accept: '.txt,text/plain', hidden: true, onchange: (e) => { loadPlayers(e.target.files[0]); e.target.value = ''; } })))),
+        h('button', { class: 'small', onclick: () => tickAll(true) }, 'Tick all'),
+        h('button', { class: 'small', onclick: () => tickAll(false) }, 'Tick none'),
+        h('button', { class: 'small', onclick: () => { ctx.state.peopleReturn = 'setup'; ctx.go('people'); } }, 'Add or edit players…'))),
     card('Courts & time', 'rg',
       h('div', { class: 'row' },
         field('Courts', numberInput('courts', 1)),
@@ -170,21 +210,13 @@ function planField(d, ev, refresh) {
 const courtsText = (n) => `${n} court${n === 1 ? '' : 's'}`;
 
 function setupPreview(ctx, d, ev) {
-  const out = [h('p', { class: 'muted' }, `${ev.players.length} players entered`)];
+  const out = [h('p', { class: 'muted' }, `${ev.players.length} players ticked`)];
   if (ev.games) {
     const games = describeGames(ev.players.length, d.courts, ev.plan.rounds, ev.plan.lastRoundCourts);
     out.push(ev.games.even
       ? h('p', { class: 'ok' }, `Even: ${games}.`)
-      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game.`));
+      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game. Who plays fewer is drawn at random; Manage → Swap players can change it later.`));
     if (ev.plan.lastRoundCourts) out.push(h('p', { class: 'muted' }, `The last round uses only ${courtsText(ev.plan.lastRoundCourts)}, so the games come out more even.`));
-    const fewer = fewerGamesCount(ev.players.length, d.courts, ev.plan.rounds, ev.plan.lastRoundCourts);
-    const marked = ev.players.filter((p) => p.fewer).map((p) => p.name);
-    if (fewer > 0) {
-      const rest = fewer - marked.length;
-      out.push(h('p', { class: 'muted' }, marked.length === 0
-        ? `The ${fewer} with ${ev.games.min} games are drawn at random. Add * after a name (e.g. "3: Anna, Ben*") to choose them.`
-        : `${ev.games.min} games for ${marked.join(', ')}${rest ? ` and ${rest} more drawn at random` : ''}.`));
-    }
   }
   if (ev.problems.length) out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));
   out.push(h('div', { class: 'actions' },
@@ -225,5 +257,6 @@ function createFromDraft(ctx, d, ev) {
   }
   ctx.state.draft = null;
   ctx.save(t);
+  ctx.savePeople(rememberSkills(ctx.people(), t.players)); // suggested for the next tournament
   ctx.open(t);
 }

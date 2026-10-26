@@ -1,12 +1,13 @@
-import { h, formatSigned, slugify } from './dom.js';
+import { h, formatSigned } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renamePlayers, renameTournament, swapPlayersAcross } from '../engine/tournament.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross } from '../engine/tournament.js';
 import { resultKey, computeStandings } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
 import { tournamentSummary } from '../engine/summary.js';
-import { saveFile, downloadFile } from './export.js';
+import { updatePerson } from '../engine/people.js';
+import { exportBackup } from './backup.js';
 import { draftFromTournament } from './setup.js';
 
 const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['manage', 'Manage']];
@@ -242,10 +243,6 @@ function standingsTab(t) {
   ];
 }
 
-function exportTournament(t) {
-  saveFile(`${slugify(t.name)}.seedr.json`, JSON.stringify(t, null, 2), { nav: navigator, download: downloadFile });
-}
-
 function fact(label, value) {
   return [h('dt', {}, label), h('dd', {}, String(value))];
 }
@@ -336,9 +333,9 @@ function manageOverview(ctx, t) {
       : h('p', { class: 'muted' }, 'Shown once the first round is revealed.')],
     [h('button', { onclick: () => openPage(ctx, 'quality') }, 'Details')]),
     summaryCard(t),
-    section('Print & export', h('p', { class: 'muted' }, 'The printout has the summary, the player skills, the standings and all revealed rounds. The export is a file to keep the tournament safe or move it to another device.'), [
+    section('Print & export', h('p', { class: 'muted' }, 'The printout has the summary, the player skills, the standings and all revealed rounds. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
       h('button', { onclick: () => printAll(ctx) }, 'Print'),
-      h('button', { onclick: () => exportTournament(t) }, 'Export (.seedr.json)')]),
+      h('button', { onclick: () => exportBackup(ctx) }, 'Export backup')]),
     h('div', { class: 'actions' }, h('button', {
       class: 'danger',
       onclick: () => {
@@ -375,21 +372,34 @@ function tournamentPage(ctx, t) {
       disabled: locked,
       onclick: () => {
         ctx.state.view.manage = null;
-        ctx.state.draft = draftFromTournament(t);
+        ctx.state.draft = draftFromTournament(t, ctx.people());
         ctx.go('setup');
       },
     }, 'Change courts, rounds & times…')),
   ], [h('button', { class: 'primary', onclick: save }, 'Save')]);
 }
 
-// Names can be corrected at any time; the draw and the results stay as they are.
+// Names can be corrected at any time; the draw and the results stay as they are. Names
+// belong to the people, so a correction shows in all their tournaments.
 function playersPage(ctx, t) {
   // Edits not saved yet, by player id; kept when saving fails.
   const edits = (ctx.state.view.names ??= {});
   const save = () => {
-    const names = Object.fromEntries(Object.entries(edits).filter(([id, name]) => t.players.find((p) => p.id === id)?.name !== name.trim()));
     try {
-      if (Object.keys(names).length) ctx.save(renamePlayers(t, names));
+      let people = ctx.people();
+      let tournaments = ctx.store.list();
+      const changed = new Map();
+      for (const [id, name] of Object.entries(edits)) {
+        const player = t.players.find((p) => p.id === id);
+        if (!player || player.name === name.trim()) continue;
+        const person = people.find((p) => p.id === player.personId);
+        if (!person) throw new Error(`${player.name} is not on the Players page.`);
+        const result = updatePerson(people, tournaments, person.id, { name, birthYear: person.birthYear ?? null });
+        people = result.people;
+        for (const x of result.tournaments) changed.set(x.id, x);
+        tournaments = tournaments.map((x) => changed.get(x.id) ?? x);
+      }
+      ctx.savePeople(people, [...changed.values()]);
       closePage(ctx);
     } catch (error) {
       ctx.state.message = error.message;
@@ -397,7 +407,7 @@ function playersPage(ctx, t) {
     }
   };
   return subPage(ctx, 'Player names', [
-    h('p', { class: 'muted' }, 'Correct names at any time. The draw and the results stay as they are.'),
+    h('p', { class: 'muted' }, 'Correct names at any time. The draw and the results stay as they are, and the correction shows in all tournaments of the player. Years of birth are on the Players page (home screen).'),
     h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
       h('span', {}, `Skill ${p.skill}${isActive(p) ? '' : ' · withdrew'}`),
       h('input', { type: 'text', value: edits[p.id] ?? p.name, oninput: (e) => { edits[p.id] = e.target.value; } })))),

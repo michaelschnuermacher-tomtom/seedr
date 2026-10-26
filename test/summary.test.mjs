@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tournamentSummary } from '../src/engine/summary.js';
-import { createTournament } from '../src/engine/tournament.js';
+import { createTournament, setResult, withdrawPlayers } from '../src/engine/tournament.js';
 
 // Team values: Anna+Ben 12, Carla+David 10, Anna+Carla 7, Ben+Eva 13.5, David+Eva 8.5.
 const players = [
@@ -54,12 +54,75 @@ test('every player who played is mentioned at least once', () => {
   }
 });
 
-test('more properties name everyone who has them, until every player is mentioned', () => {
-  const s = summary({ '1-1': 2, '2-1': 1 });
-  assert.match(s['Still smiling'], /^Eva and Ben have no wins yet/, 'everyone without a win');
-  assert.match(s.Comeback, /^Anna lost the first game and won the last one\./);
-  assert.match(s['Flying start'], /^Carla and David won the very first game\./, 'Carla is named again: the group is complete');
-  assert.match(summary({ '1-1': 1, '2-1': 1, '3-1': 2 })['Strong finish'], /^David & Eva won in round 3, the latest round\./);
+test('age, giant killer, late bloomer and court regular name exactly the right players', () => {
+  const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
+  const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
+  const years = [1960, 1975, 1980, 1990, 1999, 1955, 1970, 2005, 1985, 1992, 1978, 1966, 2001, 1988, 1995, 1972, 1950];
+  const seen = new Set();
+  for (let seed = 1; seed <= 8; seed++) {
+    for (const played of [4, 6, 9]) {
+      const t = createTournament({ id: 'x', name: 'x', seed, now: new Date(), players: names.map((name, i) => ({ name, skill: skills[i], birthYear: years[i] })),
+        settings: { courts: 2, rounds: 9, lastRoundCourts: 1, matchMinutes: 21, breakMinutes: 5, revealBatch: 'all' } });
+      let k = seed;
+      const results = {};
+      for (const r of t.schedule.slice(0, played)) for (const m of r.matches) { k = (k * 31 + 7) % 97; results[`${r.round}-${m.court}`] = (k % 2) + 1; }
+      const s = Object.fromEntries(tournamentSummary({ ...t, results }).map((x) => [x.title, x.text]));
+      // Independent count of wins and games per player.
+      const byId = new Map(t.players.map((p) => [p.id, p]));
+      const wins = new Map(t.players.map((p) => [p.id, 0]));
+      const winning = [];
+      for (const r of t.schedule.slice(0, played)) for (const m of r.matches) {
+        const team = results[`${r.round}-${m.court}`] === 1 ? m.team1 : m.team2;
+        team.forEach((id) => wins.set(id, wins.get(id) + 1));
+        winning.push(team);
+      }
+      const winners = t.players.filter((p) => wins.get(p.id) > 0);
+      const namedIn = (text) => names.filter((n) => new RegExp(`\\b${n}\\b`).test(text)).sort();
+      if (s['Old hands']) {
+        const oldest = Math.min(...winners.map((p) => p.birthYear));
+        assert.deepEqual(namedIn(s['Old hands']), winners.filter((p) => p.birthYear === oldest).map((p) => p.name).sort());
+        seen.add('Old hands');
+      }
+      if (s['Young guns']) {
+        const youngest = Math.max(...winners.map((p) => p.birthYear));
+        assert.deepEqual(namedIn(s['Young guns']), winners.filter((p) => p.birthYear === youngest).map((p) => p.name).sort());
+        seen.add('Young guns');
+      }
+      if (s['Across generations']) {
+        const gap = (team) => Math.abs(byId.get(team[0]).birthYear - byId.get(team[1]).birthYear);
+        const widest = Math.max(...winning.map(gap));
+        assert.deepEqual(namedIn(s['Across generations']), [...new Set(winning.filter((team) => gap(team) === widest).flat().map((id) => byId.get(id).name))].sort());
+        seen.add('Across generations');
+      }
+      for (const title of ['Giant killer', 'Late bloomer', 'Court regular']) if (s[title]) seen.add(title);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['Across generations', 'Court regular', 'Giant killer', 'Late bloomer', 'Old hands', 'Young guns']);
+});
+
+test('without years of birth there are no age highlights', () => {
+  const s = summary();
+  assert.ok(!('Old hands' in s) && !('Young guns' in s) && !('Across generations' in s));
+});
+
+test('Still smiling names everyone without a win', () => {
+  assert.match(summary({ '1-1': 2, '2-1': 1 })['Still smiling'], /^Eva and Ben have no wins yet/);
+});
+
+test('players who withdrew are mentioned, and only the rounds before they left count for sitting out', () => {
+  const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
+  const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
+  let t = createTournament({ id: 'x', name: 'x', seed: 4, now: new Date(), players: names.map((name, i) => ({ name, skill: skills[i] })),
+    settings: { courts: 2, rounds: 9, matchMinutes: 21, breakMinutes: 5, revealBatch: 'all' } });
+  for (const r of t.schedule.slice(0, 2)) for (const m of r.matches) t = setResult(t, r.round, m.court, 1);
+  const gone = t.schedule[0].matches[0].team1[0];
+  t = withdrawPlayers(t, [gone], 1);
+  for (const r of t.schedule.slice(2, 6)) for (const m of r.matches) t = setResult(t, r.round, m.court, 2);
+  const s = tournamentSummary(t);
+  const goneName = t.players.find((p) => p.id === gone).name;
+  assert.ok(s.some((x) => `${x.title} ${x.text}`.includes(goneName)), `${goneName} is mentioned`);
+  const bench = s.find((x) => x.title === 'Bench warmer');
+  assert.ok(!bench || !bench.text.includes(goneName), 'the rounds after leaving are not sit-outs');
 });
 
 test('in a real-size tournament, every player who played is mentioned and no property names more than a third', () => {

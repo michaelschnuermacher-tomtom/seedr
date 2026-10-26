@@ -20,24 +20,27 @@ Open `dist/index.html` in a browser (double-click works). Data is saved in that 
 
 Tournament data stays on the device. The host only serves the empty app.
 
-## Players file
+## Players
 
-On the setup screen, **Load players file** reads a plain text file (e.g. from Dropbox or
-iCloud Drive) with one line per skill (1 = best, 10 = weakest) and the players of
-that skill after a colon, separated by commas:
+Players are kept on the device and shared by all tournaments: **Players** on the home
+screen lists them with name and (optional) year of birth. The list comes first; **Edit**
+and **Add player** open a page to change them. A correction shows in every tournament of
+that player, old ones included. A player can only be deleted while they are in no
+tournament. If two different people ended up as one (e.g. two "Max"), **Split…** gives
+the chosen tournaments a player of their own.
 
-```
-1: Carla
-3: Anna, David
-7: Ben Miller
-```
+The skill (1 = best, 10 = weakest) belongs to each tournament: in the setup, tick who
+plays and set their skill. A new tournament starts with the players of the most recent
+one ticked, with their skill there; **Add or edit players…** leads to the Players page
+and back.
 
-A single player can also be written as name and skill, e.g. `Ben Miller: 7`. Names
-that contain a comma must be written that way: `Müller, Jörg: 1`. A line counts as a
-skill line when it starts with a number.
+The year of birth is only used for the tournament summary, in words ("the oldest player
+to win a game"); ages and years are never printed.
 
-The players appear in the text box, where they can still be edited. You can also type
-or paste players in the same format.
+When the version with shared players first starts, it builds the list from the stored
+tournaments (one player per name, ignoring upper and lower case) and the default players,
+and links every tournament to it. An untouched copy of each tournament is kept on the device
+first (`seedr.v1.original.t.<id>`).
 
 ## How the draw works
 
@@ -53,7 +56,7 @@ or paste players in the same format.
 
 ### Steps
 
-1. **How often everyone sits out.** Each round, `players − 4 × courts used` players sit out, and everyone sits out equally often (at most one apart). When the games can't come out even, players marked with `*` after their name (e.g. `4: Gesa*, Henri`, or `Gesa: 4 *` on a line of their own) are the ones who get fewer games. Only as many players can be marked as there are players who get fewer games; any extra places are drawn at random. These numbers never change during the draw.
+1. **How often everyone sits out.** Each round, `players − 4 × courts used` players sit out, and everyone sits out equally often (at most one apart). When the games can't come out even, who gets fewer is drawn at random; **Manage → Swap players** can change it later (swapping a player on court with one who sits out moves a game from one to the other). These numbers never change during the draw.
 2. **Starting draw.** A first rotation decides who sits out in which round, and each round's players are shuffled into teams and matches.
 3. **Improvement.** The draw then repeatedly makes small changes: it swaps two players or two whole teams in a round, or *exchanges sit-outs* between two rounds (Anna plays in round 3 instead of round 6, Ben the other way round, so both keep their number of games). Moving sit-outs lets players meet who would otherwise never be on court in the same round. Each change is scored, and lower scores are better. F is the difference of the two team values in a match:
 
@@ -99,14 +102,17 @@ Everything that changes or reveals the draw is in **Manage**, which can ask for 
 - **Players**: the players by skill; **Edit names** corrects names, **Player leaves…** withdraws players and redraws the remaining rounds.
 - **Draw quality**: average and biggest edge; **Details** shows all figures and, before the first result, **Redraw schedule**.
 - **Tournament summary**: fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player.
-- **Print & export**: the printout (summary, player skills, standings and all revealed rounds) and the `.seedr.json` export.
+- **Print & export**: the printout (summary, player skills, standings and all revealed rounds) and **Export backup**.
 - **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.
 
 ## Keeping data safe
 
-Browser storage can be lost (clearing Safari data, a new device). Use **Manage → Export**
-to save a `.seedr.json` file (e.g. to Dropbox or iCloud Drive) and **Import** to load it
-on any device.
+Browser storage can be lost (clearing Safari data, a new device). **Export backup** (home
+screen or Manage) saves one file with all players and all tournaments, e.g.
+`seedr-backup-2026-10-26.json` (to Dropbox or iCloud Drive). **Import** on the home screen
+merges it into any device: players are matched by id, then by name, and existing players
+and tournaments are only replaced after a confirmation. Single tournament files from older
+versions (`.seedr.json`) can be imported too.
 
 ## Logo
 

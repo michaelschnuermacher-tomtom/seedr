@@ -43,10 +43,8 @@ export function strengthOf(skill) {
 // the places go to players who just sat out.
 // Each round's list is in selection order (fewest sit-outs first).
 // `before` continues from earlier rounds: sit-outs so far per player and who sat out last.
-// `fewer` are players who should get the extra sit-outs when the games come out uneven:
-// whenever only some of the players on a level sit out, they go first.
 // `perRound` is the number of players on court, the same for every round or one per round.
-export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}, fewer = new Set()) {
+export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}) {
   const count = before.count ? [...before.count] : new Array(playerCount).fill(0);
   let previous = new Set(before.previous);
   return Array.from({ length: rounds }, (_, r) => {
@@ -61,13 +59,7 @@ export function assignSitOuts(playerCount, perRound, rounds, rng, before = {}, f
         chosen.push(...level);
         continue;
       }
-      const marked = level.filter((i) => fewer.has(i));
-      if (marked.length > need) {
-        chosen.push(...pickSitOuts(marked, need, previous));
-        continue;
-      }
-      chosen.push(...marked);
-      chosen.push(...pickSitOuts(level.filter((i) => !marked.includes(i)), need - marked.length, previous));
+      chosen.push(...pickSitOuts(level, need, previous));
     }
     chosen.forEach((i) => count[i]++);
     previous = new Set(chosen);
@@ -282,8 +274,7 @@ export function generateSchedule({ players, courts, rounds, seed, iterations, pa
     count: players.map((_, i) => satOut.filter((r) => r.includes(i)).length),
     previous: satOut.at(-1) ?? [],
   };
-  const fewer = new Set(players.flatMap((p, i) => (p.fewer ? [i] : [])));
-  const sitOuts = assignSitOuts(n, perRoundPlayers(n, courts, rounds, lastRoundCourts), rounds, rng, before, fewer);
+  const sitOuts = assignSitOuts(n, perRoundPlayers(n, courts, rounds, lastRoundCourts), rounds, rng, before);
   const total = everyone.length;
   const fixed = history.length;
 

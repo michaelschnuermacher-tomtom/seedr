@@ -261,29 +261,3 @@ test('16 players on 2 courts: at most 2 back-to-back sit-outs per round', () => 
   }
 });
 
-test('marked players get the extra sit-outs when games are uneven', () => {
-  const fewer = new Set([0, 5, 9, 16]);
-  for (let seed = 1; seed <= 50; seed++) {
-    const sitOuts = assignSitOuts(17, 8, 8, createRng(seed), {}, fewer); // 72 sit-outs: 4 players sit 5×
-    const count = new Array(17).fill(0);
-    sitOuts.flat().forEach((i) => count[i]++);
-    const most = count.flatMap((c, i) => (c === 5 ? [i] : []));
-    assert.deepEqual(most, [0, 5, 9, 16], `seed ${seed}`);
-    assert.ok(count.every((c) => c === 4 || c === 5));
-  }
-});
-
-test('with fewer marked players than extra sit-outs, all marked ones get one', () => {
-  for (let seed = 1; seed <= 50; seed++) {
-    const sitOuts = assignSitOuts(17, 8, 8, createRng(seed), {}, new Set([3]));
-    const count = new Array(17).fill(0);
-    sitOuts.flat().forEach((i) => count[i]++);
-    assert.equal(count[3], 5, `seed ${seed}`);
-    assert.equal(count.filter((c) => c === 5).length, 4);
-  }
-});
-
-test('without marked players, sit-outs are unchanged', () => {
-  assert.deepEqual(assignSitOuts(17, 8, 8, createRng(7)), assignSitOuts(17, 8, 8, createRng(7), {}, new Set()));
-});
-

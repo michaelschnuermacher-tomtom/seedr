@@ -1,41 +1,38 @@
 import { generateSchedule } from './schedule.js';
 import { resultKey } from './standings.js';
-import { fewerGamesCount } from './timeplan.js';
 
-export const FORMAT_VERSION = 1;
+// Version 2: players link to a person (`personId`) and may have a year of birth.
+export const FORMAT_VERSION = 2;
 
-// Two kinds of lines:
+// Players as text (the default players and tests). Two kinds of lines:
 // - "skill: Name, Name, ..." lists all players of one skill, e.g. "1: Markus, Micha, Seb".
 // - "Name: skill" is one player. The last ":" separates, so names may contain spaces,
 //   commas and other punctuation, e.g. "Müller, Jörg: 1".
-// A line is the first kind when it starts with a number. A "*" after a name (first
-// kind) or after the skill (second kind) marks a player who should get fewer games
-// when they cannot come out even.
+// A line is the first kind when it starts with a number.
 export function parsePlayers(text) {
   const players = [];
   const errors = [];
   const names = new Set();
   const skillOf = (skillText) => (/^\d+$/.test(skillText) && Number(skillText) >= 1 && Number(skillText) <= 10 ? Number(skillText) : null);
-  const stripStar = (s) => (s.endsWith('*') ? [s.slice(0, -1).trim(), true] : [s, false]);
   text.split(/\r?\n/).forEach((raw, index) => {
     const line = raw.trim();
     if (!line) return;
     const n = index + 1;
-    const add = (name, skill, fewer) => {
+    const add = (name, skill) => {
       if (names.has(name.toLowerCase())) {
         errors.push(`Line ${n}: duplicate name "${name}"`);
         return;
       }
       names.add(name.toLowerCase());
-      players.push(fewer ? { name, skill, fewer } : { name, skill });
+      players.push({ name, skill });
     };
     const group = /^(\d+)\s*:(.*)$/.exec(line);
     if (group) {
       const skill = skillOf(group[1]);
-      const entries = group[2].split(',').map((s) => s.trim()).filter(Boolean);
+      const entries = group[2].split(',').map((x) => x.trim()).filter(Boolean);
       if (!skill) errors.push(`Line ${n}: skill must be a whole number from 1 to 10 ("${line}")`);
       else if (entries.length === 0) errors.push(`Line ${n}: expected names after the skill, e.g. "3: Anna, Ben"`);
-      else entries.map(stripStar).forEach(([name, fewer]) => (name ? add(name, skill, fewer) : errors.push(`Line ${n}: "*" without a name`)));
+      else entries.forEach((name) => add(name, skill));
       return;
     }
     const colon = line.lastIndexOf(':');
@@ -44,41 +41,26 @@ export function parsePlayers(text) {
       errors.push(`Line ${n}: expected "skill: Name, Name" or "Name: skill", e.g. "3: Anna, Ben"`);
       return;
     }
-    const [skillText, fewer] = stripStar(line.slice(colon + 1).trim());
-    const skill = skillOf(skillText);
+    const skill = skillOf(line.slice(colon + 1).trim());
     if (!skill) {
       errors.push(`Line ${n}: skill must be a whole number from 1 to 10 ("${line}")`);
       return;
     }
-    add(name, skill, fewer);
+    add(name, skill);
   });
   return { players, errors };
 }
 
-// Players as text, one line per skill from 1 to 10, e.g. "1: Markus, Micha, Seb*".
-// Names with a comma get a "Name: skill" line of their own.
-export function formatPlayers(players) {
-  const entry = (p) => `${p.name}${p.fewer ? '*' : ''}`;
-  const grouped = players.filter((p) => !p.name.includes(','));
-  const lines = [...new Set(grouped.map((p) => p.skill))].sort((a, b) => a - b)
-    .map((skill) => `${skill}: ${grouped.filter((p) => p.skill === skill).map(entry).join(', ')}`);
-  return [...lines, ...players.filter((p) => p.name.includes(',')).map((p) => `${p.name}: ${p.skill}${p.fewer ? ' *' : ''}`)].join('\n');
-}
-
-// Only as many players can be marked for fewer games as there are players who get them.
-export function checkFewer(players, settings) {
-  const marked = players.filter((p) => p.fewer).length;
-  const allowed = fewerGamesCount(players.length, settings.courts, settings.rounds, settings.lastRoundCourts);
-  if (marked <= allowed) return null;
-  return allowed === 0
-    ? 'Everyone plays the same number of games, so no player can be marked with * for fewer games.'
-    : `Only ${allowed} player${allowed === 1 ? '' : 's'} get${allowed === 1 ? 's' : ''} fewer games, but ${marked} are marked with *.`;
-}
-
-function numberPlayers(players, settings) {
-  const problem = checkFewer(players, settings);
-  if (problem) throw new Error(problem);
-  return players.map((p, i) => ({ id: `p${i + 1}`, name: p.name, skill: p.skill, ...(p.fewer ? { fewer: true } : {}) }));
+// Tournament players: { id, personId?, name, skill, birthYear? }; ids are p1, p2, ...
+function numberPlayers(players) {
+  const names = new Set();
+  for (const p of players) {
+    if (names.has(p.name.trim().toLowerCase())) throw new Error(`The name "${p.name}" is used twice`);
+    names.add(p.name.trim().toLowerCase());
+  }
+  return players.map((p, i) => ({
+    id: `p${i + 1}`, ...(p.personId ? { personId: p.personId } : {}), name: p.name, skill: p.skill, ...(p.birthYear != null ? { birthYear: p.birthYear } : {}),
+  }));
 }
 
 function initialReveal(settings) {
@@ -91,7 +73,7 @@ function drawSchedule(players, settings, seed) {
 }
 
 export function createTournament({ id, name, players, settings, seed, now }) {
-  const withIds = numberPlayers(players, settings);
+  const withIds = numberPlayers(players);
   return {
     version: FORMAT_VERSION,
     id,
@@ -127,9 +109,10 @@ export function redraw(t, seed) {
 // schedule and keeps id and creation date.
 export function updateSettings(t, { name, players, settings }, seed) {
   if (hasResults(t)) throw new Error('Cannot change settings after results have been entered');
-  const withIds = numberPlayers(players, settings);
+  const withIds = numberPlayers(players);
   return {
     ...t,
+    version: FORMAT_VERSION,
     name,
     settings: { ...settings },
     players: withIds,
@@ -178,26 +161,6 @@ export function renameTournament(t, name) {
   const trimmed = String(name).trim();
   if (!trimmed) throw new Error('The tournament name cannot be empty');
   return { ...t, name: trimmed };
-}
-
-// New names for players, as { id: name }; allowed at any time since the draw only uses
-// ids. Names must stay readable in the players text: not empty, unique, not just a
-// number and without a "*" at the end.
-export function renamePlayers(t, names) {
-  const players = t.players.map((p) => (p.id in names ? { ...p, name: String(names[p.id]).trim() } : p));
-  const seen = new Set();
-  for (const p of players) {
-    if (!p.name) throw new Error('Names cannot be empty');
-    if (/^\d+$/.test(p.name)) throw new Error(`"${p.name}" cannot be a name: it would be read as a skill`);
-    if (p.name.endsWith('*')) throw new Error(`"${p.name}" cannot end with *`);
-    const key = p.name.toLowerCase();
-    if (seen.has(key)) throw new Error(`The name "${p.name}" is used twice`);
-    seen.add(key);
-  }
-  for (const id of Object.keys(names)) {
-    if (!t.players.some((p) => p.id === id)) throw new Error(`Unknown player ${id}`);
-  }
-  return { ...t, players };
 }
 
 // Swaps two players within a round: between the teams of a match, between courts, or

@@ -1,13 +1,16 @@
-import { h } from './dom.js';
-import { createStore, STORAGE_PREFIX } from './store.js';
+import { h, newId } from './dom.js';
+import { createStore, STORAGE_PREFIX, PEOPLE_KEY } from './store.js';
 import { validateTournament } from '../engine/validate.js';
+import { parsePlayers } from '../engine/tournament.js';
+import { peopleFromTournaments, linkTournament } from '../engine/people.js';
 import { homeScreen } from './home.js';
+import { peopleScreen } from './people-view.js';
 import { installCourtBackground } from './court.js';
 import { installPrintHeader } from './print-header.js';
-import { setupScreen } from './setup.js';
+import { setupScreen, DEFAULT_PLAYERS } from './setup.js';
 import { tournamentScreen } from './tournament-view.js';
 
-const SCREENS = { home: homeScreen, setup: setupScreen, tournament: tournamentScreen };
+const SCREENS = { home: homeScreen, setup: setupScreen, tournament: tournamentScreen, people: peopleScreen };
 
 const appRoot = document.getElementById('app');
 const store = createStore(safeLocalStorage());
@@ -38,7 +41,19 @@ const ctx = {
   },
   save(t) {
     state.tournament = t;
-    if (!store.save(t)) state.message = 'Could not save on this device. Use Export to keep your data.';
+    if (!store.save(t)) state.message = 'Could not save on this device. Use Export backup to keep your data.';
+  },
+  people() {
+    return store.people() ?? [];
+  },
+  // Saves the people and the tournaments that changed with them (names copied into them).
+  savePeople(people, tournaments = []) {
+    let ok = store.savePeople(people);
+    for (const t of tournaments) {
+      ok = store.save(t) && ok;
+      if (state.tournament?.id === t.id) state.tournament = t;
+    }
+    if (!ok) state.message = 'Could not save on this device. Use Export backup to keep your data.';
   },
   open(t) {
     const check = validateTournament(t);
@@ -60,9 +75,26 @@ function render() {
   appRoot.replaceChildren(...[banner, screen(ctx)].filter(Boolean));
 }
 
-// Another tab changed a tournament: show the stored version instead of a stale copy.
+// First start with shared players: build the people list from the stored tournaments
+// (one person per name) and the default players, and link every tournament to it. An
+// untouched copy of each tournament is kept first.
+function linkStoredTournaments() {
+  let people = store.people();
+  const tournaments = store.list();
+  if (!people) people = peopleFromTournaments(tournaments, parsePlayers(DEFAULT_PLAYERS).players, newId);
+  for (const t of tournaments) {
+    if (t.players.every((p) => p.personId) || !validateTournament(t).ok) continue;
+    store.keepOriginal(t);
+    const linked = linkTournament(t, people, newId);
+    people = linked.people;
+    store.save(linked.t);
+  }
+  store.savePeople(people);
+}
+
+// Another tab changed a tournament or the people: show the stored version instead of a stale copy.
 window.addEventListener('storage', (event) => {
-  if (event.key !== null && !event.key.startsWith(STORAGE_PREFIX)) return;
+  if (event.key !== null && !event.key.startsWith(STORAGE_PREFIX) && event.key !== PEOPLE_KEY) return;
   if (state.tournament) {
     const fresh = store.get(state.tournament.id);
     if (fresh) {
@@ -80,6 +112,7 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.protocol 
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+linkStoredTournaments();
 installCourtBackground();
 installPrintHeader();
 render();

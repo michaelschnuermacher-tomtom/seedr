@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, formatPlayers, renamePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -35,7 +35,7 @@ const make = (settings = SETTINGS) => createTournament({
 
 test('createTournament builds a complete tournament', () => {
   const t = make();
-  assert.equal(t.version, 1);
+  assert.equal(t.version, 2);
   assert.equal(t.id, 't1');
   assert.equal(t.createdAt, '2026-10-14T18:00:00.000Z');
   assert.deepEqual(t.players[0], { id: 'p1', name: 'P1', skill: 1 });
@@ -147,24 +147,13 @@ test('redraw before any result drops players who withdrew earlier', () => {
   assert.ok(r.schedule.every((round) => !JSON.stringify(round).includes('"p2"')));
 });
 
-test('parsePlayers reads a * after the skill as "fewer games"', () => {
-  const { players, errors } = parsePlayers('Gesa: 3 *\nVera: 3*\nUta: 3\nBad: *');
-  assert.deepEqual(players, [{ name: 'Gesa', skill: 3, fewer: true }, { name: 'Vera', skill: 3, fewer: true }, { name: 'Uta', skill: 3 }]);
-  assert.equal(errors.length, 1);
-});
-
-test('marked players play fewer games, and no more can be marked than play fewer', () => {
-  const group = (marks) => [5, 6, 7, 4, 1, 7, 3, 5, 4, 6, 1, 3, 6, 3, 1, 3, 3]
-    .map((skill, i) => ({ name: `P${i + 1}`, skill, ...(marks.includes(i) ? { fewer: true } : {}) }));
-  const settings = { ...SETTINGS, rounds: 8 }; // 17 players, 2 courts: 4 get 3 games
-  const t = createTournament({ id: 't', name: 'x', players: group([1, 4, 8, 15]), settings, seed: 11, now: new Date() });
-  const games = new Map(t.players.map((p) => [p.id, 0]));
-  t.schedule.forEach((r) => r.matches.forEach((m) => [...m.team1, ...m.team2].forEach((id) => games.set(id, games.get(id) + 1))));
-  assert.deepEqual(t.players.filter((p) => games.get(p.id) === 3).map((p) => p.id), ['p2', 'p5', 'p9', 'p16']);
-  assert.ok(t.players.filter((p) => !p.fewer).every((p) => games.get(p.id) === 4));
-  assert.throws(() => createTournament({ id: 't', name: 'x', players: group([0, 1, 2, 3, 4]), settings, seed: 1, now: new Date() }), /Only 4 players get fewer games, but 5/);
-  const even = createTournament({ id: 't', name: 'x', players: PLAYERS, settings: { ...SETTINGS, rounds: 5 }, seed: 1, now: new Date() });
-  assert.throws(() => updateSettings(even, { name: 'x', players: PLAYERS.map((p, i) => (i ? p : { ...p, fewer: true })), settings: { ...SETTINGS, rounds: 5 } }, 1), /same number of games/);
+test('players keep the link to their person and their year of birth', () => {
+  const players = PLAYERS.map((p, i) => ({ ...p, personId: `person-${i}`, ...(i === 0 ? { birthYear: 1980 } : {}) }));
+  const t = createTournament({ id: 't', name: 'x', players, settings: SETTINGS, seed: 1, now: new Date() });
+  assert.equal(t.version, 2);
+  assert.deepEqual(t.players[0], { id: 'p1', personId: 'person-0', name: players[0].name, skill: players[0].skill, birthYear: 1980 });
+  assert.deepEqual(t.players[1], { id: 'p2', personId: 'person-1', name: players[1].name, skill: players[1].skill });
+  assert.throws(() => createTournament({ id: 't', name: 'x', players: [...PLAYERS, { ...PLAYERS[0] }], settings: SETTINGS, seed: 1, now: new Date() }), /used twice/);
 });
 
 test('the last round can use fewer courts, also after a withdrawal', () => {
@@ -181,40 +170,15 @@ test('the last round can use fewer courts, also after a withdrawal', () => {
 });
 
 test('parsePlayers reads "skill: Name, Name" lines, also mixed with "Name: skill"', () => {
-  const { players, errors } = parsePlayers('1: Markus, Micha ,Seb*\n4: Gesa *, Henri\nMüller, Jörg: 2\n11: Zoe\n3:\n5: Anna, *\n6: Markus');
+  const { players, errors } = parsePlayers('1: Markus, Micha ,Seb\n4: Gesa, Henri\nMüller, Jörg: 2\n11: Zoe\n3:\n6: Markus');
   assert.deepEqual(players, [
-    { name: 'Markus', skill: 1 }, { name: 'Micha', skill: 1 }, { name: 'Seb', skill: 1, fewer: true },
-    { name: 'Gesa', skill: 4, fewer: true }, { name: 'Henri', skill: 4 },
-    { name: 'Müller, Jörg', skill: 2 }, { name: 'Anna', skill: 5 },
+    { name: 'Markus', skill: 1 }, { name: 'Micha', skill: 1 }, { name: 'Seb', skill: 1 },
+    { name: 'Gesa', skill: 4 }, { name: 'Henri', skill: 4 }, { name: 'Müller, Jörg', skill: 2 },
   ]);
-  assert.equal(errors.length, 4);
+  assert.equal(errors.length, 3);
   assert.match(errors[0], /^Line 4: skill must be/);
   assert.match(errors[1], /^Line 5: expected names after the skill/);
-  assert.match(errors[2], /^Line 6: "\*" without a name/);
-  assert.match(errors[3], /^Line 7: duplicate name "Markus"/);
-});
-
-test('formatPlayers writes one line per skill and reads back the same players', () => {
-  const players = [
-    { name: 'Seb', skill: 1, fewer: true }, { name: 'Ada', skill: 6 }, { name: 'Markus', skill: 1 },
-    { name: 'Müller, Jörg', skill: 2, fewer: true },
-  ];
-  const text = formatPlayers(players);
-  assert.equal(text, '1: Seb*, Markus\n6: Ada\nMüller, Jörg: 2 *');
-  assert.deepEqual(new Set(parsePlayers(text).players.map((p) => JSON.stringify(p))), new Set(players.map((p) => JSON.stringify(p))));
-});
-
-test('renamePlayers changes names at any time and keeps the draw and results', () => {
-  const t = setResult(make(), 1, 1, 1);
-  const r = renamePlayers(t, { p1: '  Anna ', p2: 'P1' });
-  assert.deepEqual(r.players.slice(0, 2).map((p) => p.name), ['Anna', 'P1']);
-  assert.deepEqual([r.schedule, r.results], [t.schedule, t.results]);
-  assert.deepEqual(renamePlayers(t, { p1: 'P2', p2: 'P1' }).players.slice(0, 2).map((p) => p.name), ['P2', 'P1'], 'names can be swapped');
-  assert.throws(() => renamePlayers(t, { p1: '' }), /empty/);
-  assert.throws(() => renamePlayers(t, { p1: 'p3' }), /used twice/);
-  assert.throws(() => renamePlayers(t, { p1: '7' }), /read as a skill/);
-  assert.throws(() => renamePlayers(t, { p1: 'Anna*' }), /end with \*/);
-  assert.throws(() => renamePlayers(t, { x: 'Anna' }), /Unknown player/);
+  assert.match(errors[2], /^Line 6: duplicate name "Markus"/);
 });
 
 test('swapPlayers swaps two players within a round, also with a sit-out', () => {

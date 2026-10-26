@@ -30,7 +30,7 @@ test('rejects things that are not tournaments', () => {
 });
 
 const cases = {
-  'unsupported version': [(t) => { t.version = 2; }, /version/],
+  'unsupported version': [(t) => { t.version = 3; }, /version/],
   'too few players': [(t) => { t.players = t.players.slice(0, 3); }, /4 players/],
   'skill out of range': [(t) => { t.players[0].skill = 11; }, /skill/],
   'duplicate name (case-insensitive)': [(t) => { t.players[1].name = t.players[0].name.toLowerCase(); }, /Duplicate player name/],
@@ -66,10 +66,24 @@ test('withdrawn players may only appear up to their last round', () => {
   assert.match(validateTournament(bad).error, /Invalid withdrawal/);
 });
 
-test('the fewer-games mark must be true or false', () => {
+test('old files: the fewer-games mark must be true or false', () => {
   const t = base();
+  t.players[0].fewer = true;
+  assert.equal(validateTournament(t).ok, true);
   t.players[0].fewer = 'yes';
   assert.match(validateTournament(t).error, /fewer-games/);
+});
+
+test('version 1 files are accepted; links and years of birth are checked', () => {
+  const t = base();
+  t.version = 1;
+  assert.equal(validateTournament(t).ok, true);
+  t.version = 2;
+  t.players[0].personId = 'a1';
+  t.players[0].birthYear = 1985;
+  assert.equal(validateTournament(t).ok, true);
+  assert.match(validateTournament({ ...t, players: t.players.map((p, i) => (i ? p : { ...p, personId: '' })) }).error, /player link/);
+  assert.match(validateTournament({ ...t, players: t.players.map((p, i) => (i ? p : { ...p, birthYear: 'old' })) }).error, /year of birth/);
 });
 
 test('the last round may not use more courts than set', () => {

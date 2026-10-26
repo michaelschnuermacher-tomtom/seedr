@@ -22,10 +22,6 @@ export function formatSigned(x) {
   return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1);
 }
 
-export function slugify(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tournament';
-}
-
 export function newId() {
   return `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
