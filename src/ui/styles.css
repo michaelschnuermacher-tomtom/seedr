@@ -318,10 +318,13 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   .screen > h2.print-only { margin: 2mm 0 4mm; font-size: 12pt; }
   .overview { gap: 3mm; margin: 2mm 0 0; grid-template-columns: 1fr 1fr; }
   p.timing { margin: -2mm 0 3mm; break-after: avoid; }
-  .overview-round { padding: 2.5mm 3mm; border-radius: 3mm; }
-  .overview-round h3 { margin: 0 0 1.5mm; font-size: 9.5pt; }
-  .mini-match { gap: 1.5mm; margin-bottom: 1.5mm; }
-  .mini-match .court, .mini-match .vs, .mini-match .court .gaps { font-size: 7.5pt; }
-  .mini-match .team { min-height: 0; padding: 1mm 2.5mm; font-size: 9.5pt; border-radius: 2mm; }
+  /* Tight enough for 8 rounds (4 rows of 2) on one page, title included. */
+  .overview-round { padding: 2mm 3mm; border-radius: 3mm; }
+  .overview-round h3 { margin: 0 0 1mm; font-size: 9.5pt; line-height: 1.25; }
+  .mini-match { gap: 1mm 1.5mm; margin-bottom: 1mm; }
+  .mini-match:last-child { margin-bottom: 0; }
+  .mini-match .court, .mini-match .vs, .mini-match .court .gaps { font-size: 7.5pt; line-height: 1.25; }
+  .mini-match .team { min-height: 0; padding: .6mm 2.5mm; font-size: 9.5pt; line-height: 1.25; border-radius: 2mm; }
+  .mini-match .team .plus { line-height: 1; }
   .overview-round > p.muted { margin: 1mm 0 0; font-size: 7.5pt; line-height: 1.3; }
 }

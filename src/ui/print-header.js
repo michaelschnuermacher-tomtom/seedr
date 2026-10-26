@@ -6,28 +6,28 @@ const SLAM = ['#2596be', '#1f3c88', '#c8553d', '#006633']; // AO, US Open, Rolan
 
 const dataUrl = (svg) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
 
-// The two pictures of the header. The logo is used directly with a print size, not wrapped
-// in another SVG: an image inside an SVG image loads separately, and printing can start
-// before it has (no logo on paper).
+// The stripe is the background of the margin box, so it is always as wide as the printed
+// area, on A4 as on Letter paper: four equal colors.
+const STRIPE = `linear-gradient(to right, ${SLAM.map((c, i) => `${c} ${i * 25}% ${(i + 1) * 25}%`).join(', ')})`;
+
+// The logo is used directly with a print size, not wrapped in another SVG: an image inside
+// an SVG image loads separately, and printing can start before it has (no logo on paper).
 export function printHeaderImages() {
-  return {
-    stripe: dataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="186mm" height="1.5mm" viewBox="0 0 4 1" preserveAspectRatio="none">${
-      SLAM.map((c, i) => `<rect x="${i}" width="1" height="1" fill="${c}"/>`).join('')}</svg>`),
-    logo: dataUrl(LOGO_SVG.replace('<svg ', '<svg width="5mm" height="5mm" ')),
-  };
+  return { logo: dataUrl(LOGO_SVG.replace('<svg ', '<svg width="5mm" height="5mm" ')) };
 }
 
 export function printHeaderCss() {
-  const { stripe, logo } = printHeaderImages();
+  const { logo } = printHeaderImages();
   return `@media print { @page { @top-left {
-  content: url("${stripe}") "\\A\\A" url("${logo}") "  SEEDR";
+  width: 100%; content: url("${logo}") "  SEEDR";
+  background: ${STRIPE} left 9.5mm / 100% 1.5mm no-repeat;
   white-space: pre; vertical-align: bottom; padding-bottom: 3mm;
   font: 600 8pt system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .12em; color: #2596be;
 } } }`;
 }
 
-// Kept so the browser holds the decoded pictures: they are only used when printing, and a
-// first print right after starting the app should not have to wait for them.
+// Kept so the browser holds the decoded logo: it is only used when printing, and a first
+// print right after starting the app should not have to wait for it.
 const preloaded = [];
 
 export function installPrintHeader(doc = document) {
