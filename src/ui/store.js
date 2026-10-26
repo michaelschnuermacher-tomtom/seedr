@@ -1,11 +1,9 @@
 // Each tournament lives under its own key and is read fresh on every access, so two
 // open tabs never overwrite each other's tournaments. When storage fails, tournaments
 // are kept in memory for this page and `available` becomes false.
-// The people (shared by all tournaments) live under one key of their own; before a
-// tournament is first linked to people, an untouched copy is kept under ORIGINAL_PREFIX.
+// The people (shared by all tournaments) live under one key of their own.
 export const STORAGE_PREFIX = 'seedr.v1.t.';
 export const PEOPLE_KEY = 'seedr.v1.people';
-export const ORIGINAL_PREFIX = 'seedr.v1.original.t.';
 
 export function createStore(backend) {
   let available = Boolean(backend);
@@ -96,15 +94,6 @@ export function createStore(backend) {
       }
       memoryPeople = people;
       return false;
-    },
-    // Keeps an untouched copy of a tournament (only the first one).
-    keepOriginal(t) {
-      if (!backend) return;
-      try {
-        if (backend.getItem(ORIGINAL_PREFIX + t.id) === null) write(ORIGINAL_PREFIX + t.id, t);
-      } catch {
-        available = false;
-      }
     },
     remove(id) {
       memory.delete(id);

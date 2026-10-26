@@ -37,11 +37,6 @@ and back.
 The year of birth is only used for the tournament summary, in words ("the oldest player
 to win a game"); ages and years are never printed.
 
-When the version with shared players first starts, it builds the list from the stored
-tournaments (one player per name, ignoring upper and lower case) and the default players,
-and links every tournament to it. An untouched copy of each tournament is kept on the device
-first (`seedr.v1.original.t.<id>`).
-
 ## How the draw works
 
 ### Settings
@@ -97,7 +92,7 @@ Withdrawn players keep their wins in the standings, but get no bonus and no rank
 
 Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. Manage lists everything read-only, and changes happen on a sub-page that an **Edit** button opens, with Save and Cancel:
 
-- **Finish**: when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in a **Summary** tab; **Reopen** undoes it. Names can still be corrected.
+- **Finish**: when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Names can still be corrected.
 - **Rounds**: how many rounds are revealed, with **Reveal round(s)** and **Swap players**.
 - **Tournament**: name and settings; **Edit** changes the name, and before the first result also courts, rounds and times (in the setup, which draws again).
 - **Players**: the players by skill; **Edit names** corrects names, **Player leaves…** withdraws players and redraws the remaining rounds.
@@ -107,7 +102,7 @@ Everything that changes or reveals the draw is in **Manage**, which can ask for 
 
 ### Tournament summary
 
-Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in a **Summary** tab for everyone, and as an option for the printout.
+Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in the **Summary** tab for everyone (until then it says so), and as an option for the printout.
 
 ## Keeping data safe
 
@@ -115,8 +110,7 @@ Browser storage can be lost (clearing Safari data, a new device). **Export backu
 screen or Manage) saves one file with all players and all tournaments, e.g.
 `seedr-backup-2026-10-26.json` (to Dropbox or iCloud Drive). **Import** on the home screen
 merges it into any device: players are matched by id, then by name, and existing players
-and tournaments are only replaced after a confirmation. Single tournament files from older
-versions (`.seedr.json`) can be imported too.
+and tournaments are only replaced after a confirmation.
 
 ## Logo
 

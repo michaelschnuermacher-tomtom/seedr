@@ -10,9 +10,7 @@ import { updatePerson } from '../engine/people.js';
 import { exportBackup } from './backup.js';
 import { draftFromTournament } from './setup.js';
 
-// The Summary tab appears once the tournament is finished: until then the highlights would
-// give away results nobody should see yet (they are only in the printout).
-const tabs = (t) => [['rounds', 'Rounds'], ['standings', 'Standings'], ...(isFinished(t) ? [['summary', 'Summary']] : []), ['manage', 'Manage']];
+const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['manage', 'Manage']];
 
 function roundComplete(t, round) {
   return round.matches.every((m) => t.results[resultKey(round.round, m.court)]);
@@ -21,7 +19,6 @@ function roundComplete(t, round) {
 export function tournamentScreen(ctx) {
   const t = ctx.state.tournament;
   const view = (ctx.state.view ??= { tab: isFinished(t) ? 'summary' : 'rounds' });
-  if (view.tab === 'summary' && !isFinished(t)) view.tab = 'rounds';
   const body = view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'summary' ? summaryTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
@@ -32,7 +29,7 @@ export function tournamentScreen(ctx) {
       h('div', { class: 'titles' },
         h('button', { class: 'eyebrow home-link', title: 'Home', onclick: () => ctx.go('home') }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
         h('h1', {}, t.name))),
-    h('nav', { class: 'tabs' }, tabs(t).map(([key, label]) =>
+    h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
       h('button', {
         class: view.tab === key ? 'current' : '',
         onclick: () => {
@@ -342,7 +339,7 @@ function finishSection(ctx, t) {
     return section('Finished', h('p', { class: 'muted' }, `Finished on ${new Date(t.finishedAt).toLocaleDateString()}. Results and the draw are locked, and the Summary tab shows the highlights to everyone.`), [
       h('button', {
         onclick: () => {
-          if (!confirm('Reopen the tournament? The Summary tab disappears until it is finished again.')) return;
+          if (!confirm('Reopen the tournament? The summary is hidden until it is finished again.')) return;
           ctx.save(reopenTournament(t));
           ctx.render();
         },
@@ -350,7 +347,7 @@ function finishSection(ctx, t) {
     ]);
   }
   const open = t.schedule.reduce((n, r) => n + r.matches.filter((m) => !t.results[resultKey(r.round, m.court)]).length, 0);
-  return section('Finish', h('p', { class: 'muted' }, 'When the last match is played: finishing locks results and the draw, and shows the tournament summary to everyone in a Summary tab. It can be reopened.'), [
+  return section('Finish', h('p', { class: 'muted' }, 'When the last match is played: finishing locks results and the draw, and shows the tournament summary to everyone in the Summary tab. It can be reopened.'), [
     h('button', {
       class: 'primary',
       onclick: () => {
@@ -600,9 +597,14 @@ function skillsCard(t) {
     h('div', { style: 'height: 12px' }));
 }
 
-// The Summary tab of a finished tournament.
+// The highlights would give away results nobody should see yet, so the Summary tab only
+// shows them once the tournament is finished.
 function summaryTab(t) {
-  return summaryCard(t);
+  if (isFinished(t)) return summaryCard(t);
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Tournament summary'),
+    h('p', { class: 'muted' }, 'Fun highlights of the tournament (champion, underdog of the day, upset of the tournament and more) appear here once the tournament is finished.'),
+    h('div', { style: 'height: 12px' }));
 }
 
 // Fun highlights of the results (the Summary tab and the top of the printout).

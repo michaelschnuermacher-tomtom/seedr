@@ -2,18 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   personProblem, addPerson, updatePerson, deletePerson, splitPerson, usage, linkTournament, syncTournament,
-  peopleFromTournaments, rememberSkills, makeBackup, readBackup, mergeBackup,
+  rememberSkills, makeBackup, readBackup, mergeBackup,
 } from '../src/engine/people.js';
 import { createTournament } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 const ids = () => { let n = 0; return () => `n${++n}`; };
 const SETTINGS = { courts: 1, rounds: 2, matchMinutes: 10, breakMinutes: 2, revealBatch: 'all' };
-// A version-1 tournament: players without a link to a person.
-const oldTournament = (id, names, createdAt = '2026-01-01T00:00:00.000Z') => ({
-  ...createTournament({ id, name: id, seed: 1, now: new Date(createdAt), settings: SETTINGS, players: names.map((name, i) => ({ name, skill: i + 1 })) }),
-  version: 1,
-});
+// A tournament whose players are not linked to people yet (linkTournament links them).
+const oldTournament = (id, names, createdAt = '2026-01-01T00:00:00.000Z') =>
+  createTournament({ id, name: id, seed: 1, now: new Date(createdAt), settings: SETTINGS, players: names.map((name, i) => ({ name, skill: i + 1 })) });
 
 test('names must be unique and years of birth plausible', () => {
   const people = [{ id: 'a', name: 'Seb' }];
@@ -23,13 +21,6 @@ test('names must be unique and years of birth plausible', () => {
   assert.match(personProblem(people, { name: 'Ana', birthYear: 1850 }), /between 1900/);
   assert.match(personProblem(people, { name: 'Ana', birthYear: 1990.5 }), /between 1900/);
   assert.equal(personProblem(people, { name: 'Ana', birthYear: 1990 }), null);
-});
-
-test('the first people list comes from the tournaments (one person per name) and the defaults', () => {
-  const older = oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max'], '2026-01-01T00:00:00.000Z');
-  const newer = oldTournament('b', ['seb', 'Ada', 'Lia', 'Hugo'], '2026-02-01T00:00:00.000Z');
-  const people = peopleFromTournaments([older, newer], [{ name: 'Anne', skill: 9 }, { name: 'Max', skill: 8 }], ids());
-  assert.deepEqual(people.map((p) => [p.name, p.lastSkill]), [['seb', 1], ['Ada', 2], ['Lia', 3], ['Hugo', 4], ['Micha', 2], ['Max', 4], ['Anne', 9]]);
 });
 
 test('linking gives every player a person, by name, and keeps the tournament valid', () => {
@@ -96,10 +87,11 @@ test('a backup round-trips all people and tournaments', () => {
   assert.deepEqual(read, { people, tournaments: [t] });
   assert.throws(() => readBackup({ ...backup, version: 9 }), /Unsupported backup version/);
   assert.throws(() => readBackup({ ...backup, people: [{ id: 'a', name: 'X' }, { id: 'a', name: 'Y' }] }), /invalid player/);
-  assert.throws(() => readBackup({ format: 'nope' }), /not a Seedr tournament/);
+  assert.throws(() => readBackup({ format: 'nope' }), /not a Seedr backup/);
+  assert.throws(() => readBackup(t), /not a Seedr backup/, 'a single tournament is no backup');
 });
 
-test('importing merges by id, then by name, and links old tournament files', () => {
+test('importing merges by id, then by name', () => {
   const next = ids();
   const local = linkTournament(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Max']), [], next);
   const seb = local.people.find((p) => p.name === 'Seb');
@@ -112,11 +104,6 @@ test('importing merges by id, then by name, and links old tournament files', () 
   assert.equal(b.players.find((p) => p.name === 'Seb').personId, seb.id, 'linked to the local Seb');
   assert.ok(merged.tournaments.some((t) => t.id === 'a' && t.players[0].birthYear === 1990), 'the local tournament gets the year too');
   assert.deepEqual(merged.replaced, { people: 1, tournaments: 0 });
-  // An old single tournament file (version 1).
-  const single = mergeBackup({ people: merged.people, tournaments: merged.tournaments }, readBackup(oldTournament('a', ['Seb', 'Micha', 'Lia', 'Zoe'])), next);
-  assert.equal(single.replaced.tournaments, 1);
-  assert.ok(single.people.some((p) => p.name === 'Zoe'));
-  assert.ok(single.tournaments.find((t) => t.id === 'a').players.every((p) => p.personId));
 });
 
 test('syncTournament leaves a tournament alone when nothing changed', () => {

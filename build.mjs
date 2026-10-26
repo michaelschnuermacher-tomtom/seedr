@@ -47,7 +47,6 @@ export function build(dist = resolve(projectRoot, 'dist')) {
   mkdirSync(dist, { recursive: true });
   writeFileSync(resolve(dist, 'index.html'), html);
   // Icons stay separate files (manifest, home screen); the service worker precaches them.
-  rmSync(resolve(dist, 'photos'), { recursive: true, force: true }); // left over from older builds
   rmSync(resolve(dist, 'icons'), { recursive: true, force: true });
   cpSync(ui('icons'), resolve(dist, 'icons'), { recursive: true });
   const icons = ['icons/logo.svg', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];

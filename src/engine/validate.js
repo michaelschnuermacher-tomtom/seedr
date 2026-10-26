@@ -16,7 +16,7 @@ export function validateTournament(value) {
 
 function checkTournament(t) {
   if (!isObject(t) || !('version' in t)) fail('This is not a Seedr tournament file');
-  if (t.version !== 1 && t.version !== 2) fail(`Unsupported file version: ${t.version}`);
+  if (t.version !== 2) fail(`Unsupported file version: ${t.version}`);
   if (typeof t.id !== 'string' || !t.id) fail('Missing tournament id');
   if (typeof t.name !== 'string') fail('Missing tournament name');
   if (typeof t.createdAt !== 'string') fail('Missing creation date');
@@ -49,8 +49,6 @@ function checkPlayers(players) {
     if (ids.has(p.id)) fail(`Duplicate player id ${p.id}`);
     const key = p.name.trim().toLowerCase();
     if (names.has(key)) fail(`Duplicate player name ${p.name}`);
-    // `fewer` (fewer games, version 1) is no longer used but may still be in old files.
-    if ('fewer' in p && typeof p.fewer !== 'boolean') fail(`Invalid fewer-games mark for ${p.name}`);
     if ('personId' in p && (typeof p.personId !== 'string' || !p.personId)) fail(`Invalid player link for ${p.name}`);
     if ('birthYear' in p && (!isInt(p.birthYear) || p.birthYear < 1900 || p.birthYear > 2100)) fail(`Invalid year of birth for ${p.name}`);
     if ('withdrawnAfter' in p &&(!isInt(p.withdrawnAfter) || p.withdrawnAfter < 0)) fail(`Invalid withdrawal for ${p.name}`);

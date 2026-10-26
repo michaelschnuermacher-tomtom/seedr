@@ -103,22 +103,6 @@ export function linkTournament(t, people, newId) {
   return { t: syncTournament({ ...t, players }, list), people: list };
 }
 
-// The first people list on a device: everyone from the stored tournaments (one person per
-// name) and the default players. The last skill is the one from the most recent tournament.
-export function peopleFromTournaments(tournaments, defaults, newId) {
-  const people = new Map();
-  const newestFirst = [...tournaments].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
-  for (const t of newestFirst) {
-    for (const p of t.players) {
-      if (!people.has(key(p.name))) people.set(key(p.name), cleanPerson({ id: newId(), name: p.name, lastSkill: p.skill }));
-    }
-  }
-  for (const p of defaults) {
-    if (!people.has(key(p.name))) people.set(key(p.name), cleanPerson({ id: newId(), name: p.name, lastSkill: p.skill }));
-  }
-  return [...people.values()];
-}
-
 // Remembers each player's skill, to suggest it for the next tournament.
 export function rememberSkills(people, players) {
   const skills = new Map(players.filter((p) => p.personId).map((p) => [p.personId, p.skill]));
@@ -129,27 +113,23 @@ export function makeBackup(people, tournaments, now = new Date()) {
   return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: now.toISOString(), people, tournaments };
 }
 
-// Reads an imported file: a backup, or a single tournament file (also from older versions).
+// Reads an imported backup file.
 export function readBackup(value) {
-  if (value?.format === BACKUP_FORMAT) {
-    if (value.version !== BACKUP_VERSION) throw new Error(`Unsupported backup version: ${value.version}`);
-    if (!Array.isArray(value.people) || !Array.isArray(value.tournaments)) throw new Error('This backup is incomplete.');
-    const ids = new Set();
-    for (const p of value.people) {
-      if (typeof p?.id !== 'string' || !p.id || ids.has(p.id)) throw new Error('This backup has an invalid player entry.');
-      const problem = personProblem(value.people.filter((x) => x !== p), { id: p.id, name: p.name, birthYear: p.birthYear ?? null });
-      if (problem) throw new Error(`Player "${p.name}": ${problem}`);
-      ids.add(p.id);
-    }
-    for (const t of value.tournaments) {
-      const check = validateTournament(t);
-      if (!check.ok) throw new Error(`Tournament "${t?.name}": ${check.error}`);
-    }
-    return { people: value.people.map(cleanPerson), tournaments: value.tournaments };
+  if (value?.format !== BACKUP_FORMAT) throw new Error('This is not a Seedr backup.');
+  if (value.version !== BACKUP_VERSION) throw new Error(`Unsupported backup version: ${value.version}`);
+  if (!Array.isArray(value.people) || !Array.isArray(value.tournaments)) throw new Error('This backup is incomplete.');
+  const ids = new Set();
+  for (const p of value.people) {
+    if (typeof p?.id !== 'string' || !p.id || ids.has(p.id)) throw new Error('This backup has an invalid player entry.');
+    const problem = personProblem(value.people.filter((x) => x !== p), { id: p.id, name: p.name, birthYear: p.birthYear ?? null });
+    if (problem) throw new Error(`Player "${p.name}": ${problem}`);
+    ids.add(p.id);
   }
-  const check = validateTournament(value);
-  if (!check.ok) throw new Error(check.error);
-  return { people: [], tournaments: [value] };
+  for (const t of value.tournaments) {
+    const check = validateTournament(t);
+    if (!check.ok) throw new Error(`Tournament "${t?.name}": ${check.error}`);
+  }
+  return { people: value.people.map(cleanPerson), tournaments: value.tournaments };
 }
 
 // Merges an imported backup into the device. People are matched by id, then by name;

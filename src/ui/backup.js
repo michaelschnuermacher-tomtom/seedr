@@ -9,8 +9,8 @@ export function exportBackup(ctx) {
   saveFile(`seedr-backup-${date}.json`, text, { nav: navigator, download: downloadFile });
 }
 
-// Merges a backup (or a single tournament file, also from older versions) into this
-// device. Existing players and tournaments are only replaced after a confirmation.
+// Merges a backup into this device. Existing players and tournaments are only replaced
+// after a confirmation.
 export async function importBackup(ctx, file) {
   if (!file) return;
   let incoming;

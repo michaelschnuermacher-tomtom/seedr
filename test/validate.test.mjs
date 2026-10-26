@@ -66,24 +66,14 @@ test('withdrawn players may only appear up to their last round', () => {
   assert.match(validateTournament(bad).error, /Invalid withdrawal/);
 });
 
-test('old files: the fewer-games mark must be true or false', () => {
+test('player links and years of birth are checked', () => {
   const t = base();
-  t.players[0].fewer = true;
-  assert.equal(validateTournament(t).ok, true);
-  t.players[0].fewer = 'yes';
-  assert.match(validateTournament(t).error, /fewer-games/);
-});
-
-test('version 1 files are accepted; links and years of birth are checked', () => {
-  const t = base();
-  t.version = 1;
-  assert.equal(validateTournament(t).ok, true);
-  t.version = 2;
   t.players[0].personId = 'a1';
   t.players[0].birthYear = 1985;
   assert.equal(validateTournament(t).ok, true);
   assert.match(validateTournament({ ...t, players: t.players.map((p, i) => (i ? p : { ...p, personId: '' })) }).error, /player link/);
   assert.match(validateTournament({ ...t, players: t.players.map((p, i) => (i ? p : { ...p, birthYear: 'old' })) }).error, /year of birth/);
+  assert.match(validateTournament({ ...t, version: 1 }).error, /Unsupported file version: 1/);
 });
 
 test('the last round may not use more courts than set', () => {

@@ -1,13 +1,11 @@
 import { h, newId } from './dom.js';
 import { createStore, STORAGE_PREFIX, PEOPLE_KEY } from './store.js';
 import { validateTournament } from '../engine/validate.js';
-import { parsePlayers } from '../engine/tournament.js';
-import { peopleFromTournaments, linkTournament } from '../engine/people.js';
 import { homeScreen } from './home.js';
 import { peopleScreen } from './people-view.js';
 import { installCourtBackground } from './court.js';
 import { installPrintHeader } from './print-header.js';
-import { setupScreen, DEFAULT_PLAYERS } from './setup.js';
+import { setupScreen, defaultPeople } from './setup.js';
 import { tournamentScreen } from './tournament-view.js';
 
 const SCREENS = { home: homeScreen, setup: setupScreen, tournament: tournamentScreen, people: peopleScreen };
@@ -75,21 +73,9 @@ function render() {
   appRoot.replaceChildren(...[banner, screen(ctx)].filter(Boolean));
 }
 
-// First start with shared players: build the people list from the stored tournaments
-// (one person per name) and the default players, and link every tournament to it. An
-// untouched copy of each tournament is kept first.
-function linkStoredTournaments() {
-  let people = store.people();
-  const tournaments = store.list();
-  if (!people) people = peopleFromTournaments(tournaments, parsePlayers(DEFAULT_PLAYERS).players, newId);
-  for (const t of tournaments) {
-    if (t.players.every((p) => p.personId) || !validateTournament(t).ok) continue;
-    store.keepOriginal(t);
-    const linked = linkTournament(t, people, newId);
-    people = linked.people;
-    store.save(linked.t);
-  }
-  store.savePeople(people);
+// A new device starts with the default players.
+function addDefaultPeople() {
+  if (!store.people()) store.savePeople(defaultPeople().map((p) => ({ ...p, id: newId() })));
 }
 
 // Another tab changed a tournament or the people: show the stored version instead of a stale copy.
@@ -112,7 +98,7 @@ if ('serviceWorker' in navigator && window.isSecureContext && location.protocol 
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-linkStoredTournaments();
+addDefaultPeople();
 installCourtBackground();
 installPrintHeader();
 render();
