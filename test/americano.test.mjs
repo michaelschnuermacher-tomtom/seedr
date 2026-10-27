@@ -20,7 +20,7 @@ test('an Americano result is its score: points adding up to the total; equal poi
   assert.equal(validateTournament(draw).ok, true);
   assert.throws(() => setScore(t, 1, 1, [[15, 10]]), /add up to 24/);
   assert.throws(() => setScore(t, 1, 1, [[15, 9], [12, 12]]), /both teams/);
-  assert.throws(() => setResult(t, 1, 1, 1), /result is its score/);
+  assert.throws(() => setResult(t, 1, 1, 1), /needs its score/);
   assert.ok(!('1-1' in setResult(draw, 1, 1, null).results), 'a result can still be cleared');
   assert.equal(firstRedrawableRound(draw), 2, 'a draw counts as a result');
   const m = draw.schedule[0].matches[0];
@@ -58,4 +58,18 @@ test('Americano standings: the points scored, plus the own average for missing g
   assert.ok(rows.every((r, i) => i === 0 || rows[i - 1].points >= r.points), 'ranked by points');
   const summary = Object.fromEntries(tournamentSummary(t).map((x) => [x.title, x.text]));
   assert.match(summary['By the numbers'], /^3 matches played, 1 draw\./);
+});
+
+test('"scores required": every result needs its score; ranking as with wins', () => {
+  let t = createTournament({ id: 't', name: 'x', seed: 2, now: new Date(),
+    players: [1, 2, 3, 4].map((skill, i) => ({ name: `P${i + 1}`, skill })),
+    settings: { courts: 1, rounds: 2, matchMinutes: 10, breakMinutes: 2, revealBatch: 'all', scoring: { mode: 'sets' } } });
+  assert.throws(() => setResult(t, 1, 1, 1), /needs its score/);
+  t = setScore(t, 1, 1, [[21, 15], [21, 19]]);
+  assert.equal(t.results['1-1'], 1);
+  assert.throws(() => setScore(t, 1, 1, [[21, 21]]), /cannot be equal/, 'sets still need a winner');
+  assert.equal(validateTournament(t).ok, true);
+  assert.match(validateTournament({ ...t, settings: { ...t.settings, scoring: { mode: 'other' } } }).error, /Invalid scoring/);
+  const rows = computeStandings(t.players, t.schedule, t.results, t.scores, t.settings.scoring);
+  assert.deepEqual(rows.filter((r) => r.rank === 1).map((r) => [r.wins, r.setsWon, r.setsLost]), [[1, 2, 0], [1, 2, 0]]);
 });

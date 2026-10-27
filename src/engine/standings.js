@@ -9,10 +9,23 @@ export function hasResult(results, key) {
   return results[key] === 0 || results[key] === 1 || results[key] === 2;
 }
 
-// Americano: every match is played to a fixed total of points (`scoring.points`), and the
-// ranking is by the points a player's teams scored. Otherwise matches are won or lost.
+// How matches are scored (`settings.scoring`):
+// - none: wins, with scores optional (matches, then sets, then points as tie-breakers);
+// - { mode: 'sets' }: the same, but every result needs its score;
+// - { mode: 'americano', points }: every match is played to a fixed total of points, and
+//   the ranking is by the points a player's teams scored.
 export function isAmericano(scoring) {
   return scoring?.mode === 'americano';
+}
+
+export function scoresRequired(scoring) {
+  return scoring?.mode === 'americano' || scoring?.mode === 'sets';
+}
+
+export function scoringLabel(scoring) {
+  return isAmericano(scoring) ? `Americano: total points win (${scoring.points} points per match)`
+    : scoring?.mode === 'sets' ? 'Matches, then sets, then points/games (scores required)'
+      : 'Wins (scores optional)';
 }
 
 // What a score says: sets won by each team and points of each team. A set goes to the

@@ -124,3 +124,11 @@ test('choosing an option with fewer courts in the last round keeps them in the p
   assert.equal(draftFromTournament(t).lastRoundCourts, 1);
   assert.deepEqual(evaluateDraft(draftFromTournament(t), people17).plan, { rounds: 9, matchMinutes: 21, lastRoundCourts: 1 });
 });
+
+test('the scoring step: wins, scores required, or Americano with points per match', () => {
+  const scoring = (d) => evaluateDraft({ ...example(), selectedRounds: 9, ...d }, people18).scoring;
+  assert.equal(scoring({ scoring: 'wins' }), null, 'wins with optional scores need no settings');
+  assert.deepEqual(scoring({ scoring: 'sets' }), { mode: 'sets' });
+  assert.deepEqual(scoring({ scoring: 'americano', americanoPoints: 21 }), { mode: 'americano', points: 21 });
+  assert.equal(evaluateDraft({ ...example(), scoring: 'americano' }, people18).steps.scoring, false, 'Americano needs the points');
+});

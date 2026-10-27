@@ -92,7 +92,7 @@ Tap the winning team on a round card; tap again to clear. A score is optional: *
 
 ### Americano
 
-In the setup, **Scoring** chooses between *Wins (scores optional)* and *Americano: points to a fixed total*, e.g. 24 points per match (15:9, 12:12 …). In Americano every result is its score: tapping a match opens the score page, where typing one team's points fills in the other; equal points are a draw. The standings rank by the points a player's teams scored, then point difference, then wins, and show W–D–L. For each game fewer than the most played, a player gets their own average points per game as a bonus (none before their first game). The draw itself is the same: balanced by skill, with partners rotating.
+In the setup, **Scoring** chooses between *Wins (scores optional)*, *Matches, then sets, then points/games (scores required)* — like the first, but every result needs its score, so tapping a match opens the score page — and *Americano: total points win*; only Americano asks for the points per match, e.g. 24 (15:9, 12:12 …). In Americano every result is its score: tapping a match opens the score page, where typing one team's points fills in the other; equal points are a draw. The standings rank by the points a player's teams scored, then point difference, then wins, and show W–D–L. For each game fewer than the most played, a player gets their own average points per game as a bonus (none before their first game). The draw itself is the same: balanced by skill, with partners rotating.
 
 ### Standings
 

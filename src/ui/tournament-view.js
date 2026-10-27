@@ -1,7 +1,7 @@
 import { h, formatSigned } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../engine/tournament.js';
-import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano } from '../engine/standings.js';
+import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano, scoresRequired, scoringLabel } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
@@ -82,7 +82,7 @@ function infoTab(t) {
       fact('Playing time', `${total} min${hours ? ` (${hours} h${total % 60 ? ` ${total % 60} min` : ''})` : ''}`),
       fact('Games per player', spread(games, 'game')),
       fact('Sit-outs per player', spread(sitOuts, 'sit-out')),
-      fact('Scoring', isAmericano(s.scoring) ? `Americano, ${s.scoring.points} points per match` : 'Wins (scores optional)'),
+      fact('Scoring', scoringLabel(s.scoring)),
       fact('Skill scale', `${scaleOf(s).min}–${scaleOf(s).max}. ${describeScale(scaleOf(s))}`),
       fact('Rounds revealed', `${s.revealBatch === 'all' ? 'All at once' : `${s.revealBatch} at a time`} (${t.revealedRounds} of ${s.rounds} so far)`)),
     h('div', { style: 'height: 12px' }));
@@ -135,7 +135,7 @@ function teamButton(ctx, t, round, match, n) {
     class: ['team', winner === n ? 'winner' : '', winner && winner !== n ? 'loser' : ''].join(' ').trim(),
     disabled: isFinished(t),
     onclick: () => {
-      if (match.score || isAmericano(t.settings.scoring)) {
+      if (match.score || scoresRequired(t.settings.scoring)) {
         openScore(ctx, round, match);
         return;
       }
@@ -169,7 +169,7 @@ function closeScore(ctx) {
 
 // The score of one match: one row per set with the points of both teams. The winner
 // follows from the score (more sets, then more points); when both are equal it is chosen
-// here. Entering a score is optional: tapping the winner on the round card still works.
+// here. Unless the tournament requires scores, tapping the winner on the round card works too.
 function scorePage(ctx, t, view) {
   if (isAmericano(t.settings.scoring)) return americanoScorePage(ctx, t, view);
   const { round, court } = view.scoring;
@@ -231,7 +231,7 @@ function scorePage(ctx, t, view) {
         h('button', { class: 'primary', onclick: save }, 'Save'),
         match.score ? h('button', {
           onclick: () => {
-            ctx.save(setScore(t, round, court, null));
+            ctx.save(scoresRequired(t.settings.scoring) ? setResult(t, round, court, null) : setScore(t, round, court, null));
             closeScore(ctx);
           },
         }, 'Remove score') : null,

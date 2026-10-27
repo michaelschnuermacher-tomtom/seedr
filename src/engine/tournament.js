@@ -1,5 +1,5 @@
 import { generateSchedule } from './schedule.js';
-import { resultKey, scoreWinner, hasResult, isAmericano } from './standings.js';
+import { resultKey, scoreWinner, hasResult, isAmericano, scoresRequired } from './standings.js';
 import { scaleOf, calibratePlayers, isSkill } from './scale.js';
 
 // Version 2: players link to a person (`personId`) and may have a year of birth.
@@ -255,7 +255,7 @@ export function setResult(t, round, court, winner) {
   checkOpen(t);
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
   if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);
-  if (winner !== null && isAmericano(t.settings.scoring)) throw new Error('In Americano, a result is its score.');
+  if (winner !== null && scoresRequired(t.settings.scoring)) throw new Error('In this tournament, a result needs its score.');
   const results = { ...t.results };
   const key = resultKey(round, court);
   if (winner === null) delete results[key];

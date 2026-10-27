@@ -33,7 +33,7 @@ export function newDraft() {
     scaleMin: null,
     scaleMax: null,
     best: null,
-    scoring: null, // 'wins' or 'americano'
+    scoring: null, // 'wins', 'sets' (scores required) or 'americano'
     americanoPoints: null,
     picks: [],
     extraLevels: [],
@@ -58,7 +58,7 @@ export function draftFromTournament(t) {
     scaleMin: scale.min,
     scaleMax: scale.max,
     best: scale.best,
-    scoring: s.scoring?.mode === 'americano' ? 'americano' : 'wins',
+    scoring: s.scoring?.mode ?? 'wins',
     americanoPoints: s.scoring?.points ?? null,
     picks: t.players.filter(isActive).map((p) => ({ personId: p.personId ?? p.id, skill: p.skill })),
     courts: s.courts,
@@ -97,7 +97,7 @@ export function evaluateDraft(d, people = []) {
     const person = byId.get(p.personId);
     return { personId: p.personId, name: person?.name ?? p.personId, skill: p.skill, ...(person?.birthYear != null ? { birthYear: person.birthYear } : {}) };
   });
-  const scoringDone = d.scoring === 'wins' || (d.scoring === 'americano' && isWhole(d.americanoPoints, 1));
+  const scoringDone = d.scoring === 'wins' || d.scoring === 'sets' || (d.scoring === 'americano' && isWhole(d.americanoPoints, 1));
   const steps = { name: d.name.trim() !== '', scale: Boolean(scale), scoring: scoringDone, players: players.length >= 4 };
   steps.courts = isWhole(d.courts, 1) && isWhole(d.breakMinutes, 0);
   let options = [];
@@ -122,7 +122,9 @@ export function evaluateDraft(d, people = []) {
   if (steps.time && !steps.plan) problems.push('Choose rounds and match length.');
   if (!steps.reveal) problems.push('Choose how many rounds are revealed at a time.');
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
-  const scoring = d.scoring === 'americano' && steps.scoring ? { mode: 'americano', points: d.americanoPoints } : null;
+  const scoring = !steps.scoring ? null
+    : d.scoring === 'americano' ? { mode: 'americano', points: d.americanoPoints }
+      : d.scoring === 'sets' ? { mode: 'sets' } : null;
   return { players, scale, scoring, steps, problems, options, plan, games };
 }
 
@@ -212,7 +214,7 @@ export function setupScreen(ctx) {
     })));
   const pointsField = field('Points per match (both teams together, e.g. 24)', numberInput('americanoPoints', 1));
   const scoringCard = card('Scoring', 'rg',
-    field('How are matches scored?', selectInput(d.scoring, [['', 'Choose…'], ['wins', 'Wins (scores optional)'], ['americano', 'Americano: points to a fixed total']], (e) => {
+    field('How are matches scored?', selectInput(d.scoring, [['', 'Choose…'], ['wins', 'Wins (scores optional)'], ['sets', 'Matches, then sets, then points/games (scores required)'], ['americano', 'Americano: total points win']], (e) => {
       d.scoring = e.target.value || null;
       refresh();
     })),

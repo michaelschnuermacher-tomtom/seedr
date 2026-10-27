@@ -42,7 +42,8 @@ function checkSettings(s) {
   if (!isInt(s.breakMinutes) || s.breakMinutes < 0) fail('Invalid break length');
   if (!(s.revealBatch === 'all' || (isInt(s.revealBatch) && s.revealBatch >= 1))) fail('Invalid reveal batch');
   if ('scale' in s && scaleProblem(s.scale)) fail(scaleProblem(s.scale));
-  if ('scoring' in s && !(isObject(s.scoring) && s.scoring.mode === 'americano' && isInt(s.scoring.points) && s.scoring.points >= 1)) fail('Invalid scoring');
+  if ('scoring' in s && !(isObject(s.scoring) && (s.scoring.mode === 'sets'
+    || (s.scoring.mode === 'americano' && isInt(s.scoring.points) && s.scoring.points >= 1)))) fail('Invalid scoring');
   if ('lastRoundCourts' in s && (!isInt(s.lastRoundCourts) || s.lastRoundCourts < 1 || s.lastRoundCourts >= s.courts)) fail('Invalid number of courts in the last round');
 }
 
