@@ -12,9 +12,9 @@ const example = () => ({
   courts: 3, totalMinutes: 120, breakMinutes: 2,
 });
 
-test('a new draft has no skills, no players and no scale; courts and time have defaults', () => {
+test('a new draft has no skills, players, scale or break; courts and time have defaults', () => {
   const d = newDraft();
-  assert.deepEqual([d.courts, d.breakMinutes, d.totalMinutes], [2, 5, 240]);
+  assert.deepEqual([d.courts, d.breakMinutes, d.totalMinutes], [2, null, 240]);
   assert.deepEqual([d.scaleMin, d.scaleMax, d.best, d.picks], [null, null, null, []]);
   assert.ok(defaultPeople().every((p) => !('skill' in p) && !('lastSkill' in p)), 'the default people have no skills');
 });
@@ -56,9 +56,9 @@ test('the skill range can be anything from 0 to 100, lowest below highest', () =
 test('rounds and match length must be chosen from the options', () => {
   const ev = evaluateDraft(example(), people18);
   assert.equal(ev.players.length, 18);
-  assert.ok(ev.options.length > 0);
+  assert.ok(ev.matrix.length > 0);
   assert.equal(ev.plan, null);
-  assert.ok(ev.problems.some((p) => /Choose rounds and match length/.test(p)));
+  assert.ok(ev.problems.some((p) => /Choose rounds and break/.test(p)));
 });
 
 test('a chosen option becomes the plan', () => {
@@ -118,7 +118,7 @@ test('draftFromTournament fills in every step', () => {
 test('choosing an option with fewer courts in the last round keeps them in the plan', () => {
   const skills17 = [5, 9, 8, 6, 1, 9, 4, 6, 5, 7, 1, 4, 6, 3, 1, 3, 4];
   const people17 = skills17.map((_, i) => ({ id: `y${i}`, name: `P${i + 1}` }));
-  const d = { ...newDraft(), name: 'x', scaleMin: 1, scaleMax: 10, best: 'low', scoring: 'wins',
+  const d = { ...newDraft(), name: 'x', scaleMin: 1, scaleMax: 10, best: 'low', scoring: 'wins', breakMinutes: 5,
     picks: people17.map((p, i) => ({ personId: p.id, skill: skills17[i] })), selectedRounds: 9, lastRoundCourts: 1 };
   const ev = evaluateDraft(d, people17);
   assert.deepEqual(ev.problems, []);
@@ -136,4 +136,17 @@ test('the scoring step: wins, scores required, or Americano with points per matc
   assert.deepEqual(scoring({ scoring: 'sets' }), { mode: 'sets' });
   assert.deepEqual(scoring({ scoring: 'americano', americanoPoints: 21 }), { mode: 'americano', points: 21 });
   assert.equal(evaluateDraft({ ...example(), scoring: 'americano' }, people18).steps.scoring, false, 'Americano needs the points');
+});
+
+test('the matrix: rows of rounds, columns of breaks, cells with the match length', () => {
+  const ev = evaluateDraft(example(), people18); // 18 players, 3 courts, 120 min
+  assert.deepEqual(ev.breaks, [0, 1, 2, 3, 4, 5]);
+  const nine = ev.matrix.find((r) => r.rounds === 9 && !r.lastRoundCourts);
+  assert.deepEqual(nine.cells.map((c) => c?.matchMinutes ?? null), [13, 12, 11, 10, 9, 8]);
+  assert.equal(nine.even, true);
+  assert.ok(ev.matrix.every((r) => r.cells.every((c) => c === null || c.matchMinutes >= 8)), 'no cell under 8 minutes');
+  const chosen = evaluateDraft({ ...example(), selectedRounds: 9, breakMinutes: 4 }, people18);
+  assert.deepEqual(chosen.plan, { rounds: 9, matchMinutes: 9 });
+  const edit = evaluateDraft({ ...example(), breakMinutes: 10 }, people18);
+  assert.deepEqual(edit.breaks, [0, 1, 2, 3, 4, 5, 10], 'an existing longer break gets its own column');
 });

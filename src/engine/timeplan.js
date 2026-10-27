@@ -68,3 +68,33 @@ export function recommendOptions({ players, courts, totalMinutes, breakMinutes }
   const lastCourts = (o) => o.lastRoundCourts ?? used;
   return options.sort((a, b) => (a.even === b.even ? a.rounds - b.rounds || lastCourts(b) - lastCourts(a) : a.even ? -1 : 1));
 }
+
+// Breaks offered in the setup, in minutes.
+export const BREAK_CHOICES = [0, 1, 2, 3, 4, 5];
+// Shorter matches are hardly worth playing, longer ones are unusual: such cells stay empty.
+export const MATRIX_MIN_MATCH_MINUTES = 8;
+export const MATRIX_MAX_MATCH_MINUTES = 60;
+
+// Rounds × break: one row per number of rounds (and per "last round on fewer courts"
+// option), one column per break; each cell is the match length that follows from the total
+// time, or null when it would be shorter than MATRIX_MIN_MATCH_MINUTES or longer than
+// MATRIX_MAX_MATCH_MINUTES. Rows without any
+// cell are left out. Rows are in order of rounds.
+export function planMatrix({ players, courts, totalMinutes, breaks = BREAK_CHOICES }) {
+  const used = playersPerRound(players, courts) / 4;
+  const lastCourts = (o) => o.lastRoundCourts ?? used;
+  return recommendOptions({ players, courts, totalMinutes, breakMinutes: 0 })
+    .sort((a, b) => a.rounds - b.rounds || lastCourts(b) - lastCourts(a))
+    .map((o) => ({
+      rounds: o.rounds,
+      ...(o.lastRoundCourts ? { lastRoundCourts: o.lastRoundCourts } : {}),
+      gamesMin: o.gamesMin,
+      gamesMax: o.gamesMax,
+      even: o.even,
+      cells: breaks.map((breakMinutes) => {
+        const matchMinutes = Math.floor(totalMinutes / o.rounds - breakMinutes);
+        return matchMinutes >= MATRIX_MIN_MATCH_MINUTES && matchMinutes <= MATRIX_MAX_MATCH_MINUTES ? { breakMinutes, matchMinutes, totalMinutes: o.rounds * (matchMinutes + breakMinutes) } : null;
+      }),
+    }))
+    .filter((row) => row.cells.some(Boolean));
+}

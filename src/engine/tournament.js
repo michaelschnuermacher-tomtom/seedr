@@ -138,6 +138,22 @@ export function finishTournament(t, now) {
   return { ...t, finishedAt: now.toISOString() };
 }
 
+// Whether the Info tab shows the players' skills (otherwise the players in alphabetical
+// order). A view setting: it can change at any time.
+export function setShowSkills(t, show) {
+  return { ...t, showSkills: Boolean(show) };
+}
+
+// Whether edges (how much stronger a team is) are shown at all: round cards, standings
+// and summary. On unless switched off.
+export function showsEdges(t) {
+  return t.showEdges !== false;
+}
+
+export function setShowEdges(t, show) {
+  return { ...t, showEdges: Boolean(show) };
+}
+
 export function reopenTournament(t) {
   const { finishedAt, ...rest } = t;
   return rest;

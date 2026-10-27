@@ -1,7 +1,7 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { parsePlayers, createTournament, updateSettings, isActive } from '../engine/tournament.js';
-import { recommendOptions, gamesPerPlayer, describeGames } from '../engine/timeplan.js';
+import { planMatrix, gamesPerPlayer, describeGames, BREAK_CHOICES, MATRIX_MIN_MATCH_MINUTES } from '../engine/timeplan.js';
 import { sortPeople } from '../engine/people.js';
 import { scaleOf, scaleProblem, levels, isSkill, describeScale, SCALE_LIMITS } from '../engine/scale.js';
 import { newSeed } from '../engine/rng.js';
@@ -38,7 +38,7 @@ export function newDraft() {
     picks: [],
     courts: 2,
     totalMinutes: 240,
-    breakMinutes: 5,
+    breakMinutes: null, // chosen in the matrix, with the rounds
     selectedRounds: null,
     lastRoundCourts: null,
   };
@@ -89,15 +89,18 @@ export function evaluateDraft(d, people = []) {
   const steps = { name: d.name.trim() !== '', scale: Boolean(scale), scoring: scoringDone, players: d.picks.length > 0,
     // Skills can be set from the first player on; going on needs at least 4 players.
     skills: d.picks.length >= 4 && skilled.length === d.picks.length };
-  steps.courts = isWhole(d.courts, 1) && isWhole(d.breakMinutes, 0);
-  let options = [];
+  steps.courts = isWhole(d.courts, 1);
+  // Rounds × break: the columns are the usual breaks, plus the tournament's own when editing.
+  const breaks = [...new Set([...BREAK_CHOICES, ...(isWhole(d.breakMinutes, 0) ? [d.breakMinutes] : [])])].sort((a, b) => a - b);
+  let matrix = [];
   let plan = null;
   if (steps.skills && steps.courts && isWhole(d.totalMinutes, 1)) {
-    options = recommendOptions({ players: players.length, courts: d.courts, totalMinutes: d.totalMinutes, breakMinutes: d.breakMinutes });
-    const chosen = options.find((o) => o.rounds === d.selectedRounds && (o.lastRoundCourts ?? null) === (d.lastRoundCourts ?? null));
-    if (chosen) plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes, ...(chosen.lastRoundCourts ? { lastRoundCourts: chosen.lastRoundCourts } : {}) };
+    matrix = planMatrix({ players: players.length, courts: d.courts, totalMinutes: d.totalMinutes, breaks });
+    const row = matrix.find((o) => o.rounds === d.selectedRounds && (o.lastRoundCourts ?? null) === (d.lastRoundCourts ?? null));
+    const cell = row?.cells[breaks.indexOf(d.breakMinutes)];
+    if (cell) plan = { rounds: row.rounds, matchMinutes: cell.matchMinutes, ...(row.lastRoundCourts ? { lastRoundCourts: row.lastRoundCourts } : {}) };
   }
-  steps.time = options.length > 0;
+  steps.time = matrix.length > 0;
   steps.plan = Boolean(plan);
   const problems = [];
   if (!steps.name) problems.push('Give the tournament a name.');
@@ -106,15 +109,14 @@ export function evaluateDraft(d, people = []) {
   if (d.picks.length < 4) problems.push('Choose at least 4 players.');
   else if (!steps.skills) problems.push('Give every player a skill.');
   if (!isWhole(d.courts, 1)) problems.push('Courts must be a whole number of at least 1.');
-  if (!isWhole(d.breakMinutes, 0)) problems.push('Break must be a whole number of minutes (0 or more).');
   if (steps.skills && steps.courts && !isWhole(d.totalMinutes, 1)) problems.push('Total time must be a whole number of minutes.');
-  else if (steps.skills && steps.courts && !steps.time) problems.push('Not enough time for even one round of at least 5 minutes.');
-  if (steps.time && !steps.plan) problems.push('Choose rounds and match length.');
+  else if (steps.skills && steps.courts && !steps.time) problems.push(`Not enough time for even one round of at least ${MATRIX_MIN_MATCH_MINUTES} minutes.`);
+  if (steps.time && !steps.plan) problems.push('Choose rounds and break in the table.');
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
   const scoring = !steps.scoring ? null
     : d.scoring === 'americano' ? { mode: 'americano', points: d.americanoPoints }
       : d.scoring === 'sets' ? { mode: 'sets' } : null;
-  return { players, scale, scoring, steps, problems, options, plan, games };
+  return { players, scale, scoring, steps, problems, matrix, breaks, plan, games };
 }
 
 function field(label, input) {
@@ -217,9 +219,7 @@ export function setupScreen(ctx) {
     pointsField);
   const playersCard = card('Players', 'wim', playersStep(ctx, d, people));
   const skillsCard = card('Skills', 'ao', ev0.scale ? skillsStep(ctx, d, ev0.scale, people) : null);
-  const courtsField = h('div', { class: 'row' },
-    field('Courts', numberInput('courts', 1)),
-    field('Break between rounds (min)', numberInput('breakMinutes', 0)));
+  const courtsField = field('Courts', numberInput('courts', 1));
   const timeField = field('Total tournament time (min)', numberInput('totalMinutes', 1));
   const timeCard = card('Courts & time', 'rg', courtsField, timeField, planBox);
   // Shows each step once the ones before are done.
@@ -258,22 +258,29 @@ export function setupScreen(ctx) {
     preview);
 }
 
-// Rounds and match length come only from the options that fit the total time, best first.
-// An option is "rounds" or "rounds/courts in the last round".
-const optionKey = (rounds, lastRoundCourts) => (lastRoundCourts ? `${rounds}/${lastRoundCourts}` : String(rounds));
-
+// Rounds × break: each cell is the match length that fits the total time; a tap chooses
+// rounds and break together. Rows where everyone plays the same number of games stand out.
 function planField(d, ev, refresh) {
-  const label = (o) => `${o.rounds} rounds${o.lastRoundCourts ? ` (last round on ${courtsText(o.lastRoundCourts)})` : ''}`
-    + ` × ${o.matchMinutes} min + ${o.breakMinutes} min break = ${o.totalMinutes} min · `
-    + describeGames(ev.players.length, d.courts, o.rounds, o.lastRoundCourts);
-  const choices = [['', 'Choose…'], ...ev.options.map((o) => [optionKey(o.rounds, o.lastRoundCourts), label(o)])];
-  const select = selectInput(ev.plan ? optionKey(d.selectedRounds, d.lastRoundCourts) : '', choices, (e) => {
-    const [rounds, last] = e.target.value.split('/');
-    d.selectedRounds = rounds ? Number(rounds) : null;
-    d.lastRoundCourts = last ? Number(last) : null;
-    refresh();
-  });
-  return field('Rounds and match length', select);
+  const games = (row) => (row.even ? `${row.gamesMax} games each` : `${row.gamesMin}–${row.gamesMax} games`);
+  const chosen = (row, cell) => cell && row.rounds === d.selectedRounds && (row.lastRoundCourts ?? null) === (d.lastRoundCourts ?? null) && cell.breakMinutes === d.breakMinutes;
+  return h('div', { class: 'field' },
+    h('span', {}, 'Rounds and break'),
+    h('p', { class: 'muted' }, `Each cell is the match length in minutes. Tap one to choose rounds and break; rows in green give everyone the same number of games.`),
+    h('div', { class: 'matrix-wrap' }, h('table', { class: 'matrix' },
+      h('thead', {},
+        h('tr', {}, h('th', { rowspan: 2 }, 'Rounds'), h('th', { colspan: ev.breaks.length }, 'Break (min)')),
+        h('tr', {}, ev.breaks.map((b) => h('th', {}, b)))),
+      h('tbody', {}, ev.matrix.map((row) => h('tr', { class: row.even ? 'even' : '' },
+        h('th', {}, h('strong', {}, row.rounds), row.lastRoundCourts ? h('span', { class: 'muted' }, ` (last: ${courtsText(row.lastRoundCourts)})`) : null,
+          h('span', { class: 'matrix-games' }, games(row))),
+        row.cells.map((cell) => h('td', {}, cell ? h('button', {
+          class: chosen(row, cell) ? 'primary' : '',
+          title: `${row.rounds} × ${cell.matchMinutes} min + ${cell.breakMinutes} min break = ${cell.totalMinutes} min`,
+          onclick: () => {
+            Object.assign(d, { selectedRounds: row.rounds, lastRoundCourts: row.lastRoundCourts ?? null, breakMinutes: cell.breakMinutes });
+            refresh();
+          },
+        }, cell.matchMinutes) : '–'))))))));
 }
 
 const courtsText = (n) => `${n} court${n === 1 ? '' : 's'}`;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { playersPerRound, gamesPerPlayer, recommendOptions, fewerGamesCount, describeGames } from '../src/engine/timeplan.js';
+import { playersPerRound, gamesPerPlayer, recommendOptions, fewerGamesCount, describeGames, planMatrix } from '../src/engine/timeplan.js';
 
 test('players per round is limited by courts and by groups of four', () => {
   assert.equal(playersPerRound(18, 3), 12);
@@ -51,4 +51,21 @@ test('an extra option leaves courts empty in the last round when that evens out 
   assert.ok(!options.some((o) => o.rounds === 8 && o.lastRoundCourts), 'no extra option when it would not help');
   assert.equal(describeGames(17, 2, 9, 1), 'all 17 players play 4 games');
   assert.equal(fewerGamesCount(18, 3, 8, 1), 2); // 88 places: 16 × 5 games, 2 × 4 games
+});
+
+test('planMatrix: rounds × breaks, cells with the match length, none under 8 minutes', () => {
+  const rows = planMatrix({ players: 17, courts: 2, totalMinutes: 240 });
+  const nine = rows.find((r) => r.rounds === 9 && r.lastRoundCourts === 1);
+  assert.deepEqual(nine.cells.map((c) => c.matchMinutes), [26, 25, 24, 23, 22, 21]);
+  assert.deepEqual(nine.cells[5], { breakMinutes: 5, matchMinutes: 21, totalMinutes: 234 });
+  assert.equal(nine.even, true);
+  assert.ok(rows.every((r, i) => i === 0 || rows[i - 1].rounds <= r.rounds), 'in order of rounds');
+  assert.ok(rows.every((r) => r.cells.some(Boolean) && r.cells.every((c) => c === null || c.matchMinutes >= 8)));
+  assert.equal(rows.at(-1).rounds, 30, '240 / 30 = 8 minutes without a break');
+});
+
+test('planMatrix leaves out matches over 60 minutes', () => {
+  const rows = planMatrix({ players: 17, courts: 2, totalMinutes: 240 });
+  assert.equal(rows[0].rounds, 4, '240 / 4 = 60 minutes');
+  assert.ok(rows.every((r) => r.cells.every((c) => c === null || c.matchMinutes <= 60)));
 });

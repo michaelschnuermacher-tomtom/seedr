@@ -199,3 +199,26 @@ test('the youngest and the oldest player in one team are always told', () => {
   const s = Object.fromEntries(tournamentSummary({ players: aged, schedule, results: { '1-1': 1, '2-1': 2, '3-1': 1 } }).map((x) => [x.title, x.text]));
   assert.equal(s['Youngest and oldest'], 'Ben, the youngest, and Anna, the oldest, teamed up twice: in round 1 (won) and round 3 (won).');
 });
+
+test('hidden edges and skills leave out the highlights that would give them away', () => {
+  const names = 'Markus Seb Micha Uta Vera Gesa Henri Lia Felix Jenny Mickey Ada Hugo Bianca Basti Max Anne'.split(' ');
+  const skills = [1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 8, 9];
+  const edgeTitles = ['Underdog of the day', 'Upset of the tournament', 'Luck of the draw', 'Toughest draw', 'Unshakable',
+    'Overachiever', 'So close', 'Perfectly balanced', 'Giant killer', 'Toughest luck'];
+  for (let seed = 1; seed <= 6; seed++) {
+    const t = createTournament({ id: 'x', name: 'x', seed, now: new Date(), players: names.map((name, i) => ({ name, skill: skills[i] })),
+      settings: { courts: 2, rounds: 9, lastRoundCourts: 1, matchMinutes: 21, breakMinutes: 5 } });
+    let k = seed;
+    const results = {};
+    for (const r of t.schedule.slice(0, 6)) for (const m of r.matches) { k = (k * 31 + 7) % 97; results[`${r.round}-${m.court}`] = (k % 2) + 1; }
+    const shown = tournamentSummary({ ...t, results, showSkills: true });
+    const hidden = tournamentSummary({ ...t, results, showEdges: false });
+    assert.ok(!hidden.some((x) => edgeTitles.includes(x.title) || x.title === 'Odd couple' || x.title === 'Punching above their weight'), `seed ${seed}`);
+    assert.match(hidden.find((x) => x.title === 'By the numbers').text, /^\d+ matches played\.$/, 'no word about stronger teams');
+    assert.match(shown.find((x) => x.title === 'By the numbers').text, /stronger team won/);
+    const words = new Set(hidden.map((x) => `${x.title} ${x.text}`).join(' ').split(/[^\p{L}]+/u));
+    for (const n of names) if (t.schedule.slice(0, 6).some((r) => r.matches.some((m) => [...m.team1, ...m.team2].some((id) => t.players.find((p) => p.id === id).name === n)))) {
+      assert.ok(words.has(n), `seed ${seed}: ${n} still mentioned`);
+    }
+  }
+});

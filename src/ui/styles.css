@@ -158,6 +158,17 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .skill-row:last-child { border-bottom: none; }
 .skill-row span { flex: 1; min-width: 0; font-weight: 550; overflow-wrap: anywhere; }
 .skill-row select { width: auto; flex: none; min-width: 120px; }
+/* Setup: rounds × break matrix; each cell is the match length. */
+.matrix-wrap { overflow-x: auto; margin: 6px 0; }
+.matrix { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.matrix th, .matrix td { padding: 3px 2px; text-align: center; border-bottom: 1px solid var(--line); }
+.matrix thead th { font-size: .7rem; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.matrix tbody th { text-align: left; font-weight: 400; white-space: nowrap; }
+.matrix-games { display: block; font-size: .75rem; color: var(--muted); }
+.matrix tr.even th, .matrix tr.even td { background: color-mix(in srgb, var(--win-soft) 70%, transparent); }
+.matrix tr.even .matrix-games { color: var(--win); font-weight: 600; }
+.matrix td button { min-height: 34px; width: 100%; min-width: 34px; padding: 2px; }
+.matrix td { color: var(--muted); }
 /* Players page */
 .people { list-style: none; padding: 0; margin: 0; }
 .people li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }

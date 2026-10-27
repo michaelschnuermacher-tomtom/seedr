@@ -2,6 +2,12 @@ import { computeStandings, resultKey, hasResult } from './standings.js';
 import { teamValue, edgeLevel } from './schedule.js';
 import { scaleOf, calibrated, calibratePlayers } from './scale.js';
 
+// Highlights that give away edges (how much stronger a team was) or skills; they are left
+// out when the tournament does not show them (Manage → View).
+const EDGE_HIGHLIGHTS = new Set(['Underdog of the day', 'Upset of the tournament', 'Luck of the draw', 'Toughest draw', 'Unshakable',
+  'Overachiever', 'So close', 'Perfectly balanced', 'Giant killer', 'Toughest luck']);
+const SKILL_HIGHLIGHTS = new Set(['Odd couple', 'Punching above their weight']);
+
 // English Scrabble letter values, for the last name joke.
 const SCRABBLE = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 10, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 };
 
@@ -52,7 +58,14 @@ export function tournamentSummary(t) {
   const shown = (x) => Math.round(x * 10);
   const out = [];
   const mentioned = new Set();
-  const add = (icon, title, text, ids = []) => { out.push({ icon, title, text }); ids.forEach((id) => mentioned.add(id)); };
+  const showEdges = t.showEdges !== false;
+  const showSkills = t.showSkills === true;
+  const hidden = (title) => (!showEdges && EDGE_HIGHLIGHTS.has(title)) || (!showSkills && SKILL_HIGHLIGHTS.has(title));
+  const add = (icon, title, text, ids = []) => {
+    if (hidden(title)) return;
+    out.push({ icon, title, text });
+    ids.forEach((id) => mentioned.add(id));
+  };
 
   // Champion(s)
   const top = rows.filter((r) => r.rank === 1);
@@ -159,7 +172,7 @@ export function tournamentSummary(t) {
   const ids = (list) => list.map((r) => r.id);
   const teams = (list) => and(list.map((m) => `${names(m.won)} (round ${m.round})`));
   const pool = [];
-  const offer = (icon, title, members, text) => { if (members.length) pool.push({ icon, title, members: [...new Set(members)], text }); };
+  const offer = (icon, title, members, text) => { if (members.length && !hidden(title)) pool.push({ icon, title, members: [...new Set(members)], text }); };
 
   // Hot streak: the most wins in a row.
   const streak = (r) => { let best = 0; let run = 0; for (const g of games(r)) { run = g.won ? run + 1 : 0; best = Math.max(best, run); } return best; };
@@ -369,19 +382,29 @@ export function tournamentSummary(t) {
   const vowels = (r) => [...r.name.normalize('NFD').toLowerCase()].filter((c) => 'aeiouy'.includes(c)).length;
   const singer = [...missing()].sort((x, y) => vowels(y) - vowels(x) || x.name.localeCompare(y.name))[0];
   if (singer && vowels(singer) >= 3) add('🔡', 'Vowels', `${singer.name} has ${vowels(singer)} vowels in one name: a voice made for cheering.`, [singer.id]);
-  // Victory chant: the initials of a winning team with someone still missing.
-  const chanted = matches.find((m) => m.won.some((id) => !mentioned.has(id)));
-  if (chanted) {
-    const [x, y] = chanted.won.map(initial);
-    add('🎤', 'Victory chant', `${names(chanted.won)} (round ${chanted.round}): ${x}-${y}, ${x}-${y}, what a pair to see!`, chanted.won);
+  // Victory chant: the initials of a winning team, for everyone with a win still missing
+  // (the last resort: players without a win are in Still smiling). A team that covers two
+  // missing players is preferred.
+  const chants = [];
+  const waiting = new Set(missing().filter((r) => r.wins > 0).map((r) => r.id));
+  for (const id of waiting) {
+    const wins = matches.filter((m) => m.won.includes(id));
+    const m = wins.find((x) => x.won.every((p) => waiting.has(p))) ?? wins[0];
+    if (m && !chants.includes(m)) chants.push(m);
+  }
+  if (chants.length) {
+    add('🎤', 'Victory chant', chants.map((m) => {
+      const [x, y] = m.won.map(initial);
+      return `${names(m.won)} (round ${m.round}): ${x}-${y}, ${x}-${y}, what a pair to see!`;
+    }).join(' '), chants.flatMap((m) => m.won));
   }
 
   // By the numbers: how often the stronger team won.
   const decided = matches.filter((m) => m.gap !== 0);
   const favourites = decided.filter((m) => m.gap < 0).length;
   const matchCount = matches.length + draws;
-  add('📊', 'By the numbers', `${matchCount} ${matchCount === 1 ? 'match' : 'matches'} played${draws ? `, ${plural(draws, 'draw')}` : ''}. `
-    + (decided.length
+  add('📊', 'By the numbers', `${matchCount} ${matchCount === 1 ? 'match' : 'matches'} played${draws ? `, ${plural(draws, 'draw')}` : ''}.${showEdges ? ' ' : ''}`
+    + (!showEdges ? '' : decided.length
       ? `The stronger team won ${favourites} of ${decided.length} (even matches not counted); ${plural(upsets.length, 'upset')}.`
       : 'All of them between teams of exactly the same value.'));
   return out;

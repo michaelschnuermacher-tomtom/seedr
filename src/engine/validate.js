@@ -24,6 +24,8 @@ function checkTournament(t) {
   if (typeof t.name !== 'string') fail('Missing tournament name');
   if (typeof t.createdAt !== 'string') fail('Missing creation date');
   if ('finishedAt' in t && typeof t.finishedAt !== 'string') fail('Invalid finishing date');
+  if ('showSkills' in t && typeof t.showSkills !== 'boolean') fail('Invalid view setting');
+  if ('showEdges' in t && typeof t.showEdges !== 'boolean') fail('Invalid view setting');
   checkSettings(t.settings);
   const ids = checkPlayers(t.players, scaleOf(t.settings));
   if (!isInt(t.seed)) fail('Invalid seed');

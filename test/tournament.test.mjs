@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, shownRounds, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, shownRounds, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setShowSkills, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -280,4 +280,13 @@ test('a score decides the winner: more sets, then more points; equal ones need a
   assert.ok(!('1-1' in setResult(scored, 1, 1, 2).scores), 'another winner drops a score that says otherwise');
   assert.match(validateTournament({ ...scored, scores: { '1-2': [[21, 10]] } }).error, /without a result/);
   assert.match(validateTournament({ ...scored, scores: { '1-1': [[21, 21]] } }).error, /Invalid set/);
+});
+
+test('showing skills is a view setting that can change at any time', () => {
+  const t = finishTournament(setResult(make(), 1, 1, 1), new Date());
+  const shown = setShowSkills(t, true);
+  assert.equal(shown.showSkills, true);
+  assert.equal(validateTournament(shown).ok, true);
+  assert.equal(setShowSkills(shown, false).showSkills, false);
+  assert.match(validateTournament({ ...shown, showSkills: 'yes' }).error, /view setting/);
 });
