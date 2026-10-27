@@ -1,4 +1,4 @@
-import { h, newId } from './dom.js';
+import { h, newId, closableTitle } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { sortPeople, usage, addPerson, updatePerson, deletePerson, splitPerson } from '../engine/people.js';
 
@@ -76,13 +76,10 @@ function personFields(person = {}) {
 }
 
 function personPage(ctx, view, title, content, buttons) {
-  return [
-    h('button', { class: 'back-link', onclick: () => listPeople(ctx, view) }, '← Players'),
-    h('section', { class: 'card' },
-      h('h2', { class: 'card-title' }, title),
-      content,
-      h('div', { class: 'actions' }, buttons.filter(Boolean), h('button', { onclick: () => listPeople(ctx, view) }, 'Cancel'))),
-  ];
+  return h('section', { class: 'card' },
+    closableTitle(title, () => listPeople(ctx, view)),
+    content,
+    h('div', { class: 'actions' }, buttons.filter(Boolean), h('button', { onclick: () => listPeople(ctx, view) }, 'Cancel')));
 }
 
 function addPage(ctx, view, person, people) {

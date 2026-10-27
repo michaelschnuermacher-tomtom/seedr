@@ -133,8 +133,16 @@ function checkOpen(t) {
   if (isFinished(t)) throw new Error('This tournament is finished. Reopen it in Manage to change it.');
 }
 
+// How many matches still have no result.
+export function openMatches(t) {
+  return t.schedule.reduce((n, r) => n + r.matches.filter((m) => !hasResult(t.results, resultKey(r.round, m.court))).length, 0);
+}
+
+// Finishing needs a result for every match.
 export function finishTournament(t, now) {
   checkOpen(t);
+  const open = openMatches(t);
+  if (open) throw new Error(`${open} ${open === 1 ? 'match has' : 'matches have'} no result yet: the tournament can be finished once all rounds are played.`);
   return { ...t, finishedAt: now.toISOString() };
 }
 

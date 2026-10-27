@@ -108,7 +108,11 @@ button.primary { background: var(--strong); border-color: var(--strong); color: 
 button.primary:hover { background: color-mix(in srgb, var(--strong) 85%, black); }
 button.danger { color: var(--danger); }
 button.small { min-height: 36px; padding: 4px 12px; font-size: .875rem; }
-button.back-link { min-height: 0; padding: 0; margin: 0 0 12px; border: none; background: none; color: var(--accent); font-weight: 600; }
+/* Sub-pages: the title row with a ✕ that closes the page. */
+.card-title.closable { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.close-x { min-height: 0; padding: 2px 8px; border: none; background: none; color: var(--muted); font-size: 1.1rem; line-height: 1; }
+.close-x:hover { color: var(--text); }
+.page-head { padding: 0 4px; }
 button.link { border: none; background: none; flex: 1; justify-content: flex-start; text-align: left; padding-left: 0; font-weight: 400; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 

@@ -16,6 +16,7 @@ test('players see every complete round and the next one; Manage sees all', () =>
   assert.deepEqual(roundsOverview(t, true).map((r) => r.round), [1, 2, 3, 4, 5]);
   for (const m of t.schedule[0].matches) t = setResult(t, 1, m.court, 1);
   assert.deepEqual(roundsOverview(t).map((r) => r.round), [1, 2]);
+  for (const r of t.schedule.slice(1)) for (const m of r.matches) t = setResult(t, r.round, m.court, 2);
   assert.deepEqual(roundsOverview(finishTournament(t, new Date())).map((r) => r.round), [1, 2, 3, 4, 5]);
 });
 

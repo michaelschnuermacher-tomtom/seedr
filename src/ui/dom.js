@@ -16,6 +16,12 @@ export function h(tag, props, ...children) {
   return el;
 }
 
+// The title row of a sub-page: the title and a ✕ that closes the page.
+export function closableTitle(title, onClose) {
+  return h('h2', { class: 'card-title closable' }, h('span', {}, title),
+    h('button', { class: 'close-x', title: 'Close', 'aria-label': 'Close', onclick: onClose }, '✕'));
+}
+
 export function formatSigned(x) {
   const v = Math.round(x * 10) / 10;
   // A real minus sign (−), as wide as the plus, so signed numbers line up.

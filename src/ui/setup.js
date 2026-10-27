@@ -293,7 +293,7 @@ function setupPreview(ctx, d, ev, complete) {
     const games = describeGames(ev.players.length, d.courts, ev.plan.rounds, ev.plan.lastRoundCourts);
     out.push(ev.games.even
       ? h('p', { class: 'ok' }, `Even: ${games}.`)
-      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game. Who plays fewer is drawn at random; Manage → Swap players can change it later.`));
+      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game. Who plays fewer is drawn at random; Manage → Rounds → View can change it later.`));
     if (ev.plan.lastRoundCourts) out.push(h('p', { class: 'muted' }, `The last round uses only ${courtsText(ev.plan.lastRoundCourts)}, so the games come out more even.`));
   } else if (d.editingId && ev.problems.length) {
     out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, shownRounds, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setShowSkills, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, shownRounds, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, openMatches, setShowSkills, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -29,6 +29,8 @@ test('parsePlayers reports bad lines and keeps the good ones', () => {
 
 const SETTINGS = { courts: 2, rounds: 6, matchMinutes: 12, breakMinutes: 2, revealBatch: 2 };
 const PLAYERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((skill, i) => ({ name: `P${i + 1}`, skill }));
+// Every match of the tournament with a result (team 1 wins).
+const playAll = (t) => t.schedule.reduce((x, r) => r.matches.reduce((y, m) => (y.results[`${r.round}-${m.court}`] ? y : setResult(y, r.round, m.court, 1)), x), t);
 const make = (settings = SETTINGS) => createTournament({
   id: 't1', name: 'Club night', players: PLAYERS, settings, seed: 11, now: new Date('2026-10-14T18:00:00Z'),
 });
@@ -51,7 +53,7 @@ test('players see every complete round and the next one; all once finished', () 
   assert.equal(shownRounds(t), 2, 'round 1 complete: round 2 appears');
   t = setResult(t, 2, t.schedule[1].matches[0].court, 2);
   assert.equal(shownRounds(t), 2, 'round 2 not complete yet');
-  assert.equal(shownRounds(finishTournament(t, new Date())), 6);
+  assert.equal(shownRounds(finishTournament(playAll(t), new Date())), 6);
 });
 
 test('setResult sets, changes and clears a result without changing the input', () => {
@@ -227,8 +229,15 @@ test('renameTournament changes the name at any time but not to an empty one', ()
   assert.throws(() => renameTournament(t, '   '), /cannot be empty/);
 });
 
-test('a finished tournament is locked until it is reopened', () => {
+test('a tournament can only be finished once every match has a result', () => {
   const t = setResult(make(), 1, 1, 1);
+  assert.throws(() => finishTournament(t, new Date()), /no result yet/);
+  assert.equal(openMatches(playAll(t)), 0);
+  assert.ok(isFinished(finishTournament(playAll(t), new Date())));
+});
+
+test('a finished tournament is locked until it is reopened', () => {
+  const t = playAll(make());
   const done = finishTournament(t, new Date('2026-10-26T20:00:00Z'));
   assert.equal(done.finishedAt, '2026-10-26T20:00:00.000Z');
   assert.ok(isFinished(done) && !isFinished(t));
@@ -240,7 +249,7 @@ test('a finished tournament is locked until it is reopened', () => {
   assert.equal(renameTournament(done, 'Final').name, 'Final', 'names can still be corrected');
   const open = reopenTournament(done);
   assert.ok(!('finishedAt' in open));
-  assert.deepEqual(setResult(open, 1, 2, 2).results, { '1-1': 1, '1-2': 2 });
+  assert.equal(setResult(open, 1, 2, 2).results['1-2'], 2);
 });
 
 test('skills can change while the tournament runs; the remaining rounds can be drawn again', () => {
@@ -256,7 +265,7 @@ test('skills can change while the tournament runs; the remaining rounds can be d
   assert.equal(validateTournament(redrawn).ok, true);
   const fresh = redrawRemaining(setSkills(make(), { p1: 9 }), 3);
   assert.equal(fresh.seed, 3, 'before the first result the whole schedule is new');
-  assert.throws(() => setSkills(finishTournament(t, new Date()), { p1: 2 }), /finished/);
+  assert.throws(() => setSkills(finishTournament(playAll(t), new Date()), { p1: 2 }), /finished/);
 });
 
 test('a score decides the winner: more sets, then more points; equal ones need a choice', () => {
@@ -283,7 +292,7 @@ test('a score decides the winner: more sets, then more points; equal ones need a
 });
 
 test('showing skills is a view setting that can change at any time', () => {
-  const t = finishTournament(setResult(make(), 1, 1, 1), new Date());
+  const t = finishTournament(playAll(make()), new Date());
   const shown = setShowSkills(t, true);
   assert.equal(shown.showSkills, true);
   assert.equal(validateTournament(shown).ok, true);
