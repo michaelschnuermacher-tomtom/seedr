@@ -64,10 +64,6 @@ function numberPlayers(players) {
   }));
 }
 
-function initialReveal(settings) {
-  return settings.revealBatch === 'all' ? settings.rounds : Math.min(settings.rounds, settings.revealBatch);
-}
-
 // The draw works on calibrated skills (see scale.js); the tournament keeps its own.
 function drawSchedule(players, settings, seed) {
   const { courts, rounds, lastRoundCourts } = settings;
@@ -85,16 +81,16 @@ export function createTournament({ id, name, players, settings, seed, now }) {
     players: withIds,
     seed,
     schedule: drawSchedule(withIds, settings, seed),
-    revealedRounds: initialReveal(settings),
     results: {},
   };
 }
 
-export function revealNext(t) {
-  checkOpen(t);
-  const { rounds, revealBatch } = t.settings;
-  const step = revealBatch === 'all' ? rounds : revealBatch;
-  return { ...t, revealedRounds: Math.min(rounds, t.revealedRounds + step) };
+// The rounds the players see: every complete round and the next one; a finished
+// tournament shows all. (Manage always shows all rounds.)
+export function shownRounds(t) {
+  if (isFinished(t)) return t.settings.rounds;
+  const complete = t.schedule.findIndex((r) => !r.matches.every((m) => hasResult(t.results, resultKey(r.round, m.court))));
+  return complete === -1 ? t.settings.rounds : Math.min(t.settings.rounds, complete + 1);
 }
 
 export function hasResults(t) {
@@ -106,7 +102,7 @@ export function redraw(t, seed) {
   if (hasResults(t)) throw new Error('Cannot redraw after results have been entered');
   // Without results, players who withdrew earlier have nothing left to keep.
   const players = t.players.filter(isActive);
-  return { ...t, players, seed, schedule: drawSchedule(players, t.settings, seed), revealedRounds: initialReveal(t.settings) };
+  return { ...t, players, seed, schedule: drawSchedule(players, t.settings, seed) };
 }
 
 // New name, players or settings for a tournament that has not started: draws a new
@@ -123,7 +119,6 @@ export function updateSettings(t, { name, players, settings }, seed) {
     players: withIds,
     seed,
     schedule: drawSchedule(withIds, settings, seed),
-    revealedRounds: initialReveal(settings),
     results: {},
   };
 }
@@ -223,7 +218,6 @@ export function swapPlayers(t, round, a, b) {
   checkOpen(t);
   const r = t.schedule[round - 1];
   if (!r) throw new Error(`Unknown round ${round}`);
-  if (round > t.revealedRounds) throw new Error('Only revealed rounds can be changed');
   if (a === b) throw new Error('Choose two different players');
   const where = (id) => {
     const m = r.matches.find((x) => x.team1.includes(id) || x.team2.includes(id));

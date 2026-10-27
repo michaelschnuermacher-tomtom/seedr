@@ -1,6 +1,6 @@
 import { h, formatSigned } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../engine/tournament.js';
+import { shownRounds, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../engine/tournament.js';
 import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano, scoresRequired, scoringLabel } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
@@ -84,12 +84,12 @@ function infoTab(t) {
       fact('Sit-outs per player', spread(sitOuts, 'sit-out')),
       fact('Scoring', scoringLabel(s.scoring)),
       fact('Skill scale', `${scaleOf(s).min}–${scaleOf(s).max}. ${describeScale(scaleOf(s))}`),
-      fact('Rounds revealed', `${s.revealBatch === 'all' ? 'All at once' : `${s.revealBatch} at a time`} (${t.revealedRounds} of ${s.rounds} so far)`)),
+      fact('Rounds shown', `${shownRounds(t)} of ${s.rounds} (the next appears once a round is complete)`)),
     h('div', { style: 'height: 12px' }));
 }
 
-// Display data for all revealed rounds; hidden rounds are never included.
-export function roundsOverview(t) {
+// Display data for the rounds the players see (`all`: every round, for Manage).
+export function roundsOverview(t, all = false) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const scale = scaleOf(t.settings);
   const team = (ids) => {
@@ -101,7 +101,7 @@ export function roundsOverview(t) {
       spread: Math.max(...skills) - Math.min(...skills),
     };
   };
-  return t.schedule.slice(0, t.revealedRounds).map((r) => ({
+  return t.schedule.slice(0, all ? t.schedule.length : shownRounds(t)).map((r) => ({
     round: r.round,
     complete: roundComplete(t, r),
     matches: r.matches.map((m) => {
@@ -126,6 +126,14 @@ export function roundsOverview(t) {
 // Each court has its own Grand Slam color: AO blue, Roland Garros clay, Wimbledon green, US Open blue.
 function courtColor(court) {
   return `court-color-${(court - 1) % 4}`;
+}
+
+// A team on a round card that cannot be tapped (Manage, printout).
+function teamBox(round, match, n) {
+  const team = n === 1 ? match.team1 : match.team2;
+  const { winner } = match;
+  return h('div', { class: ['team', winner === n ? 'winner' : '', winner && winner !== n ? 'loser' : ''].join(' ').trim() },
+    h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]));
 }
 
 function teamButton(ctx, t, round, match, n) {
@@ -335,13 +343,16 @@ function askPassword(ctx, question) {
   return false;
 }
 
-// All revealed rounds; revealing, swapping and the team values are set in Manage.
-function roundsTab(ctx, t, view) {
-  if (view.scoring) return scorePage(ctx, t, view);
-  const rounds = roundsOverview(t);
-  const hidden = t.settings.rounds - t.revealedRounds;
+// The rounds the players see: every complete round and the next one. With `all` (Manage
+// and the printout) every round, read-only; Manage can also swap players there.
+function roundsTab(ctx, t, view, all = false) {
+  if (view.scoring && !all) return scorePage(ctx, t, view);
+  const rounds = roundsOverview(t, all);
+  const hidden = t.settings.rounds - rounds.length;
   const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
-  const swapping = Boolean(view.swapping);
+  const swapping = all && Boolean(view.swapping);
+  // In Manage results are not entered: the round cards are only shown.
+  const team = (r, m, n) => (all ? teamBox(r, m, n) : teamButton(ctx, t, r.round, m, n));
   const { matchMinutes, breakMinutes } = t.settings;
   const timing = `Each round takes ${matchMinutes} min, ${breakMinutes ? `with a ${breakMinutes} min break between rounds` : 'with no break between rounds'}.`;
   return [
@@ -352,10 +363,10 @@ function roundsTab(ctx, t, view) {
       h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
       swapping ? swapRound(ctx, t, view, r) : r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
         courtLine('span', m),
-        teamButton(ctx, t, r.round, m, 1),
+        team(r, m, 1),
         h('span', { class: 'vs' }, 'vs'),
-        teamButton(ctx, t, r.round, m, 2),
-        scoreLine(ctx, t, r.round, m)))))),
+        team(r, m, 2),
+        all ? (m.score ? h('div', { class: 'score-line' }, scoreText(m.score)) : null) : scoreLine(ctx, t, r.round, m)))))),
     swapping ? swapDone(ctx, view) : comingUp,
   ];
 }
@@ -440,7 +451,7 @@ function printout(ctx, t, view) {
   return [
     parts.summary ? [h('h2', { class: 'print-only' }, 'Tournament summary'), summaryCard(t)] : null,
     parts.standings ? standingsTab(t) : null,
-    parts.rounds ? roundsTab(ctx, t, { ...view, swapping: false }) : null,
+    parts.rounds ? roundsTab(ctx, t, { ...view, swapping: false }, true) : null,
     parts.skills ? [h('h2', { class: 'print-only' }, 'Player skills'), skillsCard(t)] : null,
   ];
 }
@@ -527,7 +538,7 @@ function fact(label, value) {
 // Manage lists everything read-only; changes happen on a sub-page (view.manage) that an
 // Edit button opens, with Save and Cancel. Actions that change nothing stay direct buttons.
 function manageTab(ctx, t) {
-  const pages = { tournament: tournamentPage, skills: skillsPage, withdraw: withdrawPage, quality: qualityPage, print: printPage };
+  const pages = { tournament: tournamentPage, skills: skillsPage, withdraw: withdrawPage, quality: qualityPage, print: printPage, rounds: allRoundsPage };
   const page = pages[ctx.state.view.manage];
   return page ? page(ctx, t) : manageOverview(ctx, t);
 }
@@ -592,26 +603,32 @@ function finishSection(ctx, t) {
   ]);
 }
 
+// Every round of the schedule, including the ones players do not see yet; swapping
+// players works here too.
+function allRoundsPage(ctx, t) {
+  const view = ctx.state.view;
+  return [
+    h('button', { class: 'back-link', onclick: () => { Object.assign(view, { swapping: false, swapPick: null }); closePage(ctx); } }, '← Manage'),
+    view.swapping || isFinished(t) ? null : h('div', { class: 'actions' }, h('button', {
+      onclick: () => {
+        Object.assign(view, { swapping: true, swapPick: null });
+        ctx.render();
+      },
+    }, 'Swap players')),
+    roundsTab(ctx, t, view, true),
+  ];
+}
+
 function manageOverview(ctx, t) {
   const s = t.settings;
   const view = ctx.state.view;
-  const hidden = s.rounds - t.revealedRounds;
-  const step = s.revealBatch === 'all' ? hidden : Math.min(s.revealBatch, hidden);
-  const from = t.revealedRounds + 1;
-  const reveal = hidden > 0 ? h('button', {
-    class: 'primary',
-    onclick: () => {
-      ctx.save(revealNext(t));
-      ctx.state.message = step === 1 ? `Round ${from} is revealed.` : `Rounds ${from}–${from + step - 1} are revealed.`;
-      ctx.render();
-    },
-  }, step === 1 ? `Reveal round ${from}` : `Reveal rounds ${from}–${from + step - 1}`) : null;
+  const shown = shownRounds(t);
+  const allRounds = h('button', { class: 'primary', onclick: () => openPage(ctx, 'rounds') }, 'All rounds');
   const swap = h('button', {
     onclick: () => {
       view.swapping = true;
       view.swapPick = null;
-      view.tab = 'rounds';
-      ctx.render();
+      openPage(ctx, 'rounds');
     },
   }, 'Swap players');
   const withdrawn = t.players.length - t.players.filter(isActive).length;
@@ -619,16 +636,15 @@ function manageOverview(ctx, t) {
   const finished = isFinished(t);
   return [
     finishSection(ctx, t),
-    section('Rounds', h('p', { class: 'muted' }, hidden > 0
-      ? `Rounds 1–${t.revealedRounds} of ${s.rounds} are revealed.`
-      : `All ${s.rounds} rounds are revealed.`), finished ? [] : [reveal, swap]),
+    section('Rounds', h('p', { class: 'muted' }, shown < s.rounds
+      ? `Players see rounds 1–${shown} of ${s.rounds}; the next appears once a round is complete.`
+      : `Players see all ${s.rounds} rounds.`), [allRounds, finished ? null : swap]),
     section('Tournament', h('dl', { class: 'facts' },
       fact('Name', t.name),
       fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),
       fact('Rounds', s.rounds),
       fact('Match length', `${s.matchMinutes} min`),
-      fact('Break', `${s.breakMinutes} min`),
-      fact('Rounds revealed at a time', s.revealBatch === 'all' ? 'All' : s.revealBatch)),
+      fact('Break', `${s.breakMinutes} min`)),
     [h('button', { onclick: () => openPage(ctx, 'tournament') }, 'Edit')]),
     section('Players', [
       h('p', { class: 'muted' }, `${t.players.length - withdrawn} players${withdrawn ? ` (${withdrawn} withdrew)` : ''}. ${describeScale(scaleOf(t.settings))}`),
@@ -639,9 +655,9 @@ function manageOverview(ctx, t) {
       ? h('dl', { class: 'facts' },
         fact('Average edge', formatValue(Math.round((quality.q.avgGap / quality.unit) * 100) / 100)),
         fact('Biggest edge', quality.q.worst ? formatValue(Math.round((quality.q.worst.gap / quality.unit) * 100) / 100) : '–'))
-      : h('p', { class: 'muted' }, 'Shown once the first round is revealed.')],
+      : h('p', { class: 'muted' }, 'No rounds yet.')],
     [h('button', { onclick: () => openPage(ctx, 'quality') }, 'Details')]),
-    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all revealed rounds and the player skills: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
+    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all rounds and the player skills: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
       h('button', { onclick: () => openPage(ctx, 'print') }, 'Print…'),
       h('button', { onclick: () => exportBackup(ctx) }, 'Export backup')]),
     h('div', { class: 'actions' }, h('button', {
@@ -783,7 +799,7 @@ function revealedQuality(t) {
   const scale = scaleOf(t.settings);
   const players = calibratePlayers(t.players, scale);
   const warnings = drawWarnings(scheduleStats(players, t.schedule), stepUnit(scale)).map((w) => h('p', { class: 'warning' }, w));
-  const revealed = t.schedule.slice(0, t.revealedRounds);
+  const revealed = t.schedule; // Manage shows every round
   return { warnings, revealed, q: revealed.length ? drawQuality(players, revealed) : null, unit: stepUnit(scale) };
 }
 

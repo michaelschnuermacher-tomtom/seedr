@@ -23,10 +23,10 @@ export function defaultPeople() {
 }
 
 // The setup is a sequence of decisions; each step appears once the one before is made:
-// name, skill scale, scoring, players per skill, courts and break, total time, rounds,
-// reveal mode.
-// `picks` are the chosen players in the order they were added: { personId, skill }.
-// `extraLevels` are skill levels added by hand (large scales only show levels in use).
+// name, scoring, skill scale, players, a skill for each player, courts and break, total
+// time, rounds.
+// `picks` are the chosen players in the order they were added: { personId, skill }, with
+// skill null until it is set.
 export function newDraft() {
   return {
     name: '',
@@ -36,13 +36,11 @@ export function newDraft() {
     scoring: null, // 'wins', 'sets' (scores required) or 'americano'
     americanoPoints: null,
     picks: [],
-    extraLevels: [],
     courts: 2,
     totalMinutes: 240,
     breakMinutes: 5,
     selectedRounds: null,
     lastRoundCourts: null,
-    revealBatch: null,
   };
 }
 
@@ -66,23 +64,12 @@ export function draftFromTournament(t) {
     totalMinutes: s.rounds * (s.matchMinutes + s.breakMinutes),
     selectedRounds: s.rounds,
     lastRoundCourts: s.lastRoundCourts ?? null,
-    revealBatch: s.revealBatch,
   };
 }
 
 export function draftScale(d) {
   const scale = { min: d.scaleMin, max: d.scaleMax, best: d.best };
   return scaleProblem(scale) ? null : scale;
-}
-
-// Small scales show every level; larger ones only the levels in use or added by hand.
-const SHOW_ALL_LEVELS = 11;
-
-export function shownLevels(d, scale) {
-  const all = levels(scale);
-  if (all.length <= SHOW_ALL_LEVELS) return all;
-  const used = new Set([...d.picks.map((p) => p.skill), ...d.extraLevels]);
-  return all.filter((skill) => used.has(skill));
 }
 
 const isWhole = (v, min) => Number.isInteger(v) && v >= min;
@@ -92,35 +79,37 @@ const isWhole = (v, min) => Number.isInteger(v) && v >= min;
 export function evaluateDraft(d, people = []) {
   const byId = new Map(people.map((p) => [p.id, p]));
   const scale = draftScale(d);
-  const picks = scale ? d.picks.filter((p) => isSkill(p.skill, scale)) : [];
-  const players = picks.map((p) => {
+  // Skills outside the scale (e.g. after it changed) count as not set.
+  const skilled = scale ? d.picks.filter((p) => isSkill(p.skill, scale)) : [];
+  const players = skilled.map((p) => {
     const person = byId.get(p.personId);
     return { personId: p.personId, name: person?.name ?? p.personId, skill: p.skill, ...(person?.birthYear != null ? { birthYear: person.birthYear } : {}) };
   });
   const scoringDone = d.scoring === 'wins' || d.scoring === 'sets' || (d.scoring === 'americano' && isWhole(d.americanoPoints, 1));
-  const steps = { name: d.name.trim() !== '', scale: Boolean(scale), scoring: scoringDone, players: players.length >= 4 };
+  const steps = { name: d.name.trim() !== '', scale: Boolean(scale), scoring: scoringDone, players: d.picks.length > 0,
+    // Skills can be set from the first player on; going on needs at least 4 players.
+    skills: d.picks.length >= 4 && skilled.length === d.picks.length };
   steps.courts = isWhole(d.courts, 1) && isWhole(d.breakMinutes, 0);
   let options = [];
   let plan = null;
-  if (steps.players && steps.courts && isWhole(d.totalMinutes, 1)) {
+  if (steps.skills && steps.courts && isWhole(d.totalMinutes, 1)) {
     options = recommendOptions({ players: players.length, courts: d.courts, totalMinutes: d.totalMinutes, breakMinutes: d.breakMinutes });
     const chosen = options.find((o) => o.rounds === d.selectedRounds && (o.lastRoundCourts ?? null) === (d.lastRoundCourts ?? null));
     if (chosen) plan = { rounds: chosen.rounds, matchMinutes: chosen.matchMinutes, ...(chosen.lastRoundCourts ? { lastRoundCourts: chosen.lastRoundCourts } : {}) };
   }
   steps.time = options.length > 0;
   steps.plan = Boolean(plan);
-  steps.reveal = d.revealBatch != null;
   const problems = [];
   if (!steps.name) problems.push('Give the tournament a name.');
   if (!steps.scale) problems.push(scaleProblem({ min: d.scaleMin, max: d.scaleMax, best: d.best }) ?? 'Choose the skill scale.');
   if (!steps.scoring) problems.push(d.scoring === 'americano' ? 'Points per match must be a whole number of at least 1.' : 'Choose how matches are scored.');
-  if (!steps.players) problems.push('Choose at least 4 players.');
+  if (d.picks.length < 4) problems.push('Choose at least 4 players.');
+  else if (!steps.skills) problems.push('Give every player a skill.');
   if (!isWhole(d.courts, 1)) problems.push('Courts must be a whole number of at least 1.');
   if (!isWhole(d.breakMinutes, 0)) problems.push('Break must be a whole number of minutes (0 or more).');
-  if (steps.players && steps.courts && !isWhole(d.totalMinutes, 1)) problems.push('Total time must be a whole number of minutes.');
-  else if (steps.players && steps.courts && !steps.time) problems.push('Not enough time for even one round of at least 5 minutes.');
+  if (steps.skills && steps.courts && !isWhole(d.totalMinutes, 1)) problems.push('Total time must be a whole number of minutes.');
+  else if (steps.skills && steps.courts && !steps.time) problems.push('Not enough time for even one round of at least 5 minutes.');
   if (steps.time && !steps.plan) problems.push('Choose rounds and match length.');
-  if (!steps.reveal) problems.push('Choose how many rounds are revealed at a time.');
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
   const scoring = !steps.scoring ? null
     : d.scoring === 'americano' ? { mode: 'americano', points: d.americanoPoints }
@@ -138,46 +127,53 @@ function selectInput(value, choices, onchange) {
   return select;
 }
 
-// Players per skill level: one dropdown per chosen player, and an empty one to add the
-// next. Only players not chosen yet are offered.
-function playersStep(ctx, d, scale, people) {
+// The players: one dropdown per chosen player, and an empty one to add the next. Only
+// players not chosen yet are offered.
+function playersStep(ctx, d, people) {
   const known = sortPeople(people);
   const chosen = new Set(d.picks.map((p) => p.personId));
   const free = known.filter((p) => !chosen.has(p.id));
   const name = (id) => known.find((p) => p.id === id)?.name ?? id;
-  const level = (skill) => {
-    const here = d.picks.filter((p) => p.skill === skill);
-    const pickSelect = (pick) => selectInput(pick.personId, [[pick.personId, name(pick.personId)], ...free.map((p) => [p.id, p.name])], (e) => {
-      pick.personId = e.target.value;
-      ctx.render();
-    });
-    const addSelect = free.length ? selectInput('', [['', here.length ? 'Add another…' : 'Add player…'], ...free.map((p) => [p.id, p.name])], (e) => {
-      if (!e.target.value) return;
-      d.picks.push({ personId: e.target.value, skill });
-      ctx.render();
-    }) : null;
-    return h('div', { class: 'level' },
-      h('div', { class: 'level-label' }, `Skill ${skill}`),
-      h('div', { class: 'level-picks' },
-        here.map((pick) => h('div', { class: 'level-pick' }, pickSelect(pick),
-          h('button', { class: 'small', title: 'Remove', 'aria-label': `Remove ${name(pick.personId)}`, onclick: () => { d.picks.splice(d.picks.indexOf(pick), 1); ctx.render(); } }, '✕'))),
-        addSelect));
-  };
-  const shown = shownLevels(d, scale);
-  const missing = levels(scale).filter((skill) => !shown.includes(skill));
-  const addLevel = levels(scale).length > SHOW_ALL_LEVELS && missing.length
-    ? field('Add a skill level', selectInput('', [['', 'Choose…'], ...missing.map((skill) => [skill, `Skill ${skill}`])], (e) => {
-      if (e.target.value === '') return;
-      d.extraLevels.push(Number(e.target.value));
-      ctx.render();
-    }))
-    : null;
+  const pickSelect = (pick) => selectInput(pick.personId, [[pick.personId, name(pick.personId)], ...free.map((p) => [p.id, p.name])], (e) => {
+    pick.personId = e.target.value;
+    ctx.render();
+  });
+  const addSelect = free.length ? selectInput('', [['', d.picks.length ? 'Add another…' : 'Add player…'], ...free.map((p) => [p.id, p.name])], (e) => {
+    if (!e.target.value) return;
+    d.picks.push({ personId: e.target.value, skill: null });
+    ctx.render();
+  }) : null;
   return [
-    h('p', { class: 'muted' }, `${describeScale(scale)} Choose the players of each level; a new dropdown appears for the next one. ${d.picks.length} chosen.`),
-    h('div', { class: 'levels' }, shown.map(level)),
-    addLevel,
+    h('p', { class: 'muted' }, `Choose who plays; a new dropdown appears for the next one. ${d.picks.length} chosen.`),
+    h('div', { class: 'level-picks' },
+      d.picks.map((pick) => h('div', { class: 'level-pick' }, pickSelect(pick),
+        h('button', { class: 'small', title: 'Remove', 'aria-label': `Remove ${name(pick.personId)}`, onclick: () => { d.picks.splice(d.picks.indexOf(pick), 1); ctx.render(); } }, '✕'))),
+      addSelect),
     h('div', { class: 'actions' },
       h('button', { class: 'small', onclick: () => { ctx.state.peopleReturn = 'setup'; ctx.go('people'); } }, 'Add or edit players…')),
+  ];
+}
+
+// A skill for each chosen player. Players with a skill are sorted by it (best first);
+// the ones still without follow in the order they were chosen.
+export function skillOrder(picks, scale) {
+  const rank = new Map(levels(scale).map((skill, i) => [skill, i]));
+  const set = picks.filter((p) => isSkill(p.skill, scale)).sort((a, b) => rank.get(a.skill) - rank.get(b.skill));
+  return [...set, ...picks.filter((p) => !isSkill(p.skill, scale))];
+}
+
+function skillsStep(ctx, d, scale, people) {
+  const name = (id) => people.find((p) => p.id === id)?.name ?? id;
+  const choices = [['', 'Choose…'], ...levels(scale).map((skill) => [skill, `Skill ${skill}`])];
+  const missing = d.picks.filter((p) => !isSkill(p.skill, scale)).length;
+  return [
+    h('p', { class: 'muted' }, `${describeScale(scale)} ${missing ? `${missing} still without a skill.` : 'Every player has a skill.'}`),
+    h('div', { class: 'skill-list' }, skillOrder(d.picks, scale).map((pick) => h('label', { class: 'skill-row' },
+      h('span', {}, name(pick.personId)),
+      selectInput(isSkill(pick.skill, scale) ? pick.skill : '', choices, (e) => {
+        pick.skill = e.target.value === '' ? null : Number(e.target.value);
+        ctx.render();
+      })))),
   ];
 }
 
@@ -219,32 +215,28 @@ export function setupScreen(ctx) {
       refresh();
     })),
     pointsField);
-  const playersCard = card('Players', 'wim', ev0.scale ? playersStep(ctx, d, ev0.scale, people) : null);
+  const playersCard = card('Players', 'wim', playersStep(ctx, d, people));
+  const skillsCard = card('Skills', 'ao', ev0.scale ? skillsStep(ctx, d, ev0.scale, people) : null);
   const courtsField = h('div', { class: 'row' },
     field('Courts', numberInput('courts', 1)),
     field('Break between rounds (min)', numberInput('breakMinutes', 0)));
   const timeField = field('Total tournament time (min)', numberInput('totalMinutes', 1));
   const timeCard = card('Courts & time', 'rg', courtsField, timeField, planBox);
-  const revealCard = card('Draw', 'uso',
-    field('Rounds revealed at a time', selectInput(d.revealBatch,
-      [['', 'Choose…'], ['all', 'All (whole schedule in advance)'], ['1', '1 (surprise)'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']],
-      (e) => { d.revealBatch = e.target.value === '' ? null : e.target.value === 'all' ? 'all' : Number(e.target.value); refresh(); })));
-
   // Shows each step once the ones before are done.
   const refresh = () => {
     const ev = evaluateDraft(d, people);
     const s = ev.steps;
-    const order = [s.name, s.scale, s.scoring, s.players, s.courts, s.time, s.plan, s.reveal];
+    const order = [s.name, s.scoring, s.scale, s.players, s.skills, s.courts, s.time, s.plan];
     const reached = order.findIndex((done) => !done); // the first open step (-1: all done)
     const upTo = (i) => reached === -1 || i <= reached;
-    scaleCard.hidden = !upTo(1);
-    scoringCard.hidden = !upTo(2);
+    scoringCard.hidden = !upTo(1);
+    scaleCard.hidden = !upTo(2);
     pointsField.hidden = d.scoring !== 'americano';
-    playersCard.hidden = !upTo(3) || !ev.scale;
-    timeCard.hidden = !upTo(4);
-    timeField.hidden = !upTo(5);
-    planBox.hidden = !upTo(6);
-    revealCard.hidden = !upTo(7);
+    playersCard.hidden = !upTo(3);
+    skillsCard.hidden = !upTo(4) || !ev.scale;
+    timeCard.hidden = !upTo(5);
+    timeField.hidden = !upTo(6);
+    planBox.hidden = !upTo(7);
     planBox.replaceChildren(planField(d, ev, refresh));
     preview.replaceChildren(...setupPreview(ctx, d, ev, reached === -1));
   };
@@ -262,7 +254,7 @@ export function setupScreen(ctx) {
           },
         }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
         h('h1', {}, d.editingId ? 'Edit tournament' : 'New tournament'))),
-    h('div', { class: 'form' }, nameCard, scaleCard, scoringCard, playersCard, timeCard, revealCard),
+    h('div', { class: 'form' }, nameCard, scoringCard, scaleCard, playersCard, skillsCard, timeCard),
     preview);
 }
 
@@ -320,7 +312,7 @@ function cancelSetup(ctx) {
 }
 
 function createFromDraft(ctx, d, ev) {
-  const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch,
+  const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes,
     scale: ev.scale, ...(ev.scoring ? { scoring: ev.scoring } : {}), ...(ev.plan.lastRoundCourts ? { lastRoundCourts: ev.plan.lastRoundCourts } : {}) };
   const editing = d.editingId && ctx.store.get(d.editingId);
   let t;

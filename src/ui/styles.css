@@ -65,6 +65,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Steps and fields that are not reached yet stay hidden, whatever their display. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);
@@ -145,15 +147,17 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fon
 .option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .option input { width: auto; accent-color: var(--accent); }
 .options.withdraw { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-/* Setup: players per skill level, one dropdown per player and one to add the next. */
-.levels { display: grid; gap: 10px; margin: 10px 0; }
-.level { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.level:last-child { border-bottom: none; }
-.level-label { font-weight: 650; padding-top: 10px; }
+/* Setup: the chosen players (one dropdown each), then a skill for each. */
 .level-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
 .level-pick { display: flex; gap: 6px; align-items: center; }
 .level-pick select { flex: 1; min-width: 0; }
 .level-pick button { flex: none; min-height: 36px; padding: 4px 10px; }
+.level-picks { margin: 10px 0; }
+.skill-list { display: grid; gap: 6px; margin: 10px 0; }
+.skill-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.skill-row:last-child { border-bottom: none; }
+.skill-row span { flex: 1; min-width: 0; font-weight: 550; overflow-wrap: anywhere; }
+.skill-row select { width: auto; flex: none; min-width: 120px; }
 /* Players page */
 .people { list-style: none; padding: 0; margin: 0; }
 .people li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }

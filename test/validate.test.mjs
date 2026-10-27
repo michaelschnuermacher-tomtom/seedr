@@ -40,8 +40,6 @@ const cases = {
   'invalid court number': [(t) => { t.schedule[0].matches[0].court = 7; }, /court/],
   'result for an unknown match': [(t) => { t.results['9-1'] = 1; }, /unknown match/],
   'invalid result value': [(t) => { t.results['1-1'] = 3; }, /Invalid result/],
-  'revealed rounds out of range': [(t) => { t.revealedRounds = 5; }, /revealed/],
-  'invalid reveal batch': [(t) => { t.settings.revealBatch = 0; }, /reveal batch/],
 };
 
 for (const [name, [mutate, message]] of Object.entries(cases)) {

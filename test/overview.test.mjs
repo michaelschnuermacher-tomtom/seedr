@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTournament, setResult } from '../src/engine/tournament.js';
+import { createTournament, setResult, finishTournament } from '../src/engine/tournament.js';
 import { teamValue, edgeLevel } from '../src/engine/schedule.js';
 import { roundsOverview, isAllRoundsPassword } from '../src/ui/tournament-view.js';
 
@@ -10,9 +10,13 @@ const make = (revealBatch) => createTournament({
   settings: { courts: 2, rounds: 5, matchMinutes: 12, breakMinutes: 2, revealBatch },
 });
 
-test('only revealed rounds are listed', () => {
-  assert.deepEqual(roundsOverview(make(2)).map((r) => r.round), [1, 2]);
-  assert.deepEqual(roundsOverview(make('all')).map((r) => r.round), [1, 2, 3, 4, 5]);
+test('players see every complete round and the next one; Manage sees all', () => {
+  let t = make();
+  assert.deepEqual(roundsOverview(t).map((r) => r.round), [1]);
+  assert.deepEqual(roundsOverview(t, true).map((r) => r.round), [1, 2, 3, 4, 5]);
+  for (const m of t.schedule[0].matches) t = setResult(t, 1, m.court, 1);
+  assert.deepEqual(roundsOverview(t).map((r) => r.round), [1, 2]);
+  assert.deepEqual(roundsOverview(finishTournament(t, new Date())).map((r) => r.round), [1, 2, 3, 4, 5]);
 });
 
 test('each match shows names, team values and the winner', () => {

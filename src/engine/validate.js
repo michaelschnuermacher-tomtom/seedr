@@ -28,7 +28,6 @@ function checkTournament(t) {
   const ids = checkPlayers(t.players, scaleOf(t.settings));
   if (!isInt(t.seed)) fail('Invalid seed');
   checkSchedule(t.schedule, t.settings, ids);
-  if (!isInt(t.revealedRounds) || t.revealedRounds < 0 || t.revealedRounds > t.settings.rounds) fail('Invalid number of revealed rounds');
   const americano = t.settings.scoring?.mode === 'americano';
   checkResults(t.results, t.schedule, americano);
   if ('scores' in t) checkScores(t.scores, t.results, americano ? t.settings.scoring.points : null);
@@ -40,7 +39,6 @@ function checkSettings(s) {
   if (!isInt(s.rounds) || s.rounds < 1) fail('Invalid number of rounds');
   if (!isInt(s.matchMinutes) || s.matchMinutes < 1) fail('Invalid match length');
   if (!isInt(s.breakMinutes) || s.breakMinutes < 0) fail('Invalid break length');
-  if (!(s.revealBatch === 'all' || (isInt(s.revealBatch) && s.revealBatch >= 1))) fail('Invalid reveal batch');
   if ('scale' in s && scaleProblem(s.scale)) fail(scaleProblem(s.scale));
   if ('scoring' in s && !(isObject(s.scoring) && (s.scoring.mode === 'sets'
     || (s.scoring.mode === 'americano' && isInt(s.scoring.points) && s.scoring.points >= 1)))) fail('Invalid scoring');

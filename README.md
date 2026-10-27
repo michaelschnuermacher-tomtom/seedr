@@ -32,8 +32,7 @@ the chosen tournaments a player of their own.
 ## Setting up a tournament
 
 The setup is a sequence of decisions, and each step appears once the one before is made:
-name, skill scale, players, courts and break, total time, rounds and match length, how
-many rounds are revealed at a time, and finally **Draw schedule**.
+name, scoring, skill scale, players, a skill for each player, courts and break, total time, rounds and match length, and finally **Draw schedule**.
 
 - **Skill scale**: any whole-number range from 0 to 100 (e.g. 1–5 or 1–10), and whether
   a lower or a higher skill is better. The draw is calibrated for 1–10 (1 = best); every
@@ -58,7 +57,7 @@ to win a game"); ages and years are never printed.
 | Courts | Up to 4 players per court play each round. With fewer than `4 × courts` players, only as many courts are used as there are full groups of 4. |
 | Total time, break | From these, Seedr works out every number of rounds that fits: match length = total time ÷ rounds − break, rounded down, at least 5 minutes. |
 | Rounds and match length | Chosen from a dropdown of these options only. Options where everyone plays the same number of games come first. If leaving courts empty in the last round means fewer players get fewer games, that is offered as an extra option, e.g. "9 rounds (last round on 1 court)". Only the number of rounds affects the draw. Match length and break are only used for the time plan. |
-| Rounds revealed at a time | Only changes what is shown. The whole schedule is drawn up front, and hidden rounds are revealed in batches with **Manage → Reveal round(s)**. |
+| Rounds shown | The whole schedule is drawn up front. The Rounds tab shows every complete round and the next one: as soon as a round has all its results, the next appears. Manage → **All rounds** shows the whole schedule. |
 
 ### Steps
 
@@ -109,14 +108,14 @@ Withdrawn players keep their wins in the standings, but get no bonus and no rank
 
 ## Manage
 
-Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The **Info** tab shows the most important facts (status, players, courts, rounds, match length, break, playing time, games and sit-outs per player, skill scale, reveal mode); Rounds and Standings only show the revealed rounds, results and standings, so the phone can be handed to players. A finished tournament shows **Finished** next to its name. Manage lists everything read-only, and changes happen on a sub-page that an **Edit** button opens, with Save and Cancel:
+Everything that changes the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The **Info** tab shows the most important facts (status, players, courts, rounds, match length, break, playing time, games and sit-outs per player, skill scale, rounds shown); Rounds and Standings only show the rounds played so far and the next one, results and standings, so the phone can be handed to players. A finished tournament shows **Finished** next to its name. Manage lists everything read-only, and changes happen on a sub-page that an **Edit** button opens, with Save and Cancel:
 
 - **Finish**: when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Names can still be corrected.
-- **Rounds**: how many rounds are revealed, with **Reveal round(s)** and **Swap players**.
+- **Rounds**: how many rounds the players see; **All rounds** shows the whole schedule (read-only), and **Swap players** works there in every round.
 - **Tournament**: name and settings; **Edit** changes the name, and before the first result also courts, rounds and times (in the setup, which draws again).
 - **Players**: the players by skill; **Edit skills** changes skills for this tournament (team values, edges, standings and summary follow; **Save and redraw** draws again what has no result yet), **Player leaves…** withdraws players and redraws the remaining rounds. Names and years of birth are only changed on the Players page.
 - **Draw quality**: average and biggest edge; **Details** shows all figures and, before the first result, **Redraw schedule**.
-- **Print & export**: **Print…** asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, all revealed rounds and player skills. A section starts on the same page when it still fits, and **Export backup**.
+- **Print & export**: **Print…** asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, all rounds and player skills. A section starts on the same page when it still fits, and **Export backup**.
 - **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.
 
 ### Tournament summary

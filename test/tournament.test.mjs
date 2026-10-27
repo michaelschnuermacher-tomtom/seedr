@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, shownRounds, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -40,17 +40,18 @@ test('createTournament builds a complete tournament', () => {
   assert.equal(t.createdAt, '2026-10-14T18:00:00.000Z');
   assert.deepEqual(t.players[0], { id: 'p1', name: 'P1', skill: 1 });
   assert.equal(t.schedule.length, 6);
-  assert.equal(t.revealedRounds, 2);
   assert.deepEqual(t.results, {});
   assert.equal(t.seed, 11);
 });
 
-test('revealNext reveals batches until all rounds are visible', () => {
+test('players see every complete round and the next one; all once finished', () => {
   let t = make();
-  t = revealNext(t); assert.equal(t.revealedRounds, 4);
-  t = revealNext(t); assert.equal(t.revealedRounds, 6);
-  t = revealNext(t); assert.equal(t.revealedRounds, 6);
-  assert.equal(make({ ...SETTINGS, revealBatch: 'all' }).revealedRounds, 6);
+  assert.equal(shownRounds(t), 1);
+  for (const m of t.schedule[0].matches) t = setResult(t, 1, m.court, 1);
+  assert.equal(shownRounds(t), 2, 'round 1 complete: round 2 appears');
+  t = setResult(t, 2, t.schedule[1].matches[0].court, 2);
+  assert.equal(shownRounds(t), 2, 'round 2 not complete yet');
+  assert.equal(shownRounds(finishTournament(t, new Date())), 6);
 });
 
 test('setResult sets, changes and clears a result without changing the input', () => {
@@ -83,7 +84,6 @@ test('updateSettings changes a tournament that has not started and draws a new s
   assert.equal(u.players[8].name, 'New Player');
   assert.equal(u.schedule.length, 4);
   u.schedule.forEach((r) => assert.equal(r.matches.length, 1));
-  assert.equal(u.revealedRounds, 4);
   assert.deepEqual(u.results, {});
   assert.equal(t.name, 'Club night', 'input unchanged');
 });
@@ -197,18 +197,18 @@ test('swapPlayers swaps two players within a round, also with a sit-out', () => 
   assert.equal(validateTournament(JSON.parse(JSON.stringify(o))).ok, true);
 });
 
-test('swapPlayers refuses matches with a result, hidden rounds and unknown players', () => {
-  const t = setResult(make(), 1, 1, 1); // revealBatch 2: rounds 1–2 revealed
+test('swapPlayers refuses matches with a result and unknown players; later rounds can be changed', () => {
+  const t = setResult(make(), 1, 1, 1);
   const [m1, m2] = t.schedule[0].matches;
   assert.throws(() => swapPlayers(t, 1, m1.team1[0], m2.team1[0]), /Court 1 already has a result/);
   assert.equal(swapPlayers(t, 1, m2.team1[0], m2.team2[0]).schedule[0].matches[1].team1[0], m2.team2[0]);
-  assert.throws(() => swapPlayers(t, 3, 'p1', 'p2'), /revealed/);
+  assert.equal(validateTournament(swapPlayers(t, 5, 'p1', 'p2')).ok, true, 'rounds not shown yet too (Manage)');
   assert.throws(() => swapPlayers(t, 2, 'p1', 'p1'), /two different/);
   assert.throws(() => swapPlayers(t, 2, 'p1', 'zz'), /not in round 2/);
 });
 
 test('swapPlayersAcross: two players in different rounds trade places in both rounds', () => {
-  const t = make(); // revealBatch 2: rounds 1–2 revealed
+  const t = make();
   const s = swapPlayersAcross(t, 1, 'p1', 2, 'p2');
   const back = (round) => JSON.parse(JSON.stringify(round).replace(/"p[12]"/g, (x) => (x === '"p1"' ? '"p2"' : '"p1"')));
   assert.notDeepEqual(s.schedule[0], t.schedule[0]);
@@ -233,7 +233,7 @@ test('a finished tournament is locked until it is reopened', () => {
   assert.equal(done.finishedAt, '2026-10-26T20:00:00.000Z');
   assert.ok(isFinished(done) && !isFinished(t));
   assert.equal(validateTournament(done).ok, true);
-  for (const change of [() => setResult(done, 1, 2, 1), () => revealNext(done), () => redraw(done, 2), () => withdrawPlayers(done, ['p1'], 2),
+  for (const change of [() => setResult(done, 1, 2, 1), () => redraw(done, 2), () => withdrawPlayers(done, ['p1'], 2),
     () => swapPlayers(done, 1, 'p1', 'p2'), () => finishTournament(done, new Date())]) {
     assert.throws(change, /finished/);
   }
