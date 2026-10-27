@@ -1,4 +1,4 @@
-import { computeStandings, resultKey } from './standings.js';
+import { computeStandings, resultKey, hasResult } from './standings.js';
 import { teamValue, edgeLevel } from './schedule.js';
 import { scaleOf, calibrated, calibratePlayers } from './scale.js';
 
@@ -23,24 +23,29 @@ export function tournamentSummary(t) {
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
-  // Matches of complete rounds, with winner and loser.
+  // Matches of complete rounds, with winner and loser. Draws (Americano) only count as played.
   const matches = [];
+  let draws = 0;
   for (const r of t.schedule) {
-    const winners = r.matches.map((m) => t.results[resultKey(r.round, m.court)]);
-    if (!r.matches.length || !winners.every((w) => w === 1 || w === 2)) continue;
-    r.matches.forEach((m, i) => {
-      const [won, lost] = winners[i] === 1 ? [m.team1, m.team2] : [m.team2, m.team1];
+    if (!r.matches.length || !r.matches.every((m) => hasResult(t.results, resultKey(r.round, m.court)))) continue;
+    for (const m of r.matches) {
+      const winner = t.results[resultKey(r.round, m.court)];
+      if (winner === 0) {
+        draws++;
+        continue;
+      }
+      const [won, lost] = winner === 1 ? [m.team1, m.team2] : [m.team2, m.team1];
       matches.push({ round: r.round, court: m.court, won, lost, gap: value(won) - value(lost) }); // gap > 0: the weaker team won
-    });
+    }
   }
-  if (matches.length === 0) return [];
+  if (matches.length + draws === 0) return [];
   // Once finished, the summary speaks of the result rather than of the tournament so far.
   const done = Boolean(t.finishedAt);
   const yet = done ? '' : ' yet';
   const next = done ? 'there is always the next tournament!' : 'there is always the next round!';
 
   // Everyone who played, including players who withdrew later.
-  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results, t.scores).filter((r) => r.games > 0);
+  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results, t.scores, t.settings?.scoring).filter((r) => r.games > 0);
   // A highlight about a statistic names everyone who shares it; edges count as equal when
   // they show the same in the standings.
   const and = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);
@@ -374,7 +379,8 @@ export function tournamentSummary(t) {
   // By the numbers: how often the stronger team won.
   const decided = matches.filter((m) => m.gap !== 0);
   const favourites = decided.filter((m) => m.gap < 0).length;
-  add('📊', 'By the numbers', `${matches.length} ${matches.length === 1 ? 'match' : 'matches'} played. `
+  const matchCount = matches.length + draws;
+  add('📊', 'By the numbers', `${matchCount} ${matchCount === 1 ? 'match' : 'matches'} played${draws ? `, ${plural(draws, 'draw')}` : ''}. `
     + (decided.length
       ? `The stronger team won ${favourites} of ${decided.length} (even matches not counted); ${plural(upsets.length, 'upset')}.`
       : 'All of them between teams of exactly the same value.'));

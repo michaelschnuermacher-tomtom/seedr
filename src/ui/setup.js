@@ -23,7 +23,8 @@ export function defaultPeople() {
 }
 
 // The setup is a sequence of decisions; each step appears once the one before is made:
-// name, skill scale, players per skill, courts and break, total time, rounds, reveal mode.
+// name, skill scale, scoring, players per skill, courts and break, total time, rounds,
+// reveal mode.
 // `picks` are the chosen players in the order they were added: { personId, skill }.
 // `extraLevels` are skill levels added by hand (large scales only show levels in use).
 export function newDraft() {
@@ -32,6 +33,8 @@ export function newDraft() {
     scaleMin: null,
     scaleMax: null,
     best: null,
+    scoring: null, // 'wins' or 'americano'
+    americanoPoints: null,
     picks: [],
     extraLevels: [],
     courts: 2,
@@ -55,6 +58,8 @@ export function draftFromTournament(t) {
     scaleMin: scale.min,
     scaleMax: scale.max,
     best: scale.best,
+    scoring: s.scoring?.mode === 'americano' ? 'americano' : 'wins',
+    americanoPoints: s.scoring?.points ?? null,
     picks: t.players.filter(isActive).map((p) => ({ personId: p.personId ?? p.id, skill: p.skill })),
     courts: s.courts,
     breakMinutes: s.breakMinutes,
@@ -92,7 +97,8 @@ export function evaluateDraft(d, people = []) {
     const person = byId.get(p.personId);
     return { personId: p.personId, name: person?.name ?? p.personId, skill: p.skill, ...(person?.birthYear != null ? { birthYear: person.birthYear } : {}) };
   });
-  const steps = { name: d.name.trim() !== '', scale: Boolean(scale), players: players.length >= 4 };
+  const scoringDone = d.scoring === 'wins' || (d.scoring === 'americano' && isWhole(d.americanoPoints, 1));
+  const steps = { name: d.name.trim() !== '', scale: Boolean(scale), scoring: scoringDone, players: players.length >= 4 };
   steps.courts = isWhole(d.courts, 1) && isWhole(d.breakMinutes, 0);
   let options = [];
   let plan = null;
@@ -107,6 +113,7 @@ export function evaluateDraft(d, people = []) {
   const problems = [];
   if (!steps.name) problems.push('Give the tournament a name.');
   if (!steps.scale) problems.push(scaleProblem({ min: d.scaleMin, max: d.scaleMax, best: d.best }) ?? 'Choose the skill scale.');
+  if (!steps.scoring) problems.push(d.scoring === 'americano' ? 'Points per match must be a whole number of at least 1.' : 'Choose how matches are scored.');
   if (!steps.players) problems.push('Choose at least 4 players.');
   if (!isWhole(d.courts, 1)) problems.push('Courts must be a whole number of at least 1.');
   if (!isWhole(d.breakMinutes, 0)) problems.push('Break must be a whole number of minutes (0 or more).');
@@ -115,7 +122,8 @@ export function evaluateDraft(d, people = []) {
   if (steps.time && !steps.plan) problems.push('Choose rounds and match length.');
   if (!steps.reveal) problems.push('Choose how many rounds are revealed at a time.');
   const games = plan ? gamesPerPlayer(players.length, d.courts, plan.rounds, plan.lastRoundCourts) : null;
-  return { players, scale, steps, problems, options, plan, games };
+  const scoring = d.scoring === 'americano' && steps.scoring ? { mode: 'americano', points: d.americanoPoints } : null;
+  return { players, scale, scoring, steps, problems, options, plan, games };
 }
 
 function field(label, input) {
@@ -202,6 +210,13 @@ export function setupScreen(ctx) {
       d.best = e.target.value || null;
       ctx.render();
     })));
+  const pointsField = field('Points per match (both teams together, e.g. 24)', numberInput('americanoPoints', 1));
+  const scoringCard = card('Scoring', 'rg',
+    field('How are matches scored?', selectInput(d.scoring, [['', 'Choose…'], ['wins', 'Wins (scores optional)'], ['americano', 'Americano: points to a fixed total']], (e) => {
+      d.scoring = e.target.value || null;
+      refresh();
+    })),
+    pointsField);
   const playersCard = card('Players', 'wim', ev0.scale ? playersStep(ctx, d, ev0.scale, people) : null);
   const courtsField = h('div', { class: 'row' },
     field('Courts', numberInput('courts', 1)),
@@ -217,15 +232,17 @@ export function setupScreen(ctx) {
   const refresh = () => {
     const ev = evaluateDraft(d, people);
     const s = ev.steps;
-    const order = [s.name, s.scale, s.players, s.courts, s.time, s.plan, s.reveal];
+    const order = [s.name, s.scale, s.scoring, s.players, s.courts, s.time, s.plan, s.reveal];
     const reached = order.findIndex((done) => !done); // the first open step (-1: all done)
     const upTo = (i) => reached === -1 || i <= reached;
     scaleCard.hidden = !upTo(1);
-    playersCard.hidden = !upTo(2) || !ev.scale;
-    timeCard.hidden = !upTo(3);
-    timeField.hidden = !upTo(4);
-    planBox.hidden = !upTo(5);
-    revealCard.hidden = !upTo(6);
+    scoringCard.hidden = !upTo(2);
+    pointsField.hidden = d.scoring !== 'americano';
+    playersCard.hidden = !upTo(3) || !ev.scale;
+    timeCard.hidden = !upTo(4);
+    timeField.hidden = !upTo(5);
+    planBox.hidden = !upTo(6);
+    revealCard.hidden = !upTo(7);
     planBox.replaceChildren(planField(d, ev, refresh));
     preview.replaceChildren(...setupPreview(ctx, d, ev, reached === -1));
   };
@@ -243,7 +260,7 @@ export function setupScreen(ctx) {
           },
         }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
         h('h1', {}, d.editingId ? 'Edit tournament' : 'New tournament'))),
-    h('div', { class: 'form' }, nameCard, scaleCard, playersCard, timeCard, revealCard),
+    h('div', { class: 'form' }, nameCard, scaleCard, scoringCard, playersCard, timeCard, revealCard),
     preview);
 }
 
@@ -302,7 +319,7 @@ function cancelSetup(ctx) {
 
 function createFromDraft(ctx, d, ev) {
   const settings = { courts: d.courts, rounds: ev.plan.rounds, matchMinutes: ev.plan.matchMinutes, breakMinutes: d.breakMinutes, revealBatch: d.revealBatch,
-    scale: ev.scale, ...(ev.plan.lastRoundCourts ? { lastRoundCourts: ev.plan.lastRoundCourts } : {}) };
+    scale: ev.scale, ...(ev.scoring ? { scoring: ev.scoring } : {}), ...(ev.plan.lastRoundCourts ? { lastRoundCourts: ev.plan.lastRoundCourts } : {}) };
   const editing = d.editingId && ctx.store.get(d.editingId);
   let t;
   try {

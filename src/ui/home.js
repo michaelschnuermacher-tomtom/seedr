@@ -35,7 +35,8 @@ function tournamentsTab(ctx) {
       : h('ul', { class: 'list' }, tournaments.map((t) => h('li', {},
         h('button', { class: 'link', onclick: () => ctx.open(t) },
           h('strong', {}, t.name),
-          h('span', { class: 'muted' }, ` · ${t.players?.length ?? 0} players · ${new Date(t.createdAt).toLocaleDateString()}${t.finishedAt ? ' · finished' : ''}`))))),
+          h('span', { class: 'muted' }, ` · ${t.players?.length ?? 0} players · ${new Date(t.createdAt).toLocaleDateString()}`),
+          t.finishedAt ? h('span', { class: 'title-badge' }, 'Finished') : null)))),
   ];
 }
 

@@ -4,6 +4,17 @@ export function resultKey(round, court) {
   return `${round}-${court}`;
 }
 
+// A match has a result: 1 or 2 (the winning team), or 0 for a draw (Americano only).
+export function hasResult(results, key) {
+  return results[key] === 0 || results[key] === 1 || results[key] === 2;
+}
+
+// Americano: every match is played to a fixed total of points (`scoring.points`), and the
+// ranking is by the points a player's teams scored. Otherwise matches are won or lost.
+export function isAmericano(scoring) {
+  return scoring?.mode === 'americano';
+}
+
 // What a score says: sets won by each team and points of each team. A set goes to the
 // team with more points. `sets` is [[team 1 points, team 2 points], …].
 export function scoreTotals(sets) {
@@ -25,11 +36,12 @@ export function scoreWinner(sets) {
 }
 
 // `scores` (optional) maps a match key to its sets; they add sets and points for the
-// tie-breakers.
-export function computeStandings(players, schedule, results, scores = {}) {
+// tie-breakers. With Americano `scoring`, the points scored are the ranking.
+export function computeStandings(players, schedule, results, scores = {}, scoring = null) {
+  const americano = isAmericano(scoring);
   const skillOf = new Map(players.map((p) => [p.id, p.skill]));
   const rows = new Map(players.map((p) => [p.id, {
-    id: p.id, name: p.name, skill: p.skill, games: 0, wins: 0, fairnessSum: 0, setsWon: 0, setsLost: 0, pointsFor: 0, pointsAgainst: 0,
+    id: p.id, name: p.name, skill: p.skill, games: 0, wins: 0, draws: 0, fairnessSum: 0, setsWon: 0, setsLost: 0, pointsFor: 0, pointsAgainst: 0,
   }]));
   // Team value as balanced by the draw (lower = stronger).
   const value = (team) => teamValue(skillOf.get(team[0]), skillOf.get(team[1]));
@@ -39,8 +51,9 @@ export function computeStandings(players, schedule, results, scores = {}) {
     round.matches.forEach((m, i) => {
       if (winners[i] === 1) m.team1.forEach((pid) => rows.get(pid).wins++);
       if (winners[i] === 2) m.team2.forEach((pid) => rows.get(pid).wins++);
+      if (winners[i] === 0) [...m.team1, ...m.team2].forEach((pid) => rows.get(pid).draws++);
     });
-    const complete = round.matches.length > 0 && winners.every((w) => w === 1 || w === 2);
+    const complete = round.matches.length > 0 && round.matches.every((m) => hasResult(results, resultKey(round.round, m.court)));
     if (!complete) continue;
     for (const m of round.matches) {
       // Match fairness from each side: the gap between the two team values, positive for
@@ -70,17 +83,25 @@ export function computeStandings(players, schedule, results, scores = {}) {
   const maxGames = Math.max(0, ...list.filter((r) => !withdrawn.has(r.id)).map((r) => r.games));
   // Edge: the average head start of a player's team per game, i.e. the match fairness
   // from their side: + = mostly in the stronger team, − = mostly in the weaker one.
+  // Bonus for games fewer than the most played: 0.5 points per game, or in Americano the
+  // player's own average points per game (one decimal).
   const out = list.map(({ fairnessSum, ...r }) => {
     const gone = withdrawn.has(r.id);
-    const bonus = gone ? 0 : 0.5 * (maxGames - r.games);
-    return { ...r, withdrawn: gone, bonus, points: r.wins + bonus, edge: r.games ? fairnessSum / r.games : null };
+    const missing = gone ? 0 : maxGames - r.games;
+    const bonus = americano ? Math.round(((r.games ? r.pointsFor / r.games : 0) * missing) * 10) / 10 : 0.5 * missing;
+    const points = americano ? Math.round((r.pointsFor + bonus) * 10) / 10 : r.wins + bonus;
+    return { ...r, withdrawn: gone, bonus, points, losses: r.games - r.wins - r.draws, edge: r.games ? fairnessSum / r.games : null };
   });
-  // Rank: points, then set difference, then point difference (both 0 without scores).
+  // Rank: points, then set difference, then point difference (both 0 without scores);
+  // in Americano points, then point difference, then wins.
   // Players equal in all three share a rank; among them the lowest edge is listed first
   // (won with the least help from the draw), then the weaker player (higher skill number).
   const sets = (r) => r.setsWon - r.setsLost;
   const diff = (r) => r.pointsFor - r.pointsAgainst;
-  const ahead = (a, b) => b.points - a.points || sets(b) - sets(a) || diff(b) - diff(a);
+  // Americano: points, then point difference, then wins.
+  const ahead = (a, b) => (americano
+    ? b.points - a.points || diff(b) - diff(a) || b.wins - a.wins
+    : b.points - a.points || sets(b) - sets(a) || diff(b) - diff(a));
   out.sort((a, b) => a.withdrawn - b.withdrawn || ahead(a, b) || (a.edge ?? 0) - (b.edge ?? 0)
     || b.skill - a.skill || a.name.localeCompare(b.name));
   const ranked = out.filter((r) => !r.withdrawn);

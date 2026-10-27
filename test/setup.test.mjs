@@ -7,7 +7,7 @@ const SKILLS_18 = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10];
 const people18 = SKILLS_18.map((_, i) => ({ id: `x${i + 1}`, name: `P${i + 1}` }));
 // The spec example: 3 courts, 120 minutes, 2-minute break, skills 1–10 (lower is better).
 const example = () => ({
-  ...newDraft(), name: 'Club night', scaleMin: 1, scaleMax: 10, best: 'low',
+  ...newDraft(), name: 'Club night', scaleMin: 1, scaleMax: 10, best: 'low', scoring: 'wins',
   picks: people18.map((p, i) => ({ personId: p.id, skill: SKILLS_18[i] })),
   courts: 3, totalMinutes: 120, breakMinutes: 2, revealBatch: 'all',
 });
@@ -21,17 +21,22 @@ test('a new draft has no skills, no players and no scale; courts and time have d
 
 test('the steps are done one after the other', () => {
   const steps = (d) => evaluateDraft(d, people18).steps;
-  assert.deepEqual(steps(newDraft()), { name: false, scale: false, players: false, courts: true, time: false, plan: false, reveal: false });
+  assert.deepEqual(steps(newDraft()), { name: false, scale: false, scoring: false, players: false, courts: true, time: false, plan: false, reveal: false });
   const d = { ...newDraft(), name: 'x' };
   assert.equal(steps(d).scale, false);
   Object.assign(d, { scaleMin: 1, scaleMax: 5 });
   assert.equal(steps(d).scale, false, 'the direction is still missing');
   d.best = 'high';
   assert.equal(steps(d).scale, true);
+  d.scoring = 'americano';
+  assert.equal(steps(d).scoring, false, 'Americano needs the points per match');
+  d.americanoPoints = 24;
+  assert.equal(steps(d).scoring, true);
   d.picks = people18.slice(0, 3).map((p) => ({ personId: p.id, skill: 2 }));
   assert.equal(steps(d).players, false, 'at least 4 players');
   d.picks.push({ personId: 'x4', skill: 5 });
-  assert.deepEqual(steps(d), { name: true, scale: true, players: true, courts: true, time: true, plan: false, reveal: false });
+  assert.deepEqual(steps(d), { name: true, scale: true, scoring: true, players: true, courts: true, time: true, plan: false, reveal: false });
+  assert.deepEqual(evaluateDraft(d, people18).scoring, { mode: 'americano', points: 24 });
 });
 
 test('the skill range can be anything from 0 to 100, lowest below highest', () => {
@@ -99,7 +104,7 @@ test('draftFromTournament fills in every step', () => {
   });
   const d = draftFromTournament(t);
   assert.deepEqual([d.editingId, d.name, d.scaleMin, d.scaleMax, d.best, d.picks.length], ['t9', 'Tenerife Cup', 1, 10, 'low', 18]);
-  assert.deepEqual([d.courts, d.breakMinutes, d.revealBatch], [3, 2, 3]);
+  assert.deepEqual([d.courts, d.breakMinutes, d.revealBatch, d.scoring], [3, 2, 3, 'wins']);
   const ev = evaluateDraft(d, people18);
   assert.deepEqual(ev.problems, []);
   assert.deepEqual(ev.plan, { rounds: 9, matchMinutes: 11 }, 'the current option is selected');
@@ -108,7 +113,7 @@ test('draftFromTournament fills in every step', () => {
 test('choosing an option with fewer courts in the last round keeps them in the plan', () => {
   const skills17 = [5, 9, 8, 6, 1, 9, 4, 6, 5, 7, 1, 4, 6, 3, 1, 3, 4];
   const people17 = skills17.map((_, i) => ({ id: `y${i}`, name: `P${i + 1}` }));
-  const d = { ...newDraft(), name: 'x', scaleMin: 1, scaleMax: 10, best: 'low', revealBatch: 'all',
+  const d = { ...newDraft(), name: 'x', scaleMin: 1, scaleMax: 10, best: 'low', scoring: 'wins', revealBatch: 'all',
     picks: people17.map((p, i) => ({ personId: p.id, skill: skills17[i] })), selectedRounds: 9, lastRoundCourts: 1 };
   const ev = evaluateDraft(d, people17);
   assert.deepEqual(ev.problems, []);

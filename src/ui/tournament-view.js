@@ -1,7 +1,7 @@
 import { h, formatSigned } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../engine/tournament.js';
-import { resultKey, computeStandings, scoreWinner } from '../engine/standings.js';
+import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
@@ -13,7 +13,7 @@ import { draftFromTournament } from './setup.js';
 const TABS = [['info', 'Info'], ['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['manage', 'Manage']];
 
 function roundComplete(t, round) {
-  return round.matches.every((m) => t.results[resultKey(round.round, m.court)]);
+  return round.matches.every((m) => hasResult(t.results, resultKey(round.round, m.court)));
 }
 
 export function tournamentScreen(ctx) {
@@ -82,6 +82,7 @@ function infoTab(t) {
       fact('Playing time', `${total} min${hours ? ` (${hours} h${total % 60 ? ` ${total % 60} min` : ''})` : ''}`),
       fact('Games per player', spread(games, 'game')),
       fact('Sit-outs per player', spread(sitOuts, 'sit-out')),
+      fact('Scoring', isAmericano(s.scoring) ? `Americano, ${s.scoring.points} points per match` : 'Wins (scores optional)'),
       fact('Skill scale', `${scaleOf(s).min}–${scaleOf(s).max}. ${describeScale(scaleOf(s))}`),
       fact('Rounds revealed', `${s.revealBatch === 'all' ? 'All at once' : `${s.revealBatch} at a time`} (${t.revealedRounds} of ${s.rounds} so far)`)),
     h('div', { style: 'height: 12px' }));
@@ -134,7 +135,7 @@ function teamButton(ctx, t, round, match, n) {
     class: ['team', winner === n ? 'winner' : '', winner && winner !== n ? 'loser' : ''].join(' ').trim(),
     disabled: isFinished(t),
     onclick: () => {
-      if (match.score) {
+      if (match.score || isAmericano(t.settings.scoring)) {
         openScore(ctx, round, match);
         return;
       }
@@ -170,6 +171,7 @@ function closeScore(ctx) {
 // follows from the score (more sets, then more points); when both are equal it is chosen
 // here. Entering a score is optional: tapping the winner on the round card still works.
 function scorePage(ctx, t, view) {
+  if (isAmericano(t.settings.scoring)) return americanoScorePage(ctx, t, view);
   const { round, court } = view.scoring;
   const match = roundsOverview(t).find((r) => r.round === round)?.matches.find((m) => m.court === court);
   if (!match) {
@@ -230,6 +232,72 @@ function scorePage(ctx, t, view) {
         match.score ? h('button', {
           onclick: () => {
             ctx.save(setScore(t, round, court, null));
+            closeScore(ctx);
+          },
+        }, 'Remove score') : null,
+        h('button', { onclick: () => closeScore(ctx) }, 'Cancel'))),
+  ];
+}
+
+// Americano: the points of both teams, adding up to the points per match. Typing one fills
+// in the other; equal points are a draw.
+function americanoScorePage(ctx, t, view) {
+  const { round, court } = view.scoring;
+  const match = roundsOverview(t).find((r) => r.round === round)?.matches.find((m) => m.court === court);
+  if (!match) {
+    closeScore(ctx);
+    return null;
+  }
+  const total = t.settings.scoring.points;
+  const pair = view.scoreDraft.sets[0];
+  const names = (n) => (n === 1 ? match.team1 : match.team2).members.join(' & ');
+  const verdict = h('p', { class: 'muted' });
+  const inputs = [];
+  const update = () => {
+    const [a, b] = pair;
+    verdict.textContent = !Number.isInteger(a) || !Number.isInteger(b) ? `Enter the points of one team; together they make ${total}.`
+      : a + b !== total ? `The points must add up to ${total}.`
+        : a === b ? 'Draw.' : `Winner: ${names(a > b ? 1 : 2)}.`;
+  };
+  const pointsInput = (i) => {
+    const input = h('input', {
+      type: 'number', min: 0, max: total, step: 1, inputmode: 'numeric', value: pair[i] ?? '',
+      'aria-label': `Points ${names(i + 1)}`,
+      oninput: (e) => {
+        pair[i] = e.target.value === '' ? null : Number(e.target.value);
+        const other = 1 - i;
+        if (Number.isInteger(pair[i]) && pair[i] >= 0 && pair[i] <= total) {
+          pair[other] = total - pair[i];
+          inputs[other].value = pair[other];
+        }
+        update();
+      },
+    });
+    inputs[i] = input;
+    return input;
+  };
+  const save = () => {
+    try {
+      ctx.save(setScore(t, round, court, [pair.map((x) => (Number.isInteger(x) ? x : NaN))]));
+      closeScore(ctx);
+    } catch (error) {
+      ctx.state.message = error.message;
+      ctx.render();
+    }
+  };
+  update();
+  return [
+    h('button', { class: 'back-link', onclick: () => closeScore(ctx) }, '← Rounds'),
+    h('section', { class: 'card' },
+      h('h2', { class: 'card-title' }, `Round ${round} · Court ${court} · ${total} points`),
+      h('div', { class: 'score-set score-head' }, h('span', {}), h('strong', {}, names(1)), h('span', {}), h('strong', {}, names(2)), h('span', {})),
+      h('div', { class: 'score-set' }, h('span', { class: 'score-set-label' }, 'Points'), pointsInput(0), h('span', { class: 'vs' }, ':'), pointsInput(1), h('span', {})),
+      verdict,
+      h('div', { class: 'actions' },
+        h('button', { class: 'primary', onclick: save }, 'Save'),
+        match.score ? h('button', {
+          onclick: () => {
+            ctx.save(setResult(t, round, court, null)); // the score is the result
             closeScore(ctx);
           },
         }, 'Remove score') : null,
@@ -336,7 +404,7 @@ function swapRound(ctx, t, view, round) {
     onclick: () => tap(id),
   }, byId.get(id).name);
   const matches = r.matches.map((m, k) => {
-    const locked = Boolean(t.results[resultKey(round.round, m.court)]);
+    const locked = hasResult(t.results, resultKey(round.round, m.court));
     return h('div', { class: `match swap ${courtColor(m.court)}` },
       courtLine('div', round.matches[k]),
       h('div', { class: 'chips' }, m.team1.map((id) => chip(id, locked))),
@@ -417,12 +485,15 @@ const formatPoints = (x) => (x > 0 ? `+${x}` : x < 0 ? `−${-x}` : '0');
 
 function standingsTab(t) {
   const scale = scaleOf(t.settings);
-  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results, t.scores);
+  const americano = isAmericano(t.settings.scoring);
+  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results, t.scores, t.settings.scoring);
   // The Bonus column only appears once someone has bonus points.
   const bonus = rows.some((r) => r.bonus);
   // Sets and point difference only appear once a score has been entered.
   const scored = Object.keys(t.scores ?? {}).length > 0;
-  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', scored ? 'Sets' : null, scored ? '+/−' : null, 'Edge'].filter(Boolean);
+  const headers = americano
+    ? ['#', 'Player', 'Games', 'W–D–L', bonus ? 'Bonus' : null, 'Points', '+/−', 'Edge'].filter(Boolean)
+    : ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', scored ? 'Sets' : null, scored ? '+/−' : null, 'Edge'].filter(Boolean);
   return [
     h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
@@ -431,17 +502,20 @@ function standingsTab(t) {
         h('td', { class: 'rank' }, r.withdrawn ? '–' : h('span', { class: 'rank-badge' }, r.rank)),
         h('td', {}, r.name, r.withdrawn ? h('span', { class: 'muted' }, ' (withdrew)') : null),
         h('td', {}, r.games),
-        h('td', {}, r.wins),
+        h('td', {}, americano ? `${r.wins}–${r.draws}–${r.losses}` : r.wins),
         bonus ? h('td', {}, r.bonus ? `+${r.bonus}` : '') : null,
         h('td', { class: 'points' }, r.points),
-        scored ? h('td', {}, `${r.setsWon}:${r.setsLost}`) : null,
-        scored ? h('td', { class: 'num' }, formatPoints(r.pointsFor - r.pointsAgainst)) : null,
+        scored && !americano ? h('td', {}, `${r.setsWon}:${r.setsLost}`) : null,
+        scored || americano ? h('td', { class: 'num' }, formatPoints(r.pointsFor - r.pointsAgainst)) : null,
         h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge / stepUnit(scale)))))))),
     h('p', { class: 'muted' },
       'Games count only rounds with all results entered. ',
-      bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
+      bonus ? (americano
+        ? 'Bonus: for each game fewer than the most games played, the player’s own average points per game. '
+        : 'Bonus: 0.5 points per game fewer than the most games played. ') : '',
+      americano ? 'Points: the points the player’s teams scored. On equal points, the point difference (+/−) and then the wins decide. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
-      scored ? 'On equal points, set difference and then point difference (+/−) decide; matches without a score count 0:0. ' : '',
+      scored && !americano ? 'On equal points, set difference and then point difference (+/−) decide; matches without a score count 0:0. ' : '',
       'Edge: how much stronger, on average, the team a player played in was than its opponents (team values): + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
   ];
 }
@@ -501,7 +575,7 @@ function finishSection(ctx, t) {
       }, 'Reopen'),
     ]);
   }
-  const open = t.schedule.reduce((n, r) => n + r.matches.filter((m) => !t.results[resultKey(r.round, m.court)]).length, 0);
+  const open = t.schedule.reduce((n, r) => n + r.matches.filter((m) => !hasResult(t.results, resultKey(r.round, m.court))).length, 0);
   return section('Finish', h('p', { class: 'muted' }, 'When the last match is played: finishing locks results and the draw, and shows the tournament summary to everyone in the Summary tab. It can be reopened.'), [
     h('button', {
       class: 'primary',

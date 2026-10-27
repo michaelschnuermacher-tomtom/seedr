@@ -29,8 +29,9 @@ function checkTournament(t) {
   if (!isInt(t.seed)) fail('Invalid seed');
   checkSchedule(t.schedule, t.settings, ids);
   if (!isInt(t.revealedRounds) || t.revealedRounds < 0 || t.revealedRounds > t.settings.rounds) fail('Invalid number of revealed rounds');
-  checkResults(t.results, t.schedule);
-  if ('scores' in t) checkScores(t.scores, t.results);
+  const americano = t.settings.scoring?.mode === 'americano';
+  checkResults(t.results, t.schedule, americano);
+  if ('scores' in t) checkScores(t.scores, t.results, americano ? t.settings.scoring.points : null);
 }
 
 function checkSettings(s) {
@@ -41,6 +42,7 @@ function checkSettings(s) {
   if (!isInt(s.breakMinutes) || s.breakMinutes < 0) fail('Invalid break length');
   if (!(s.revealBatch === 'all' || (isInt(s.revealBatch) && s.revealBatch >= 1))) fail('Invalid reveal batch');
   if ('scale' in s && scaleProblem(s.scale)) fail(scaleProblem(s.scale));
+  if ('scoring' in s && !(isObject(s.scoring) && s.scoring.mode === 'americano' && isInt(s.scoring.points) && s.scoring.points >= 1)) fail('Invalid scoring');
   if ('lastRoundCourts' in s && (!isInt(s.lastRoundCourts) || s.lastRoundCourts < 1 || s.lastRoundCourts >= s.courts)) fail('Invalid number of courts in the last round');
 }
 
@@ -99,24 +101,27 @@ function checkSchedule(schedule, settings, lastRound) {
   });
 }
 
-// Scores belong to matches with a result: sets of two whole numbers, not equal.
-function checkScores(scores, results) {
+// Scores belong to matches with a result: sets of two whole numbers, not equal. In
+// Americano (`total`): one pair adding up to the points per match, which may be equal.
+function checkScores(scores, results, total) {
   if (!isObject(scores)) fail('Invalid scores');
   for (const [key, sets] of Object.entries(scores)) {
     if (!(key in results)) fail(`Score for a match without a result ${key}`);
     if (!Array.isArray(sets) || sets.length === 0) fail(`Invalid score for match ${key}`);
     for (const set of sets) {
-      if (!Array.isArray(set) || set.length !== 2 || !set.every((x) => isInt(x) && x >= 0) || set[0] === set[1]) fail(`Invalid set in match ${key}`);
+      if (!Array.isArray(set) || set.length !== 2 || !set.every((x) => isInt(x) && x >= 0)) fail(`Invalid set in match ${key}`);
+      if (total == null && set[0] === set[1]) fail(`Invalid set in match ${key}`);
+      if (total != null && (sets.length !== 1 || set[0] + set[1] !== total)) fail(`Invalid Americano score in match ${key}`);
     }
   }
 }
 
-function checkResults(results, schedule) {
+function checkResults(results, schedule, americano = false) {
   if (!isObject(results)) fail('Invalid results');
   for (const [key, winner] of Object.entries(results)) {
     const m = /^(\d+)-(\d+)$/.exec(key);
     const round = m && schedule[Number(m[1]) - 1];
     if (!round || !round.matches.some((x) => x.court === Number(m[2]))) fail(`Result for unknown match ${key}`);
-    if (winner !== 1 && winner !== 2) fail(`Invalid result for match ${key}`);
+    if (winner !== 1 && winner !== 2 && !(americano && winner === 0)) fail(`Invalid result for match ${key}`);
   }
 }

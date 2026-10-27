@@ -1,5 +1,5 @@
 import { generateSchedule } from './schedule.js';
-import { resultKey, scoreWinner } from './standings.js';
+import { resultKey, scoreWinner, hasResult, isAmericano } from './standings.js';
 import { scaleOf, calibratePlayers, isSkill } from './scale.js';
 
 // Version 2: players link to a person (`personId`) and may have a year of birth.
@@ -156,7 +156,7 @@ export function isActive(player) {
 
 // Rounds up to the last one with a result are kept; everything after it can be redrawn.
 export function firstRedrawableRound(t) {
-  const played = t.schedule.filter((r) => r.matches.some((m) => t.results[resultKey(r.round, m.court)]));
+  const played = t.schedule.filter((r) => r.matches.some((m) => hasResult(t.results, resultKey(r.round, m.court))));
   return played.length ? played[played.length - 1].round + 1 : 1;
 }
 
@@ -232,7 +232,7 @@ export function swapPlayers(t, round, a, b) {
     throw new Error(`Player ${id} is not in round ${round}`);
   };
   for (const { m } of [where(a), where(b)]) {
-    if (m && t.results[resultKey(round, m.court)]) throw new Error(`Court ${m.court} already has a result`);
+    if (m && hasResult(t.results, resultKey(round, m.court))) throw new Error(`Court ${m.court} already has a result`);
   }
   const swap = (id) => (id === a ? b : id === b ? a : id);
   const changed = {
@@ -255,12 +255,26 @@ export function setResult(t, round, court, winner) {
   checkOpen(t);
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
   if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);
+  if (winner !== null && isAmericano(t.settings.scoring)) throw new Error('In Americano, a result is its score.');
   const results = { ...t.results };
   const key = resultKey(round, court);
   if (winner === null) delete results[key];
   else results[key] = winner;
   const { [key]: dropped, ...scores } = t.scores ?? {};
   return { ...t, results, ...(winner === null || dropped ? { scores } : {}) };
+}
+
+// Americano: one pair of points that add up to the points per match; equal points are a
+// draw (result 0).
+function setAmericanoScore(t, key, others, sets) {
+  const total = t.settings.scoring.points;
+  const [pair] = sets;
+  if (sets.length !== 1 || !Array.isArray(pair) || pair.length !== 2 || !pair.every((x) => Number.isInteger(x) && x >= 0)) {
+    throw new Error('Enter the points of both teams as whole numbers.');
+  }
+  if (pair[0] + pair[1] !== total) throw new Error(`The points must add up to ${total}.`);
+  const winner = pair[0] > pair[1] ? 1 : pair[1] > pair[0] ? 2 : 0;
+  return { ...t, results: { ...t.results, [key]: winner }, scores: { ...others, [key]: [[...pair]] } };
 }
 
 // The score of a match: sets as [[team 1 points, team 2 points], …], at least one, each
@@ -274,6 +288,7 @@ export function setScore(t, round, court, sets, winner = null) {
   const key = resultKey(round, court);
   const { [key]: old, ...others } = t.scores ?? {};
   if (sets === null) return { ...t, scores: others };
+  if (isAmericano(t.settings.scoring)) return setAmericanoScore(t, key, others, sets);
   if (!Array.isArray(sets) || sets.length === 0) throw new Error('Enter at least one set.');
   for (const set of sets) {
     if (!Array.isArray(set) || set.length !== 2 || !set.every((x) => Number.isInteger(x) && x >= 0)) throw new Error('Points must be whole numbers of 0 or more.');
