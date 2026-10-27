@@ -1,13 +1,12 @@
 import { h, formatSigned, closableTitle } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { shownRounds, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, openMatches, setShowSkills, setShowEdges, showsEdges, setSkills, redrawRemaining, setScore } from '../engine/tournament.js';
+import { shownRounds, redraw, setResult, hasResults, isActive, swapPlayersAcross, isFinished, finishTournament, reopenTournament, openMatches, setShowSkills, setShowEdges, showsEdges, setScore } from '../engine/tournament.js';
 import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano, scoresRequired, scoringLabel } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
 import { tournamentSummary } from '../engine/summary.js';
 import { scaleOf, calibrated, calibratePlayers, stepUnit, levels, describeScale } from '../engine/scale.js';
-import { exportBackup } from './backup.js';
 import { draftFromTournament } from './setup.js';
 
 const TABS = [['info', 'Info'], ['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['manage', 'Manage']];
@@ -542,7 +541,7 @@ function fact(label, value) {
 // Manage lists everything read-only; changes happen on a sub-page (view.manage) that an
 // Edit button opens, with Save and Cancel. Actions that change nothing stay direct buttons.
 function manageTab(ctx, t) {
-  const pages = { tournament: tournamentPage, print: printPage, rounds: allRoundsPage };
+  const pages = { print: printPage, rounds: allRoundsPage };
   const page = pages[ctx.state.view.manage];
   return page ? page(ctx, t) : manageOverview(ctx, t);
 }
@@ -555,7 +554,7 @@ function openPage(ctx, name) {
 
 // Back to the Manage list; edits not saved are dropped.
 function closePage(ctx) {
-  Object.assign(ctx.state.view, { manage: null, skills: null, withdraw: null, printChoice: null });
+  Object.assign(ctx.state.view, { manage: null, printChoice: null });
   ctx.render();
 }
 
@@ -633,7 +632,7 @@ function manageOverview(ctx, t) {
       ? `Players see rounds 1–${shown} of ${s.rounds}; the next appears once a round is complete.`
       : `Players see all ${s.rounds} rounds.`), [allRounds]),
     section('Tournament', h('dl', { class: 'facts' }, setupFacts(t, withdrawn, scale)),
-      [h('button', { class: 'primary', onclick: () => openPage(ctx, 'tournament') }, 'View')]),
+      [h('button', { class: 'primary', onclick: () => editTournament(ctx, t) }, 'View')]),
     qualitySection(ctx, t),
   ];
   return [
@@ -644,9 +643,8 @@ function manageOverview(ctx, t) {
       h('label', { class: 'option' },
         h('input', { type: 'checkbox', checked: showsEdges(t), onchange: (e) => { ctx.save(setShowEdges(t, e.target.checked)); ctx.render(); } }),
         h('span', {}, 'Show edges (on the round cards, in the standings and in the summary)')))),
-    section('Print & export', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all rounds and the player skills: Print… lets you choose. The backup is one file with all players and tournaments on this device, to keep them safe or move them to another device.'), [
-      h('button', { onclick: () => openPage(ctx, 'print') }, 'Print…'),
-      h('button', { onclick: () => exportBackup(ctx) }, 'Export backup')]),
+    section('Print', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all rounds and the player skills: Print… lets you choose.'), [
+      h('button', { onclick: () => openPage(ctx, 'print') }, 'Print…')]),
     finishSection(ctx, t),
     h('div', { class: 'actions' }, h('button', {
       class: 'danger',
@@ -675,147 +673,11 @@ function setupFacts(t, withdrawn, scale) {
   ];
 }
 
-// After a change on the Tournament page: drop the edits not saved and stay on the page.
-function refreshPage(ctx) {
-  Object.assign(ctx.state.view, { skills: null, withdraw: null });
-  ctx.state.message = null;
-  ctx.render();
-}
-
-const pageError = (ctx, error) => {
-  ctx.state.message = error.message;
-  ctx.render();
-};
-
-// Every option of the tournament on one page, with the ✕ back to Manage: the name at any
-// time; scoring, skill scale, players, courts and times in the setup until the first result
-// (it draws again); skills at any time; players who leave once results are in.
-function tournamentPage(ctx, t) {
-  const withdrawn = t.players.length - t.players.filter(isActive).length;
-  return [
-    h('div', { class: 'page-head' }, closableTitle('Tournament', () => closePage(ctx))),
-    nameSection(ctx, t),
-    setupSection(ctx, t, withdrawn),
-    skillsSection(ctx, t),
-    hasResults(t) ? withdrawSection(ctx, t) : null,
-  ];
-}
-
-function nameSection(ctx, t) {
-  const input = h('input', { type: 'text', value: t.name, 'aria-label': 'Name' });
-  const save = () => {
-    try {
-      if (input.value.trim() !== t.name) ctx.save(renameTournament(t, input.value));
-      refreshPage(ctx);
-    } catch (error) {
-      pageError(ctx, error);
-    }
-  };
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-  return section('Name', h('div', { class: 'field' }, input), [h('button', { onclick: save }, 'Save name')]);
-}
-
-function setupSection(ctx, t, withdrawn) {
-  const locked = hasResults(t);
-  return section('Setup', [
-    h('dl', { class: 'facts' }, setupFacts(t, withdrawn, scaleOf(t.settings)).slice(1)),
-    h('p', { class: 'muted' }, locked
-      ? 'Scoring, skill scale, players, courts and times are fixed once the first result is entered. Skills can still change below, and players who leave are taken out below.'
-      : 'Until the first result, everything can change in the setup (players and their skills too); saving draws the schedule again.'),
-  ], [locked ? null : h('button', {
-    class: 'primary',
-    onclick: () => {
-      ctx.state.view.manage = null;
-      ctx.state.draft = draftFromTournament(t, ctx.people());
-      ctx.go('setup');
-    },
-  }, 'Edit setup…')]);
-}
-
-// Skills belong to this tournament and can change while it runs. Team values, edges, the
-// standings and the summary follow at once; the schedule was drawn for the old skills, so
-// what has no result yet can be drawn again. Names are changed on the Players page.
-function skillsSection(ctx, t) {
-  // Changes not saved yet, by player id; kept when saving fails.
-  const edits = (ctx.state.view.skills ??= {});
-  const last = t.settings.rounds;
-  const from = hasResults(t) ? firstRedrawableRound(t) : 1;
-  const rounds = from === last ? `round ${last}` : `rounds ${from}–${last}`;
-  const save = (redrawToo) => {
-    const changed = Object.fromEntries(Object.entries(edits).filter(([id, skill]) => t.players.find((p) => p.id === id)?.skill !== skill));
-    if (redrawToo && !confirm(hasResults(t)
-      ? `Save the skills and draw ${rounds} again? Rounds with results stay as they are.`
-      : 'Save the skills and draw a completely new schedule?')) return;
-    try {
-      let next = setSkills(t, changed);
-      if (redrawToo) next = redrawRemaining(next, newSeed());
-      ctx.save(next);
-      refreshPage(ctx);
-    } catch (error) {
-      pageError(ctx, error);
-    }
-  };
-  const skillSelect = (p) => {
-    const select = h('select', { onchange: (e) => { edits[p.id] = Number(e.target.value); } },
-      levels(scaleOf(t.settings)).map((n) => h('option', { value: n }, `Skill ${n}`)));
-    select.value = String(edits[p.id] ?? p.skill);
-    return select;
-  };
-  return section('Players and skills', [
-    h('p', { class: 'muted' }, `Skills belong to this tournament. ${describeScale(scaleOf(t.settings))} Team values, edges, the standings and the summary follow the new skills.`
-      + (from <= last ? ` The schedule was drawn for the old skills: ${hasResults(t) ? `${rounds} can be drawn again (rounds with results stay)` : 'it can be drawn again'}.` : '')
-      + ' Names and years of birth are changed on the Players page (home screen).'),
-    h('div', { class: 'names-grid' }, t.players.map((p) => h('label', { class: 'field' },
-      h('span', {}, `${p.name}${isActive(p) ? '' : ' · withdrew'}`),
-      skillSelect(p)))),
-  ], [
-    from <= last ? h('button', { onclick: () => save(true) }, hasResults(t) ? `Save skills and redraw ${rounds}` : 'Save skills and redraw') : null,
-    h('button', { onclick: () => save(false) }, 'Save skills only'),
-  ]);
-}
-
-// A player who cannot go on: keep the rounds played so far and draw the rest again.
-function withdrawSection(ctx, t) {
-  const from = firstRedrawableRound(t);
-  const last = t.settings.rounds;
-  const active = t.players.filter(isActive);
-  const chosen = (ctx.state.view.withdraw ??= new Set());
-  const canRedraw = from <= last;
-  const rounds = from === last ? `round ${last}` : `rounds ${from}–${last}`;
-  const button = canRedraw ? h('button', {
-    disabled: chosen.size === 0 || active.length - chosen.size < 4,
-    onclick: (e) => {
-      const names = active.filter((p) => chosen.has(p.id)).map((p) => p.name).join(', ');
-      if (!confirm(`Withdraw ${names} and redraw ${rounds}? This cannot be undone.`)) return;
-      e.currentTarget.disabled = true;
-      e.currentTarget.textContent = 'Drawing…';
-      setTimeout(() => { // let the browser paint "Drawing…" first
-        try {
-          ctx.save(withdrawPlayers(t, [...chosen], newSeed()));
-          Object.assign(ctx.state.view, { manage: null, withdraw: null, skills: null, tab: 'rounds' });
-        } catch (error) {
-          ctx.state.message = error.message;
-        }
-        ctx.render();
-      }, 20);
-    },
-  }, `Withdraw and redraw ${rounds}`) : null;
-  const note = !canRedraw ? 'All rounds have results, there is nothing left to redraw.'
-    : `Tick the players who cannot go on. ${from === 2 ? 'Round 1 stays' : `Rounds 1–${from - 1} stay`} as played; ${rounds} will be drawn again without them. At least 4 players must remain.`;
-  return section('Player leaves', [
-    h('p', { class: 'muted' }, note),
-    canRedraw ? h('div', { class: 'options withdraw' }, active.map((p) => h('label', { class: 'option' },
-      h('input', {
-        type: 'checkbox',
-        checked: chosen.has(p.id),
-        onchange: (e) => {
-          if (e.target.checked) chosen.add(p.id);
-          else chosen.delete(p.id);
-          button.disabled = chosen.size === 0 || active.length - chosen.size < 4;
-        },
-      }),
-      h('span', {}, p.name)))) : null,
-  ], [button]);
+// Every option of the tournament, on the same page as for a new tournament (the setup).
+function editTournament(ctx, t) {
+  ctx.state.view.manage = null;
+  ctx.state.draft = draftFromTournament(ctx.store.get(t.id) ?? t);
+  ctx.go('setup');
 }
 
 // How even and how varied the draw is, over the revealed rounds only: repeated pairings

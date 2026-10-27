@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newDraft, evaluateDraft, draftFromTournament, skillOrder, defaultPeople } from '../src/ui/setup.js';
-import { createTournament } from '../src/engine/tournament.js';
+import { newDraft, evaluateDraft, draftFromTournament, skillOrder, defaultPeople, startedChanges, saveStarted } from '../src/ui/setup.js';
+import { createTournament, setResult, isActive } from '../src/engine/tournament.js';
 
 const SKILLS_18 = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10];
 const people18 = SKILLS_18.map((_, i) => ({ id: `x${i + 1}`, name: `P${i + 1}` }));
@@ -149,4 +149,30 @@ test('the matrix: rows of rounds, columns of breaks, cells with the match length
   assert.deepEqual(chosen.plan, { rounds: 9, matchMinutes: 9 });
   const edit = evaluateDraft({ ...example(), breakMinutes: 10 }, people18);
   assert.deepEqual(edit.breaks, [0, 1, 2, 3, 4, 5, 10], 'an existing longer break gets its own column');
+});
+
+test('a started tournament: name and skills change, removed players withdraw, the rest stays', () => {
+  let t = createTournament({
+    id: 't9', name: 'Tenerife Cup', seed: 5, now: new Date('2026-10-14T18:00:00Z'),
+    players: people18.map((p, i) => ({ personId: p.id, name: p.name, skill: SKILLS_18[i] })),
+    settings: { courts: 3, rounds: 9, matchMinutes: 11, breakMinutes: 2, scale: { min: 1, max: 10, best: 'low' } },
+  });
+  assert.equal(draftFromTournament(t).started, false);
+  for (const m of t.schedule[0].matches) t = setResult(t, 1, m.court, 1);
+  const d = draftFromTournament(t);
+  assert.equal(d.started, true);
+  d.name = 'Tenerife Open';
+  d.picks.find((p) => p.personId === 'x1').skill = 4;
+  assert.deepEqual(startedChanges(t, d), { leaving: [], skills: { p1: 4 }, from: 2, last: 9, renamed: true });
+  const saved = saveStarted(t, d, 7);
+  assert.equal(saved.name, 'Tenerife Open');
+  assert.equal(saved.players.find((p) => p.id === 'p1').skill, 4);
+  assert.deepEqual(saved.schedule, t.schedule, 'skills alone do not redraw');
+  assert.notDeepEqual(saveStarted(t, d, 7, true).schedule.slice(1), t.schedule.slice(1), 'unless asked to');
+
+  d.picks = d.picks.filter((p) => p.personId !== 'x2');
+  const withdrawn = saveStarted(t, d, 7);
+  assert.ok(!isActive(withdrawn.players.find((p) => p.personId === 'x2')));
+  assert.deepEqual(withdrawn.schedule[0], t.schedule[0], 'round 1 stays as played');
+  assert.ok(withdrawn.schedule.slice(1).every((r) => r.matches.every((m) => ![...m.team1, ...m.team2].includes('p2'))));
 });

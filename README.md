@@ -99,23 +99,23 @@ A win gives each player in the team 1 point. Players with fewer games than the m
 
 ### When a player leaves
 
-If a player can't continue, open **Manage → Tournament → View**, under **Player leaves** tick the players and choose **Withdraw and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
+If a player can't continue, open **Manage → Tournament → View**, take the players out with ✕ in **Players** and choose **Save and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
 - it avoids partners players already had;
 - it counts the opponents players already met, so they meet others first;
 - whoever has sat out least so far sits out first, and games stay spread out.
 
-Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, remove players with **Manage → Tournament → View → Edit setup…** instead.
+Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, removing a player there simply draws a new schedule without them.
 
 ## Manage
 
 Everything that changes the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The **Info** tab shows the most important facts (status, players, courts, rounds, match length, break, playing time, games and sit-outs per player, skill scale, rounds shown); Rounds and Standings only show the rounds played so far and the next one, results and standings, so the phone can be handed to players. A finished tournament shows **Finished** next to its name. Manage lists everything read-only; changes happen on a page that a **View** button opens, closed with the ✕ in its title row:
 
 - **Rounds**: how many rounds the players see; **View** shows the whole schedule, where two players can be swapped (tap one, then the other) in any round without results. Read-only once finished.
-- **Tournament**: all settings; **View** opens a page where everything can be changed: the name at any time; scoring, skill scale, players, courts and times with **Edit setup…** until the first result (the setup draws again); skills at any time (team values, edges, standings and summary follow; **Save skills and redraw** draws again what has no result yet); and once results are in, **Player leaves** withdraws players and redraws the remaining rounds. Names and years of birth are only changed on the Players page.
+- **Tournament**: all settings; **View** opens the same page as for a new tournament (the setup), filled in. Before the first result everything can change, and saving draws again. Once results are in, scoring, skill scale, courts and times are locked; the name and the skills can still change (**Save**, or **Save and redraw** for the rounds without results), and ✕ next to a player withdraws them (they keep their results; the rounds without results are drawn again). No one can join a started tournament. Names and years of birth are only changed on the Players page.
 - **Draw quality**: all figures (edges, partners, opponents, sit-outs) and, before the first result, **Redraw schedule**.
 - **View**: **Show skills in Info** (off by default); without it, Info lists the players in alphabetical order and leaves out the skill scale, and the summary leaves out highlights that show skills. **Show edges** (on by default); without it, round cards, standings and summary show no edges and no highlights based on them.
-- **Finish** (after Print & export, right before **Delete tournament**): when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Once finished, Manage only shows View, Print & export, Finish and Delete.
-- **Print & export**: **Print…** asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, all rounds and player skills. A section starts on the same page when it still fits, and **Export backup**.
+- **Finish** (after Print, right before **Delete tournament**): when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Once finished, Manage only shows View, Print, Finish and Delete.
+- **Print**: **Print…** asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, all rounds and player skills. A section starts on the same page when it still fits.
 - **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.
 
 ### Tournament summary
@@ -124,7 +124,7 @@ Fun highlights of the results (champion, underdog of the day, upset of the tourn
 
 ## Keeping data safe
 
-Browser storage can be lost (clearing Safari data, a new device). **Export backup** (Backup tab of the home screen, or Manage) saves one file with all players and all tournaments, e.g.
+Browser storage can be lost (clearing Safari data, a new device). **Export backup** (Backup tab of the home screen) saves one file with all players and all tournaments, e.g.
 `seedr-backup-2026-10-26.json` (to Dropbox or iCloud Drive). **Import** in the **Backup** tab of the home screen
 merges it into any device: players are matched by id, then by name, and existing players
 and tournaments are only replaced after a confirmation.

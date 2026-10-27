@@ -1,6 +1,6 @@
 import { h, newId } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { parsePlayers, createTournament, updateSettings, isActive } from '../engine/tournament.js';
+import { parsePlayers, createTournament, updateSettings, isActive, hasResults, renameTournament, setSkills, withdrawPlayers, redrawRemaining, firstRedrawableRound } from '../engine/tournament.js';
 import { planMatrix, gamesPerPlayer, describeGames, BREAK_CHOICES, MATRIX_MIN_MATCH_MINUTES } from '../engine/timeplan.js';
 import { sortPeople } from '../engine/people.js';
 import { scaleOf, scaleProblem, levels, isSkill, describeScale, SCALE_LIMITS } from '../engine/scale.js';
@@ -44,14 +44,16 @@ export function newDraft() {
   };
 }
 
-// Setup form for changing a tournament that has not started: everything filled in. The
-// total time is set so that the current rounds × match length is one of the options.
+// Setup form for changing a tournament: everything filled in. The total time is set so that
+// the current rounds × match length is one of the options. Once results are in (`started`),
+// only the name, the skills and who still plays can change.
 export function draftFromTournament(t) {
   const s = t.settings;
   const scale = scaleOf(s);
   return {
     ...newDraft(),
     editingId: t.id,
+    started: hasResults(t),
     name: t.name,
     scaleMin: scale.min,
     scaleMax: scale.max,
@@ -65,6 +67,32 @@ export function draftFromTournament(t) {
     selectedRounds: s.rounds,
     lastRoundCourts: s.lastRoundCourts ?? null,
   };
+}
+
+// What saving a started tournament changes: the players who leave (by tournament player id)
+// and the new skills; `from` is the first round that can be drawn again (beyond the last
+// round: none).
+export function startedChanges(t, d) {
+  const playing = new Map(t.players.filter(isActive).map((p) => [p.personId ?? p.id, p]));
+  const kept = new Set(d.picks.map((p) => p.personId));
+  const leaving = [...playing].filter(([personId]) => !kept.has(personId)).map(([, p]) => p.id);
+  const skills = {};
+  for (const pick of d.picks) {
+    const p = playing.get(pick.personId);
+    if (p && pick.skill !== p.skill) skills[p.id] = pick.skill;
+  }
+  return { leaving, skills, from: firstRedrawableRound(t), last: t.settings.rounds, renamed: d.name.trim() !== t.name };
+}
+
+// Saves a started tournament: the name, the skills, and the players who leave (they are
+// withdrawn, which draws the remaining rounds again). New skills alone redraw only on request.
+export function saveStarted(t, d, seed, redrawToo = false) {
+  const { leaving, skills, renamed } = startedChanges(t, d);
+  let next = renamed ? renameTournament(t, d.name) : t;
+  if (Object.keys(skills).length) next = setSkills(next, skills);
+  if (leaving.length) next = withdrawPlayers(next, leaving, seed);
+  else if (redrawToo) next = redrawRemaining(next, seed);
+  return next;
 }
 
 export function draftScale(d) {
@@ -131,25 +159,32 @@ function selectInput(value, choices, onchange) {
 
 // The players: one dropdown per chosen player, and an empty one to add the next. Only
 // players not chosen yet are offered.
-function playersStep(ctx, d, people) {
+function playersStep(ctx, d, people, canLeave = true) {
   const known = sortPeople(people);
+  const started = Boolean(d.started);
   const chosen = new Set(d.picks.map((p) => p.personId));
   const free = known.filter((p) => !chosen.has(p.id));
   const name = (id) => known.find((p) => p.id === id)?.name ?? id;
-  const pickSelect = (pick) => selectInput(pick.personId, [[pick.personId, name(pick.personId)], ...free.map((p) => [p.id, p.name])], (e) => {
-    pick.personId = e.target.value;
-    ctx.render();
-  });
-  const addSelect = free.length ? selectInput('', [['', d.picks.length ? 'Add another…' : 'Add player…'], ...free.map((p) => [p.id, p.name])], (e) => {
+  const pickSelect = (pick) => {
+    const select = selectInput(pick.personId, [[pick.personId, name(pick.personId)], ...free.map((p) => [p.id, p.name])], (e) => {
+      pick.personId = e.target.value;
+      ctx.render();
+    });
+    select.disabled = started;
+    return select;
+  };
+  const addSelect = free.length && !started ? selectInput('', [['', d.picks.length ? 'Add another…' : 'Add player…'], ...free.map((p) => [p.id, p.name])], (e) => {
     if (!e.target.value) return;
     d.picks.push({ personId: e.target.value, skill: null });
     ctx.render();
   }) : null;
   return [
-    h('p', { class: 'muted' }, `Choose who plays; a new dropdown appears for the next one. ${d.picks.length} chosen.`),
+    h('p', { class: 'muted' }, !started ? `Choose who plays; a new dropdown appears for the next one. ${d.picks.length} chosen.`
+      : canLeave ? `Results are in, so no one can join. ✕ takes out a player who cannot go on: they keep their results and the rounds without results are drawn again without them. ${d.picks.length} playing.`
+        : `All rounds have results, so the players stay as they are. ${d.picks.length} playing.`),
     h('div', { class: 'level-picks' },
       d.picks.map((pick) => h('div', { class: 'level-pick' }, pickSelect(pick),
-        h('button', { class: 'small', title: 'Remove', 'aria-label': `Remove ${name(pick.personId)}`, onclick: () => { d.picks.splice(d.picks.indexOf(pick), 1); ctx.render(); } }, '✕'))),
+        canLeave ? h('button', { class: 'small', title: 'Remove', 'aria-label': `Remove ${name(pick.personId)}`, onclick: () => { d.picks.splice(d.picks.indexOf(pick), 1); ctx.render(); } }, '✕') : null)),
       addSelect),
     h('div', { class: 'actions' },
       h('button', { class: 'small', onclick: () => { ctx.state.peopleReturn = 'setup'; ctx.go('people'); } }, 'Add or edit players…')),
@@ -182,6 +217,9 @@ function skillsStep(ctx, d, scale, people) {
 export function setupScreen(ctx) {
   const d = (ctx.state.draft ??= newDraft());
   const people = ctx.people();
+  const started = d.started ? ctx.store.get(d.editingId) : null;
+  if (d.started && !started) ctx.state.draft = null; // deleted meanwhile
+  const changes = started ? startedChanges(started, d) : null;
   // People deleted meanwhile drop out of the picks.
   d.picks = d.picks.filter((p) => people.some((x) => x.id === p.personId));
   const preview = h('section', { class: 'preview' });
@@ -194,7 +232,8 @@ export function setupScreen(ctx) {
 
   const card = (title, color, ...children) => h('section', { class: `card accent-${color}` }, h('h2', { class: 'card-title' }, title), ...children);
   const nameCard = card('Tournament', 'ao',
-    field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; refresh(); } })));
+    field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; refresh(); } })),
+    started ? h('p', { class: 'muted' }, 'Results are in: scoring, skill scale, courts and times stay as they are. The name and the skills can change, and players who cannot go on can be taken out.') : null);
   // The scale only takes effect when a field is left (change), so typing keeps the focus.
   const scaleInput = (key, min, max) => {
     const input = numberInput(key, min, max);
@@ -217,13 +256,20 @@ export function setupScreen(ctx) {
       refresh();
     })),
     pointsField);
-  const playersCard = card('Players', 'wim', playersStep(ctx, d, people));
+  const playersCard = card('Players', 'wim', playersStep(ctx, d, people, !changes || changes.from <= changes.last));
   const skillsCard = card('Skills', 'ao', ev0.scale ? skillsStep(ctx, d, ev0.scale, people) : null);
   const courtsField = field('Courts', numberInput('courts', 1));
   const timeField = field('Total tournament time (min)', numberInput('totalMinutes', 1));
-  const timeCard = card('Courts & time', 'rg', courtsField, timeField, planBox);
+  const timeCard = started ? card('Courts & time', 'rg', fixedPlan(started.settings)) : card('Courts & time', 'rg', courtsField, timeField, planBox);
+  // Once results are in, scoring and skill scale are shown but cannot change.
+  if (started) for (const input of [...scoringCard.querySelectorAll('input, select'), ...scaleCard.querySelectorAll('input, select')]) input.disabled = true;
   // Shows each step once the ones before are done.
   const refresh = () => {
+    if (started) {
+      pointsField.hidden = d.scoring !== 'americano';
+      preview.replaceChildren(...startedPreview(ctx, d, started));
+      return;
+    }
     const ev = evaluateDraft(d, people);
     const s = ev.steps;
     const order = [s.name, s.scoring, s.scale, s.players, s.skills, s.courts, s.time, s.plan];
@@ -284,6 +330,55 @@ function planField(d, ev, refresh) {
 }
 
 const courtsText = (n) => `${n} court${n === 1 ? '' : 's'}`;
+
+// Courts and times of a started tournament, which stay as they are.
+function fixedPlan(s) {
+  return h('p', {}, `${courtsText(s.courts)}${s.lastRoundCourts ? ` (last round: ${s.lastRoundCourts})` : ''} · ${s.rounds} rounds of ${s.matchMinutes} min · ${s.breakMinutes ? `${s.breakMinutes} min break` : 'no break'}`);
+}
+
+// Below the steps of a started tournament: what saving does, and the buttons.
+function startedPreview(ctx, d, t) {
+  const c = startedChanges(t, d);
+  const scale = scaleOf(t.settings);
+  const problems = [];
+  if (!d.name.trim()) problems.push('Give the tournament a name.');
+  if (d.picks.length < 4) problems.push('At least 4 players must remain.');
+  if (d.picks.some((p) => !isSkill(p.skill, scale))) problems.push('Give every player a skill.');
+  const rounds = c.from === c.last ? `round ${c.last}` : `rounds ${c.from}–${c.last}`;
+  const skillsChanged = Object.keys(c.skills).length > 0;
+  const changed = c.renamed || skillsChanged || c.leaving.length > 0;
+  const save = (redrawToo) => (e) => {
+    const names = t.players.filter((p) => c.leaving.includes(p.id)).map((p) => p.name).join(', ');
+    if (c.leaving.length && !confirm(`Withdraw ${names} and draw ${rounds} again? Rounds with results stay as they are. This cannot be undone.`)) return;
+    if (!c.leaving.length && redrawToo && !confirm(`Save and draw ${rounds} again? Rounds with results stay as they are.`)) return;
+    e.currentTarget.disabled = true;
+    e.currentTarget.textContent = redrawToo || c.leaving.length ? 'Drawing…' : 'Saving…';
+    setTimeout(() => { // let the browser paint "Drawing…" first
+      let next;
+      try {
+        next = saveStarted(t, d, newSeed(), redrawToo);
+      } catch (error) {
+        ctx.flash(error.message);
+        return;
+      }
+      ctx.state.draft = null;
+      ctx.save(next);
+      ctx.open(next);
+    }, 20);
+  };
+  const canRedraw = c.from <= c.last;
+  const out = [];
+  if (problems.length) out.push(h('ul', { class: 'problems' }, problems.map((p) => h('li', {}, p))));
+  else if (c.leaving.length) out.push(h('p', { class: 'warning' }, `Saving withdraws ${c.leaving.length === 1 ? '1 player' : `${c.leaving.length} players`} and draws ${rounds} again.`));
+  else if (skillsChanged && canRedraw) out.push(h('p', { class: 'muted' }, `The schedule was drawn for the old skills: ${rounds} can be drawn again (rounds with results stay).`));
+  const ok = !problems.length && changed;
+  out.push(h('div', { class: 'actions' },
+    h('button', { onclick: () => cancelSetup(ctx) }, 'Cancel'),
+    ok && c.leaving.length ? h('button', { class: 'primary', onclick: save(true) }, `Save and redraw ${rounds}`) : null,
+    ok && !c.leaving.length && skillsChanged && canRedraw ? h('button', { onclick: save(true) }, `Save and redraw ${rounds}`) : null,
+    ok && !c.leaving.length ? h('button', { class: 'primary', onclick: save(false) }, 'Save') : null));
+  return out;
+}
 
 // Below the steps: once all are done, what the plan means and the Draw button; Cancel always.
 function setupPreview(ctx, d, ev, complete) {
