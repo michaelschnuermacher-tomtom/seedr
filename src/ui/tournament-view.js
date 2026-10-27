@@ -1,7 +1,7 @@
 import { h, formatSigned } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining } from '../engine/tournament.js';
-import { resultKey, computeStandings } from '../engine/standings.js';
+import { revealNext, redraw, setResult, hasResults, isActive, firstRedrawableRound, withdrawPlayers, renameTournament, swapPlayersAcross, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../engine/tournament.js';
+import { resultKey, computeStandings, scoreWinner } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
 import { drawQuality } from '../engine/quality.js';
@@ -115,6 +115,7 @@ export function roundsOverview(t) {
         favoured: team1.value < team2.value ? 1 : team2.value < team1.value ? 2 : 0,
         spreadGap: Math.abs(team1.spread - team2.spread),
         winner: t.results[resultKey(r.round, m.court)],
+        score: t.scores?.[resultKey(r.round, m.court)] ?? null,
       };
     }),
     sitOuts: r.sitOuts.map((id) => byId.get(id).name),
@@ -133,10 +134,107 @@ function teamButton(ctx, t, round, match, n) {
     class: ['team', winner === n ? 'winner' : '', winner && winner !== n ? 'loser' : ''].join(' ').trim(),
     disabled: isFinished(t),
     onclick: () => {
+      if (match.score) {
+        openScore(ctx, round, match);
+        return;
+      }
       ctx.save(setResult(t, round, match.court, winner === n ? null : n));
       ctx.render();
     },
   }, h('span', { class: 'names' }, team.members[0], h('span', { class: 'plus' }, ' + '), team.members[1]));
+}
+
+const scoreText = (sets) => sets.map(([a, b]) => `${a}:${b}`).join(', ');
+
+// Under each match: its score, or "Add score"; tapping opens the score page. In a
+// finished tournament and on paper only an existing score shows.
+function scoreLine(ctx, t, round, match) {
+  if (isFinished(t)) return match.score ? h('div', { class: 'score-line' }, scoreText(match.score)) : null;
+  return h('button', { class: `score-line link${match.score ? '' : ' no-print'}`, onclick: () => openScore(ctx, round, match) },
+    match.score ? scoreText(match.score) : 'Add score');
+}
+
+function openScore(ctx, round, match) {
+  const sets = match.score ?? [[null, null]];
+  Object.assign(ctx.state.view, { scoring: { round, court: match.court }, scoreDraft: { sets: sets.map((set) => [...set]), winner: match.winner ?? null } });
+  ctx.state.message = null;
+  ctx.render();
+}
+
+function closeScore(ctx) {
+  Object.assign(ctx.state.view, { scoring: null, scoreDraft: null });
+  ctx.render();
+}
+
+// The score of one match: one row per set with the points of both teams. The winner
+// follows from the score (more sets, then more points); when both are equal it is chosen
+// here. Entering a score is optional: tapping the winner on the round card still works.
+function scorePage(ctx, t, view) {
+  const { round, court } = view.scoring;
+  const match = roundsOverview(t).find((r) => r.round === round)?.matches.find((m) => m.court === court);
+  if (!match) {
+    closeScore(ctx);
+    return null;
+  }
+  const draft = view.scoreDraft;
+  const names = (n) => (n === 1 ? match.team1 : match.team2).members.join(' & ');
+  const parsed = () => draft.sets.map((set) => set.map((x) => (x === null || x === '' ? NaN : Number(x))));
+  const verdict = h('p', { class: 'muted' });
+  const choice = h('div', { class: 'actions' });
+  // Shows the winner the score gives, or asks for it when sets and points are equal.
+  const update = () => {
+    const sets = parsed();
+    const complete = sets.every((set) => set.every((x) => Number.isInteger(x) && x >= 0));
+    const winner = complete ? scoreWinner(sets) : null;
+    choice.replaceChildren();
+    if (!complete) verdict.textContent = 'Enter the points of every set.';
+    else if (winner) verdict.textContent = `Winner: ${names(winner)}.`;
+    else {
+      verdict.textContent = 'Sets and points are equal. Who won?';
+      choice.append(...[1, 2].map((n) => h('button', {
+        class: draft.winner === n ? 'primary' : '',
+        onclick: () => { draft.winner = n; update(); },
+      }, names(n))));
+    }
+  };
+  const save = () => {
+    try {
+      ctx.save(setScore(t, round, court, parsed(), draft.winner));
+      closeScore(ctx);
+    } catch (error) {
+      ctx.state.message = error.message;
+      ctx.render();
+    }
+  };
+  const pointsInput = (set, i) => h('input', {
+    type: 'number', min: 0, step: 1, inputmode: 'numeric', value: set[i] ?? '',
+    'aria-label': `Points ${names(i + 1)}`,
+    oninput: (e) => { set[i] = e.target.value === '' ? null : Number(e.target.value); update(); },
+  });
+  const rows = draft.sets.map((set, k) => h('div', { class: 'score-set' },
+    h('span', { class: 'score-set-label' }, `Set ${k + 1}`),
+    pointsInput(set, 0), h('span', { class: 'vs' }, ':'), pointsInput(set, 1),
+    draft.sets.length > 1 ? h('button', { class: 'small', 'aria-label': `Remove set ${k + 1}`, onclick: () => { draft.sets.splice(k, 1); ctx.render(); } }, '✕') : h('span', {})));
+  update();
+  return [
+    h('button', { class: 'back-link', onclick: () => closeScore(ctx) }, '← Rounds'),
+    h('section', { class: 'card' },
+      h('h2', { class: 'card-title' }, `Round ${round} · Court ${court}`),
+      h('div', { class: 'score-set score-head' }, h('span', {}), h('strong', {}, names(1)), h('span', {}), h('strong', {}, names(2)), h('span', {})),
+      rows,
+      h('div', { class: 'actions' }, h('button', { class: 'small', onclick: () => { draft.sets.push([null, null]); ctx.render(); } }, 'Add set')),
+      verdict,
+      choice,
+      h('div', { class: 'actions' },
+        h('button', { class: 'primary', onclick: save }, 'Save'),
+        match.score ? h('button', {
+          onclick: () => {
+            ctx.save(setScore(t, round, court, null));
+            closeScore(ctx);
+          },
+        }, 'Remove score') : null,
+        h('button', { onclick: () => closeScore(ctx) }, 'Cancel'))),
+  ];
 }
 
 const EDGE_LABELS = { slight: 'Slight edge', clear: 'Clear edge', big: 'Big edge' };
@@ -171,6 +269,7 @@ function askPassword(ctx, question) {
 
 // All revealed rounds; revealing, swapping and the team values are set in Manage.
 function roundsTab(ctx, t, view) {
+  if (view.scoring) return scorePage(ctx, t, view);
   const rounds = roundsOverview(t);
   const hidden = t.settings.rounds - t.revealedRounds;
   const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
@@ -187,7 +286,8 @@ function roundsTab(ctx, t, view) {
         courtLine('span', m),
         teamButton(ctx, t, r.round, m, 1),
         h('span', { class: 'vs' }, 'vs'),
-        teamButton(ctx, t, r.round, m, 2)))))),
+        teamButton(ctx, t, r.round, m, 2),
+        scoreLine(ctx, t, r.round, m)))))),
     swapping ? swapDone(ctx, view) : comingUp,
   ];
 }
@@ -312,16 +412,21 @@ function printAll(ctx) {
   setTimeout(() => window.print(), 50); // let the browser lay out the tab first
 }
 
+// A point difference with a real minus sign, like the edge: +12, −3, 0.
+const formatPoints = (x) => (x > 0 ? `+${x}` : x < 0 ? `−${-x}` : '0');
+
 function standingsTab(t) {
   const scale = scaleOf(t.settings);
-  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results);
+  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results, t.scores);
   // The Bonus column only appears once someone has bonus points.
   const bonus = rows.some((r) => r.bonus);
-  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', 'Edge'].filter(Boolean);
+  // Sets and point difference only appear once a score has been entered.
+  const scored = Object.keys(t.scores ?? {}).length > 0;
+  const headers = ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', scored ? 'Sets' : null, scored ? '+/−' : null, 'Edge'].filter(Boolean);
   return [
     h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
-      h('thead', {}, h('tr', {}, headers.map((x) => h('th', { class: x === 'Edge' ? 'num' : null }, x)))),
+      h('thead', {}, h('tr', {}, headers.map((x) => h('th', { class: x === 'Edge' || x === '+/−' ? 'num' : null }, x)))),
       h('tbody', {}, rows.map((r) => h('tr', { class: r.withdrawn ? 'withdrawn' : r.rank <= 3 && r.points > 0 ? `rank-${r.rank}` : '' },
         h('td', { class: 'rank' }, r.withdrawn ? '–' : h('span', { class: 'rank-badge' }, r.rank)),
         h('td', {}, r.name, r.withdrawn ? h('span', { class: 'muted' }, ' (withdrew)') : null),
@@ -329,11 +434,14 @@ function standingsTab(t) {
         h('td', {}, r.wins),
         bonus ? h('td', {}, r.bonus ? `+${r.bonus}` : '') : null,
         h('td', { class: 'points' }, r.points),
+        scored ? h('td', {}, `${r.setsWon}:${r.setsLost}`) : null,
+        scored ? h('td', { class: 'num' }, formatPoints(r.pointsFor - r.pointsAgainst)) : null,
         h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge / stepUnit(scale)))))))),
     h('p', { class: 'muted' },
       'Games count only rounds with all results entered. ',
       bonus ? 'Bonus: 0.5 points per game fewer than the most games played. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
+      scored ? 'On equal points, set difference and then point difference (+/−) decide; matches without a score count 0:0. ' : '',
       'Edge: how much stronger, on average, the team a player played in was than its opponents (team values): + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
   ];
 }

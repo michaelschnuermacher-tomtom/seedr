@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeStandings, resultKey } from '../src/engine/standings.js';
+import { computeStandings, resultKey, scoreWinner, scoreTotals } from '../src/engine/standings.js';
 
 // strengths: p1 10, p2 6, p3 8, p4 7, p5 2
 const players = [
@@ -97,4 +97,24 @@ test('Edge averages advantages and disadvantages over the games of a player', ()
   assert.equal(rows.p2.edge, (0.25 + 3.5) / 2);
   assert.equal(rows.p3.edge, (-0.25 + 3.5) / 2);
   assert.equal(rows.p5.edge, -3.5);
+});
+
+test('scores: sets and points count, and decide the rank on equal points', () => {
+  // Round 1: Anna & Ben beat Carla & David 21:10 21:12; round 2: Ben & Carla beat Anna & Eva
+  // 21:19, 15:21, 21:18. Scores are always from team 1's side.
+  const scores = { '1-1': [[21, 10], [21, 12]], '2-1': [[19, 21], [21, 15], [18, 21]] };
+  const rows = byId(computeStandings(players, schedule, { '1-1': 1, '2-1': 2 }, scores));
+  assert.deepEqual([rows.p1.setsWon, rows.p1.setsLost, rows.p1.pointsFor, rows.p1.pointsAgainst], [3, 2, 100, 79]);
+  assert.deepEqual([rows.p2.setsWon, rows.p2.setsLost], [4, 1]);
+  // Anna and Carla both have 1 point: Anna's sets 3:2 beat Carla's 2:3, so she ranks ahead.
+  assert.equal(rows.p1.points, rows.p3.points);
+  assert.ok(rows.p1.rank < rows.p3.rank);
+  const order = computeStandings(players, schedule, { '1-1': 1, '2-1': 2 }, scores).map((r) => r.id);
+  assert.ok(order.indexOf('p1') < order.indexOf('p3'));
+});
+
+test('scoreWinner and scoreTotals', () => {
+  assert.deepEqual(scoreTotals([[21, 15], [18, 21], [21, 19]]), { sets: [2, 1], points: [60, 55] });
+  assert.equal(scoreWinner([[21, 15], [18, 21], [21, 19]]), 1);
+  assert.equal(scoreWinner([[21, 19], [19, 21]]), null);
 });

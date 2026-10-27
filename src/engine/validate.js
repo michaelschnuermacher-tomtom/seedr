@@ -30,6 +30,7 @@ function checkTournament(t) {
   checkSchedule(t.schedule, t.settings, ids);
   if (!isInt(t.revealedRounds) || t.revealedRounds < 0 || t.revealedRounds > t.settings.rounds) fail('Invalid number of revealed rounds');
   checkResults(t.results, t.schedule);
+  if ('scores' in t) checkScores(t.scores, t.results);
 }
 
 function checkSettings(s) {
@@ -96,6 +97,18 @@ function checkSchedule(schedule, settings, lastRound) {
     r.sitOuts.forEach(use);
     if (seen.size !== ids.size) fail(`${label} does not include every player`);
   });
+}
+
+// Scores belong to matches with a result: sets of two whole numbers, not equal.
+function checkScores(scores, results) {
+  if (!isObject(scores)) fail('Invalid scores');
+  for (const [key, sets] of Object.entries(scores)) {
+    if (!(key in results)) fail(`Score for a match without a result ${key}`);
+    if (!Array.isArray(sets) || sets.length === 0) fail(`Invalid score for match ${key}`);
+    for (const set of sets) {
+      if (!Array.isArray(set) || set.length !== 2 || !set.every((x) => isInt(x) && x >= 0) || set[0] === set[1]) fail(`Invalid set in match ${key}`);
+    }
+  }
 }
 
 function checkResults(results, schedule) {

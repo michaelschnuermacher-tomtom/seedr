@@ -40,7 +40,7 @@ export function tournamentSummary(t) {
   const next = done ? 'there is always the next tournament!' : 'there is always the next round!';
 
   // Everyone who played, including players who withdrew later.
-  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results).filter((r) => r.games > 0);
+  const rows = computeStandings(calibratePlayers(t.players, scale), t.schedule, t.results, t.scores).filter((r) => r.games > 0);
   // A highlight about a statistic names everyone who shares it; edges count as equal when
   // they show the same in the standings.
   const and = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0]);

@@ -1,5 +1,5 @@
 import { generateSchedule } from './schedule.js';
-import { resultKey } from './standings.js';
+import { resultKey, scoreWinner } from './standings.js';
 import { scaleOf, calibratePlayers, isSkill } from './scale.js';
 
 // Version 2: players link to a person (`personId`) and may have a year of birth.
@@ -250,6 +250,7 @@ export function swapPlayersAcross(t, roundA, a, roundB, b) {
   return roundA === roundB ? once : swapPlayers(once, roundB, a, b);
 }
 
+// The winner of a match (1 or 2), or null to clear it. Clearing also removes its score.
 export function setResult(t, round, court, winner) {
   checkOpen(t);
   const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
@@ -258,5 +259,27 @@ export function setResult(t, round, court, winner) {
   const key = resultKey(round, court);
   if (winner === null) delete results[key];
   else results[key] = winner;
-  return { ...t, results };
+  const { [key]: dropped, ...scores } = t.scores ?? {};
+  return { ...t, results, ...(winner === null || dropped ? { scores } : {}) };
+}
+
+// The score of a match: sets as [[team 1 points, team 2 points], …], at least one, each
+// with whole numbers of 0 or more and a winner. The match winner follows from the score
+// (more sets, then more points); when both are equal, `winner` decides. null removes the
+// score and keeps the winner.
+export function setScore(t, round, court, sets, winner = null) {
+  checkOpen(t);
+  const exists = t.schedule[round - 1]?.matches.some((m) => m.court === court);
+  if (!exists) throw new Error(`Unknown match: round ${round}, court ${court}`);
+  const key = resultKey(round, court);
+  const { [key]: old, ...others } = t.scores ?? {};
+  if (sets === null) return { ...t, scores: others };
+  if (!Array.isArray(sets) || sets.length === 0) throw new Error('Enter at least one set.');
+  for (const set of sets) {
+    if (!Array.isArray(set) || set.length !== 2 || !set.every((x) => Number.isInteger(x) && x >= 0)) throw new Error('Points must be whole numbers of 0 or more.');
+    if (set[0] === set[1]) throw new Error('A set needs a winner: the points cannot be equal.');
+  }
+  const decided = scoreWinner(sets) ?? winner;
+  if (decided !== 1 && decided !== 2) throw new Error('Sets and points are equal: choose the winner.');
+  return { ...t, results: { ...t.results, [key]: decided }, scores: { ...others, [key]: sets.map((set) => [...set]) } };
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, revealNext, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -257,4 +257,27 @@ test('skills can change while the tournament runs; the remaining rounds can be d
   const fresh = redrawRemaining(setSkills(make(), { p1: 9 }), 3);
   assert.equal(fresh.seed, 3, 'before the first result the whole schedule is new');
   assert.throws(() => setSkills(finishTournament(t, new Date()), { p1: 2 }), /finished/);
+});
+
+test('a score decides the winner: more sets, then more points; equal ones need a choice', () => {
+  const t = make();
+  const scored = setScore(t, 1, 1, [[21, 15], [18, 21], [21, 19]]);
+  assert.equal(scored.results['1-1'], 1);
+  assert.deepEqual(scored.scores['1-1'], [[21, 15], [18, 21], [21, 19]]);
+  assert.equal(setScore(t, 1, 1, [[10, 21]]).results['1-1'], 2);
+  assert.equal(setScore(t, 1, 1, [[21, 19], [19, 22]]).results['1-1'], 2, 'one set each: more points win');
+  assert.throws(() => setScore(t, 1, 1, [[21, 19], [19, 21]]), /choose the winner/);
+  assert.equal(setScore(t, 1, 1, [[21, 19], [19, 21]], 2).results['1-1'], 2);
+  assert.throws(() => setScore(t, 1, 1, []), /at least one set/);
+  assert.throws(() => setScore(t, 1, 1, [[21, 21]]), /cannot be equal/);
+  assert.throws(() => setScore(t, 1, 1, [[21, -1]]), /whole numbers/);
+  assert.equal(validateTournament(scored).ok, true);
+  const noScore = setScore(scored, 1, 1, null);
+  assert.equal(noScore.results['1-1'], 1, 'removing the score keeps the winner');
+  assert.ok(!('1-1' in noScore.scores));
+  const cleared = setResult(scored, 1, 1, null);
+  assert.ok(!('1-1' in cleared.results) && !('1-1' in cleared.scores), 'clearing the result removes its score');
+  assert.ok(!('1-1' in setResult(scored, 1, 1, 2).scores), 'another winner drops a score that says otherwise');
+  assert.match(validateTournament({ ...scored, scores: { '1-2': [[21, 10]] } }).error, /without a result/);
+  assert.match(validateTournament({ ...scored, scores: { '1-1': [[21, 21]] } }).error, /Invalid set/);
 });
