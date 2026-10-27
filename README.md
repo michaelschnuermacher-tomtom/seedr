@@ -101,7 +101,7 @@ Withdrawn players keep their wins in the standings, but get no bonus and no rank
 
 ## Manage
 
-Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The Rounds and Standings tabs only show the revealed rounds, results and standings, so the phone can be handed to players. Manage lists everything read-only, and changes happen on a sub-page that an **Edit** button opens, with Save and Cancel:
+Everything that changes or reveals the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The **Info** tab shows the most important facts (status, players, courts, rounds, match length, break, playing time, games and sit-outs per player, skill scale, reveal mode); Rounds and Standings only show the revealed rounds, results and standings, so the phone can be handed to players. A finished tournament shows **Finished** next to its name. Manage lists everything read-only, and changes happen on a sub-page that an **Edit** button opens, with Save and Cancel:
 
 - **Finish**: when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Names can still be corrected.
 - **Rounds**: how many rounds are revealed, with **Reveal round(s)** and **Swap players**.

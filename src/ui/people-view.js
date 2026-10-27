@@ -53,7 +53,6 @@ const playsIn = (n) => (n === 0 ? 'no tournaments' : n === 1 ? '1 tournament' : 
 
 function listPage(ctx, view, people, tournaments, leave) {
   return [
-    h('p', { class: 'muted' }, 'Names and years of birth are shared by all tournaments: a correction here shows everywhere. The skill is set for each tournament in its setup.'),
     h('div', { class: 'actions' },
       h('button', { class: 'primary', onclick: () => showPage(ctx, view, 'add') }, 'Add player'),
       leave ? h('button', { onclick: leave }, 'Back to the setup') : null),

@@ -10,7 +10,7 @@ import { scaleOf, calibrated, calibratePlayers, stepUnit, levels, describeScale 
 import { exportBackup } from './backup.js';
 import { draftFromTournament } from './setup.js';
 
-const TABS = [['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['manage', 'Manage']];
+const TABS = [['info', 'Info'], ['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['manage', 'Manage']];
 
 function roundComplete(t, round) {
   return round.matches.every((m) => t.results[resultKey(round.round, m.court)]);
@@ -19,7 +19,8 @@ function roundComplete(t, round) {
 export function tournamentScreen(ctx) {
   const t = ctx.state.tournament;
   const view = (ctx.state.view ??= { tab: isFinished(t) ? 'summary' : 'rounds' });
-  const body = view.tab === 'standings' ? standingsTab(t)
+  const body = view.tab === 'info' ? infoTab(t)
+    : view.tab === 'standings' ? standingsTab(t)
     : view.tab === 'summary' ? summaryTab(t)
     : view.tab === 'manage' ? manageTab(ctx, t)
       : view.tab === 'print' ? printout(ctx, t, view)
@@ -28,7 +29,7 @@ export function tournamentScreen(ctx) {
     h('header', { class: 'top' },
       h('div', { class: 'titles' },
         h('button', { class: 'eyebrow home-link', title: 'Home', onclick: () => ctx.go('home') }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
-        h('h1', {}, t.name))),
+        h('h1', {}, t.name, isFinished(t) ? h('span', { class: 'title-badge' }, 'Finished') : null))),
     h('nav', { class: 'tabs' }, TABS.map(([key, label]) =>
       h('button', {
         class: view.tab === key ? 'current' : '',
@@ -41,6 +42,49 @@ export function tournamentScreen(ctx) {
         },
       }, key === 'manage' ? h('span', { class: 'lock', 'aria-hidden': 'true' }, '🔒') : null, label))),
     body);
+}
+
+// The most important facts of the tournament at a glance. Games and sit-outs are counted
+// from the schedule, so withdrawals and swaps are included.
+function infoTab(t) {
+  const s = t.settings;
+  const active = t.players.filter(isActive);
+  const withdrawn = t.players.length - active.length;
+  const games = new Map(active.map((p) => [p.id, 0]));
+  const sitOuts = new Map(active.map((p) => [p.id, 0]));
+  for (const r of t.schedule) {
+    for (const m of r.matches) for (const id of [...m.team1, ...m.team2]) if (games.has(id)) games.set(id, games.get(id) + 1);
+    for (const id of r.sitOuts) if (sitOuts.has(id)) sitOuts.set(id, sitOuts.get(id) + 1);
+  }
+  // "4 each" or "4 for 13 players, 3 for 4 players", most common first.
+  const spread = (counts, unit) => {
+    const groups = new Map();
+    for (const n of counts.values()) groups.set(n, (groups.get(n) ?? 0) + 1);
+    const word = (n) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+    if (groups.size === 1) return `${word([...groups.keys()][0])} each`;
+    return [...groups].sort((a, b) => b[1] - a[1] || b[0] - a[0]).map(([n, players]) => `${word(n)} for ${players} player${players === 1 ? '' : 's'}`).join(', ');
+  };
+  const played = t.schedule.filter((r) => roundComplete(t, r)).length;
+  const total = s.rounds * s.matchMinutes + (s.rounds - 1) * s.breakMinutes;
+  const hours = Math.floor(total / 60);
+  const status = isFinished(t) ? `Finished on ${new Date(t.finishedAt).toLocaleDateString()}`
+    : hasResults(t) ? `Running: ${played} of ${s.rounds} rounds have all results` : 'Not started yet';
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Tournament'),
+    h('dl', { class: 'facts' },
+      fact('Status', status),
+      fact('Created', new Date(t.createdAt).toLocaleDateString()),
+      fact('Players', withdrawn ? `${active.length} (${withdrawn} withdrew)` : active.length),
+      fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),
+      fact('Rounds', s.rounds),
+      fact('Match length', `${s.matchMinutes} min`),
+      fact('Break between rounds', s.breakMinutes ? `${s.breakMinutes} min` : 'none'),
+      fact('Playing time', `${total} min${hours ? ` (${hours} h${total % 60 ? ` ${total % 60} min` : ''})` : ''}`),
+      fact('Games per player', spread(games, 'game')),
+      fact('Sit-outs per player', spread(sitOuts, 'sit-out')),
+      fact('Skill scale', `${scaleOf(s).min}–${scaleOf(s).max}. ${describeScale(scaleOf(s))}`),
+      fact('Rounds revealed', `${s.revealBatch === 'all' ? 'All at once' : `${s.revealBatch} at a time`} (${t.revealedRounds} of ${s.rounds} so far)`)),
+    h('div', { style: 'height: 12px' }));
 }
 
 // Display data for all revealed rounds; hidden rounds are never included.
@@ -135,8 +179,8 @@ function roundsTab(ctx, t, view) {
   const timing = `Each round takes ${matchMinutes} min, ${breakMinutes ? `with a ${breakMinutes} min break between rounds` : 'with no break between rounds'}.`;
   return [
     h('h2', { class: 'print-only' }, 'Rounds'),
-    swapping ? swapHeader(ctx, t, view) : h('p', { class: 'muted timing' }, timing),
-    isFinished(t) ? h('p', { class: 'muted no-print' }, 'The tournament is finished: the results are final.') : null,
+    // On screen the timing is in the Info tab; the printout keeps it here.
+    swapping ? swapHeader(ctx, t, view) : h('p', { class: 'muted timing print-only' }, timing),
     h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
       h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
       swapping ? swapRound(ctx, t, view, r) : r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
