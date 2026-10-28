@@ -85,14 +85,6 @@ export function createTournament({ id, name, players, settings, seed, now }) {
   };
 }
 
-// The rounds the players see: every complete round and the next one; a finished
-// tournament shows all. (Manage always shows all rounds.)
-export function shownRounds(t) {
-  if (isFinished(t)) return t.settings.rounds;
-  const complete = t.schedule.findIndex((r) => !r.matches.every((m) => hasResult(t.results, resultKey(r.round, m.court))));
-  return complete === -1 ? t.settings.rounds : Math.min(t.settings.rounds, complete + 1);
-}
-
 export function hasResults(t) {
   return Object.keys(t.results).length > 0;
 }

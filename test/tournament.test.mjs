@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, shownRounds, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, openMatches, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
+import { parsePlayers, renameTournament, swapPlayers, swapPlayersAcross, createTournament, hasResults, redraw, setResult, updateSettings, withdrawPlayers, firstRedrawableRound, isActive, isFinished, finishTournament, reopenTournament, openMatches, setSkills, redrawRemaining, setScore } from '../src/engine/tournament.js';
 import { validateTournament } from '../src/engine/validate.js';
 
 test('parsePlayers reads "Name: skill" lines', () => {
@@ -44,16 +44,6 @@ test('createTournament builds a complete tournament', () => {
   assert.equal(t.schedule.length, 6);
   assert.deepEqual(t.results, {});
   assert.equal(t.seed, 11);
-});
-
-test('players see every complete round and the next one; all once finished', () => {
-  let t = make();
-  assert.equal(shownRounds(t), 1);
-  for (const m of t.schedule[0].matches) t = setResult(t, 1, m.court, 1);
-  assert.equal(shownRounds(t), 2, 'round 1 complete: round 2 appears');
-  t = setResult(t, 2, t.schedule[1].matches[0].court, 2);
-  assert.equal(shownRounds(t), 2, 'round 2 not complete yet');
-  assert.equal(shownRounds(finishTournament(playAll(t), new Date())), 6);
 });
 
 test('setResult sets, changes and clears a result without changing the input', () => {

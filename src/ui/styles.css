@@ -125,6 +125,7 @@ button.link { border: none; background: none; flex: 1; justify-content: flex-sta
 /* Text and messages */
 .muted { color: var(--muted); font-size: .92rem; }
 .ok { color: var(--win); font-weight: 550; }
+.option.unavailable { opacity: .55; }
 .locked-note { background: var(--surface-2); color: var(--muted); padding: 10px 12px; border-radius: var(--radius-sm); font-size: .9rem; margin: 8px 0; }
 .warning { background: var(--warn-soft); color: var(--warn); padding: 12px 14px; border-radius: var(--radius-sm); font-size: .95rem; }
 .problems { color: var(--danger); padding-left: 20px; font-size: .95rem; }
@@ -313,9 +314,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 5px; z-i
   h2.print-only { break-after: avoid; }
   .standings tbody tr:nth-child(-n+4) { break-after: avoid; }
   .standings tbody tr:nth-last-child(-n+4) { break-before: avoid; }
-  /* Summary and skills get the same chapter headings as Standings and Rounds. */
-  .summary .card-title, .skills .card-title { display: none; }
-  .summary, .skills { padding-block: 12px; }
+  /* Summary, skills, general and draw quality get the same chapter headings as Standings and Rounds. */
+  .summary .card-title, .skills .card-title, .general .card-title, .quality .card-title { display: none; }
+  .summary, .skills, .general, .quality { padding-block: 12px; }
+  .general .facts, .quality .facts { gap: 3px 16px; }
   /* Three sizes in print: 9.5pt text, 12pt chapter headings, 7.5pt small labels. */
   .screen, .screen .muted { font-size: 9.5pt; }
   .highlights { gap: 6px; }
