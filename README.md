@@ -114,11 +114,11 @@ Withdrawn players keep their wins in the standings, but get no bonus and no rank
 - **Summary**: the tournament summary once finished; **Finish tournament** and **Reopen** (see below).
 - **Print**: asks which sections go into the printout, in this order: general information, the tournament summary (listed from the start, printable once the tournament is finished), standings, all rounds, draw quality and the player skills. A section starts on the same page when it still fits.
 
-Skills and edges are always shown. Where the tournament's progress locks something (e.g. scoring once results are in, everything once finished), a 🔒 note says so right there. Editing (Info → Edit, Rounds → Edit, finishing and reopening) can ask for a password every time (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The password only keeps players from peeking: it can be read in the app's source. A finished tournament shows **Finished** next to its name.
+Skills and edges are always shown. Where the tournament's progress locks something (e.g. scoring once results are in, everything once finished), a 🔒 note says so right there. Steps that are hard to undo (deleting, finishing, reopening, redrawing, withdrawing, importing a backup) ask first, in a window of the app. A finished tournament shows **Finished** next to its name.
 
 ### Tournament summary
 
-Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in the **Summary** tab for everyone (until then it says so), and as an option for the printout. The Summary tab also has **Finish tournament**: once every match has a result, it locks results and the draw and shows the summary (it asks for the password when that is switched on); **Reopen** undoes it.
+Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in the **Summary** tab for everyone (until then it says so), and as an option for the printout. The Summary tab also has **Finish tournament**: once every match has a result, it locks results and the draw and shows the summary; **Reopen** undoes it.
 
 ## Keeping data safe
 

@@ -1,3 +1,4 @@
+import { confirmAsk } from './dom.js';
 import { saveFile, downloadFile } from './export.js';
 import { makeBackup, readBackup, mergeBackup } from '../engine/people.js';
 
@@ -22,7 +23,7 @@ export async function importBackup(ctx, file) {
   const merged = mergeBackup({ people: ctx.people(), tournaments: ctx.store.list() }, incoming);
   const { people, tournaments } = merged.replaced;
   const replacing = [tournaments ? `${tournaments} tournament${tournaments === 1 ? '' : 's'}` : '', people ? `${people} player${people === 1 ? '' : 's'}` : ''].filter(Boolean);
-  if (replacing.length && !confirm(`This replaces ${replacing.join(' and ')} on this device. Continue?`)) return;
+  if (replacing.length && !await confirmAsk({ title: 'Import the backup?', text: `This replaces ${replacing.join(' and ')} on this device.`, ok: 'Import' })) return;
   ctx.savePeople(merged.people, merged.tournaments);
   const imported = merged.tournaments.filter((t) => incoming.tournaments.some((x) => x.id === t.id));
   if (incoming.people.length === 0 && imported.length === 1) {

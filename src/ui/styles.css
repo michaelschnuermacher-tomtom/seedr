@@ -126,6 +126,13 @@ button.link { border: none; background: none; flex: 1; justify-content: flex-sta
 .muted { color: var(--muted); font-size: .92rem; }
 .ok { color: var(--win); font-weight: 550; }
 .option.unavailable { opacity: .55; }
+/* The app's own confirmation window. */
+dialog.ask { border: none; border-radius: var(--radius); padding: 0; width: min(420px, calc(100vw - 32px)); background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+dialog.ask::backdrop { background: rgb(10 16 24 / .45); }
+dialog.ask form { padding: 20px 20px 16px; }
+dialog.ask h2 { margin: 0 0 8px; font-size: 1.1rem; }
+dialog.ask p { margin: 0 0 14px; color: var(--muted); }
+button.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 .locked-note { background: var(--surface-2); color: var(--muted); padding: 10px 12px; border-radius: var(--radius-sm); font-size: .9rem; margin: 8px 0; }
 .warning { background: var(--warn-soft); color: var(--warn); padding: 12px 14px; border-radius: var(--radius-sm); font-size: .95rem; }
 .problems { color: var(--danger); padding-left: 20px; font-size: .95rem; }

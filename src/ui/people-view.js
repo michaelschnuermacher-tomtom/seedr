@@ -1,4 +1,4 @@
-import { h, newId } from './dom.js';
+import { h, newId, confirmAsk } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { sortPeople, usage, addPerson, updatePerson, deletePerson, splitPerson } from '../engine/people.js';
 
@@ -106,8 +106,8 @@ function editPage(ctx, view, person, people, tournaments) {
       showError(ctx, error);
     }
   };
-  const remove = () => {
-    if (!confirm(`Delete ${person.name}?`)) return;
+  const remove = async () => {
+    if (!await confirmAsk({ title: `Delete ${person.name}?`, text: 'The player is removed from this device.', ok: 'Delete', danger: true })) return;
     try {
       ctx.savePeople(deletePerson(people, tournaments, person.id));
       listPeople(ctx, view);

@@ -1,4 +1,4 @@
-import { h, formatSigned, lockedNote } from './dom.js';
+import { h, formatSigned, lockedNote, confirmAsk } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { redraw, setResult, hasResults, isActive, swapPlayersAcross, isFinished, finishTournament, reopenTournament, openMatches, setScore } from '../engine/tournament.js';
 import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano, scoresRequired, scoringLabel } from '../engine/standings.js';
@@ -85,14 +85,14 @@ function infoTab(t) {
 }
 
 // Below everything in Info: Edit changes the whole tournament (settings, players, skills);
-// Delete is the only place where a tournament can be deleted. Both behind the password.
+// Delete is the only place where a tournament can be deleted.
 function infoEdit(ctx, t) {
   return h('div', { class: 'actions' },
     h('button', { class: 'primary', onclick: () => editTournament(ctx, t) }, 'Edit'),
     h('button', {
       class: 'danger',
-      onclick: () => {
-        if (!confirm(`Delete "${t.name}" from this device? Export a backup first (home screen) to keep it.`) || !askPassword(ctx, 'Password to delete:')) return;
+      onclick: async () => {
+        if (!await confirmAsk({ title: `Delete "${t.name}"?`, text: 'It is removed from this device. Export a backup first (home screen) to keep it.', ok: 'Delete', danger: true })) return;
         ctx.store.remove(t.id);
         ctx.state.tournament = null;
         ctx.go('home');
@@ -345,34 +345,13 @@ function courtLine(tag, m, showEdge = true) {
     h('span', { class: `gaps edge-tag edge-${level}` }, level === 'even' ? 'Even' : `${EDGE_LABELS[level]}: ${favoured.members.join(' & ')}`));
 }
 
-// Editing (Info → Edit, Rounds → Edit, finishing) asks for this password every time. It
-// only keeps players from peeking: anyone can read it in the app's source.
-const ALL_ROUNDS_PASSWORD = 'Tenerife';
-// Switched off for now: editing opens without asking. Set to true to ask again.
-const PASSWORD_REQUIRED = false;
-
-export function isAllRoundsPassword(input) {
-  return input != null && input.trim() === ALL_ROUNDS_PASSWORD;
-}
-
-// Asks for the password; false when cancelled or wrong.
-function askPassword(ctx, question) {
-  if (!PASSWORD_REQUIRED) return true;
-  const input = prompt(question);
-  if (input == null) return false;
-  if (isAllRoundsPassword(input)) return true;
-  ctx.flash('Wrong password.');
-  return false;
-}
-
-// Below the rounds: Edit opens every round of the schedule (password), not once finished.
+// Below the rounds: Edit opens every round of the schedule, not once finished.
 function roundsEdit(ctx, t) {
   if (ctx.state.view.scoring) return null;
   if (isFinished(t)) return lockedNote('The tournament is finished: results and rounds are locked. Reopen it in the Summary tab to change them.');
   return h('div', { class: 'actions' }, h('button', {
     class: 'primary',
     onclick: () => {
-      if (!askPassword(ctx, 'Password to edit the rounds:')) return;
       Object.assign(ctx.state.view, { editRounds: true, swapPick: null });
       ctx.state.message = null;
       ctx.render();
@@ -578,13 +557,13 @@ function section(title, content, buttons = []) {
 }
 
 // In the Summary tab: finishing locks results and the draw and shows the summary to
-// everyone. Like editing, it can ask for the password.
+// everyone.
 function finishSection(ctx, t) {
   if (isFinished(t)) {
     return section('Finished', h('p', { class: 'muted' }, `Finished on ${new Date(t.finishedAt).toLocaleDateString()}. Results and the draw are locked. Reopening hides the summary until it is finished again.`), [
       h('button', {
-        onclick: () => {
-          if (!confirm('Reopen the tournament? The summary is hidden until it is finished again.') || !askPassword(ctx, 'Password to reopen:')) return;
+        onclick: async () => {
+          if (!await confirmAsk({ title: 'Reopen the tournament?', text: 'The summary is hidden until it is finished again.', ok: 'Reopen' })) return;
           ctx.save(reopenTournament(t));
           ctx.render();
         },
@@ -599,8 +578,8 @@ function finishSection(ctx, t) {
     h('button', {
       class: 'primary',
       disabled: open > 0,
-      onclick: () => {
-        if (!confirm('Finish the tournament and show the summary to everyone?') || !askPassword(ctx, 'Password to finish:')) return;
+      onclick: async () => {
+        if (!await confirmAsk({ title: 'Finish the tournament?', text: 'Results and the draw are locked, and the summary is shown to everyone. It can be reopened.', ok: 'Finish' })) return;
         ctx.save(finishTournament(t, new Date()));
         ctx.state.view.tab = 'summary';
         ctx.render();
@@ -621,8 +600,8 @@ function allRoundsPage(ctx, t) {
   const done = () => h('button', { class: 'primary', onclick: close }, 'Done');
   return [
     h('div', { class: 'actions' }, done(), hasResults(t) ? lockedNote('Redraw schedule: only before the first result.') : h('button', {
-      onclick: () => {
-        if (!confirm('Draw a completely new schedule? Until the first result, this replaces it.')) return;
+      onclick: async () => {
+        if (!await confirmAsk({ title: 'Draw a completely new schedule?', text: 'The current schedule is replaced.', ok: 'Redraw' })) return;
         ctx.save(redraw(t, newSeed()));
         ctx.render();
       },
@@ -634,7 +613,6 @@ function allRoundsPage(ctx, t) {
 
 // Every option of the tournament, on the same page as for a new tournament (the setup).
 function editTournament(ctx, t) {
-  if (!askPassword(ctx, 'Password to edit the tournament:')) return;
   ctx.state.draft = draftFromTournament(ctx.store.get(t.id) ?? t);
   ctx.go('setup');
 }

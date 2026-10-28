@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTournament, setResult, finishTournament } from '../src/engine/tournament.js';
 import { teamValue, edgeLevel } from '../src/engine/schedule.js';
-import { roundsOverview, isAllRoundsPassword } from '../src/ui/tournament-view.js';
+import { roundsOverview } from '../src/ui/tournament-view.js';
 
 const make = (revealBatch) => createTournament({
   id: 't1', name: 'Club night', seed: 4, now: new Date('2026-10-14T18:00:00Z'),
@@ -39,13 +39,6 @@ test('a round is complete when every match has a result', () => {
   assert.equal(second.complete, false);
 });
 
-test('the all-rounds password is Tenerife', () => {
-  assert.equal(isAllRoundsPassword('Tenerife'), true);
-  assert.equal(isAllRoundsPassword(' Tenerife '), true);
-  assert.equal(isAllRoundsPassword('tenerife'), false);
-  assert.equal(isAllRoundsPassword(''), false);
-  assert.equal(isAllRoundsPassword(null), false);
-});
 
 test('each match has team spreads and the gaps between the teams', () => {
   const t = make('all');

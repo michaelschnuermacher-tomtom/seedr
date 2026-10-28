@@ -1,4 +1,4 @@
-import { h, newId, lockedNote } from './dom.js';
+import { h, newId, lockedNote, confirmAsk } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { parsePlayers, createTournament, updateSettings, isActive, hasResults, renameTournament, setSkills, withdrawPlayers, redrawRemaining, firstRedrawableRound } from '../engine/tournament.js';
 import { planMatrix, gamesPerPlayer, describeGames, BREAK_CHOICES, MATRIX_MIN_MATCH_MINUTES } from '../engine/timeplan.js';
@@ -364,12 +364,13 @@ function startedPreview(ctx, d, t) {
   const rounds = c.from === c.last ? `round ${c.last}` : `rounds ${c.from}–${c.last}`;
   const skillsChanged = Object.keys(c.skills).length > 0;
   const changed = c.renamed || skillsChanged || c.leaving.length > 0;
-  const save = (redrawToo) => (e) => {
+  const save = (redrawToo) => async (e) => {
+    const button = e.currentTarget; // gone from the event once a window was shown
     const names = t.players.filter((p) => c.leaving.includes(p.id)).map((p) => p.name).join(', ');
-    if (c.leaving.length && !confirm(`Withdraw ${names} and draw ${rounds} again? Rounds with results stay as they are. This cannot be undone.`)) return;
-    if (!c.leaving.length && redrawToo && !confirm(`Save and draw ${rounds} again? Rounds with results stay as they are.`)) return;
-    e.currentTarget.disabled = true;
-    e.currentTarget.textContent = redrawToo || c.leaving.length ? 'Drawing…' : 'Saving…';
+    if (c.leaving.length && !await confirmAsk({ title: `Withdraw ${names}?`, text: `${rounds[0].toUpperCase()}${rounds.slice(1)} ${c.from === c.last ? 'is' : 'are'} drawn again without them; rounds with results stay as they are. This cannot be undone.`, ok: 'Withdraw and redraw', danger: true })) return;
+    if (!c.leaving.length && redrawToo && !await confirmAsk({ title: `Save and draw ${rounds} again?`, text: 'Rounds with results stay as they are.', ok: 'Save and redraw' })) return;
+    button.disabled = true;
+    button.textContent = redrawToo || c.leaving.length ? 'Drawing…' : 'Saving…';
     setTimeout(() => { // let the browser paint "Drawing…" first
       let next;
       try {
