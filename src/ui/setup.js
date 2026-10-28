@@ -262,7 +262,7 @@ export function setupScreen(ctx) {
   const skillsCard = card('Skills', 'ao', ev0.scale ? skillsStep(ctx, d, ev0.scale, people) : null);
   const courtsField = field('Courts', numberInput('courts', 1));
   const timeField = field('Total tournament time (min)', numberInput('totalMinutes', 1));
-  const timeCard = started ? card('Courts & time', 'rg', fixedPlan(started.settings)) : card('Courts & time', 'rg', courtsField, timeField, planBox);
+  const timeCard = card('Courts & time', 'rg', courtsField, timeField, planBox);
   // Once results are in, scoring and skill scale are shown but cannot change.
   // A 🔒 note right below the title of a card that cannot change.
   const lock = (cardEl, text) => cardEl.querySelector('.card-title').after(lockedNote(text));
@@ -283,6 +283,10 @@ export function setupScreen(ctx) {
   const refresh = () => {
     if (started) {
       pointsField.hidden = d.scoring !== 'americano';
+      // The table as the tournament was set up (players taken out do not change it), greyed out.
+      const fixed = draftFromTournament(started);
+      planBox.replaceChildren(planField(fixed, evaluateDraft(fixed, people), refresh));
+      for (const el of timeCard.querySelectorAll('input, select, button')) el.disabled = true;
       preview.replaceChildren(...startedPreview(ctx, d, started));
       return;
     }
@@ -346,11 +350,6 @@ function planField(d, ev, refresh) {
 }
 
 const courtsText = (n) => `${n} court${n === 1 ? '' : 's'}`;
-
-// Courts and times of a started tournament, which stay as they are.
-function fixedPlan(s) {
-  return h('p', {}, `${courtsText(s.courts)}${s.lastRoundCourts ? ` (last round: ${s.lastRoundCourts})` : ''} · ${s.rounds} rounds of ${s.matchMinutes} min · ${s.breakMinutes ? `${s.breakMinutes} min break` : 'no break'}`);
-}
 
 // Below the steps of a started tournament: what saving does, and the buttons.
 function startedPreview(ctx, d, t) {
