@@ -31,7 +31,7 @@ function tournamentsTab(ctx) {
     h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => ctx.go('setup') }, 'New tournament')),
     tournaments.length === 0
       ? h('p', { class: 'muted' }, 'No tournaments saved on this device yet.')
-      // Deleting is only possible in Manage, behind its password.
+      // Deleting is only possible on the edit page (Info → Edit), behind the password.
       : h('ul', { class: 'list' }, tournaments.map((t) => h('li', {},
         h('button', { class: 'link', onclick: () => ctx.open(t) },
           h('strong', {}, t.name),

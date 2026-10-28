@@ -16,10 +16,9 @@ export function h(tag, props, ...children) {
   return el;
 }
 
-// The title row of a sub-page: the title and a ✕ that closes the page.
-export function closableTitle(title, onClose) {
-  return h('h2', { class: 'card-title closable' }, h('span', {}, title),
-    h('button', { class: 'close-x', title: 'Close', 'aria-label': 'Close', onclick: onClose }, '✕'));
+// Says why something cannot be changed (yet or any more), right where it would be changed.
+export function lockedNote(text) {
+  return h('p', { class: 'locked-note' }, h('span', { 'aria-hidden': 'true' }, '🔒 '), text);
 }
 
 export function formatSigned(x) {

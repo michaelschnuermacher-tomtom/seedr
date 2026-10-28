@@ -1,6 +1,6 @@
-import { h, formatSigned, closableTitle } from './dom.js';
+import { h, formatSigned, lockedNote } from './dom.js';
 import { logoDataUrl } from './logo.js';
-import { shownRounds, redraw, setResult, hasResults, isActive, swapPlayersAcross, isFinished, finishTournament, reopenTournament, openMatches, setShowSkills, setShowEdges, showsEdges, setScore } from '../engine/tournament.js';
+import { shownRounds, redraw, setResult, hasResults, isActive, swapPlayersAcross, isFinished, finishTournament, reopenTournament, openMatches, setScore } from '../engine/tournament.js';
 import { resultKey, computeStandings, scoreWinner, hasResult, isAmericano, scoresRequired, scoringLabel } from '../engine/standings.js';
 import { scheduleStats, drawWarnings, teamValue, formatValue, edgeLevel } from '../engine/schedule.js';
 import { newSeed } from '../engine/rng.js';
@@ -9,7 +9,7 @@ import { tournamentSummary } from '../engine/summary.js';
 import { scaleOf, calibrated, calibratePlayers, stepUnit, levels, describeScale } from '../engine/scale.js';
 import { draftFromTournament } from './setup.js';
 
-const TABS = [['info', 'Info'], ['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['manage', 'Manage']];
+const TABS = [['info', 'Info'], ['rounds', 'Rounds'], ['standings', 'Standings'], ['summary', 'Summary'], ['print', 'Print']];
 
 function roundComplete(t, round) {
   return round.matches.every((m) => hasResult(t.results, resultKey(round.round, m.court)));
@@ -18,12 +18,13 @@ function roundComplete(t, round) {
 export function tournamentScreen(ctx) {
   const t = ctx.state.tournament;
   const view = (ctx.state.view ??= { tab: isFinished(t) ? 'summary' : 'rounds' });
-  const body = view.tab === 'info' ? [infoTab(t), infoPlayers(t)]
+  const body = view.tab === 'info' ? [infoTab(ctx, t), infoPlayers(t), qualitySection(t)]
     : view.tab === 'standings' ? standingsTab(t)
-    : view.tab === 'summary' ? summaryTab(t)
-    : view.tab === 'manage' ? manageTab(ctx, t)
-      : view.tab === 'print' ? printout(ctx, t, view)
-      : roundsTab(ctx, t, view);
+    : view.tab === 'summary' ? summaryTab(ctx, t)
+    : view.tab === 'print' ? printPage(ctx, t)
+      : view.tab === 'printout' ? printout(ctx, t, view)
+      : view.editRounds ? allRoundsPage(ctx, t)
+      : [roundsEdit(ctx, t), roundsTab(ctx, t, view)];
   return h('main', { class: 'screen' },
     h('header', { class: 'top' },
       h('div', { class: 'titles' },
@@ -33,19 +34,16 @@ export function tournamentScreen(ctx) {
       h('button', {
         class: view.tab === key ? 'current' : '',
         onclick: () => {
-          // Manage holds every option that changes or reveals the draw: password each time.
-          if (key === 'manage' && view.tab !== 'manage' && !askPassword(ctx, 'Password for Manage:')) return;
-          if (key === 'manage') view.manage = null; // always open on the list
-          view.tab = key;
+          Object.assign(view, { tab: key, editRounds: false, swapping: false, swapPick: null });
           ctx.render();
         },
-      }, key === 'manage' ? h('span', { class: 'lock', 'aria-hidden': 'true' }, '🔒') : null, label))),
+      }, label))),
     body);
 }
 
 // The most important facts of the tournament at a glance. Games and sit-outs are counted
 // from the schedule, so withdrawals and swaps are included.
-function infoTab(t) {
+function infoTab(ctx, t) {
   const s = t.settings;
   const active = t.players.filter(isActive);
   const withdrawn = t.players.length - active.length;
@@ -82,26 +80,23 @@ function infoTab(t) {
       fact('Games per player', spread(games, 'game')),
       fact('Sit-outs per player', spread(sitOuts, 'sit-out')),
       fact('Scoring', scoringLabel(s.scoring)),
-      t.showSkills ? fact('Skill scale', `${scaleOf(s).min}–${scaleOf(s).max}. ${describeScale(scaleOf(s))}`) : null,
+      fact('Skill scale', `${scaleOf(s).min}–${scaleOf(s).max}. ${describeScale(scaleOf(s))}`),
       fact('Rounds shown', `${shownRounds(t)} of ${s.rounds} (the next appears once a round is complete)`)),
-    h('div', { style: 'height: 12px' }));
+    h('div', { class: 'actions' }, h('button', { onclick: () => editTournament(ctx, t) }, 'Edit')));
 }
 
-// The players in the Info tab: by skill when the tournament shows skills (Manage → View),
-// otherwise in alphabetical order.
+// The players in the Info tab, by skill.
 function infoPlayers(t) {
   const active = t.players.filter(isActive).length;
   const withdrawn = t.players.length - active;
-  const label = (p) => (isActive(p) ? p.name : `${p.name} (withdrew)`);
   return h('section', { class: 'card' },
     h('h2', { class: 'card-title' }, `Players · ${active}${withdrawn ? ` (${withdrawn} withdrew)` : ''}`),
-    t.showSkills
-      ? [h('p', { class: 'muted' }, describeScale(scaleOf(t.settings))), skillFacts(t)]
-      : h('p', {}, [...t.players].sort((a, b) => a.name.localeCompare(b.name)).map(label).join(', ')),
+    h('p', { class: 'muted' }, describeScale(scaleOf(t.settings))),
+    skillFacts(t),
     h('div', { style: 'height: 12px' }));
 }
 
-// Display data for the rounds the players see (`all`: every round, for Manage).
+// Display data for the rounds the players see (`all`: every round, for Rounds → Edit).
 export function roundsOverview(t, all = false) {
   const byId = new Map(t.players.map((p) => [p.id, p]));
   const scale = scaleOf(t.settings);
@@ -141,7 +136,7 @@ function courtColor(court) {
   return `court-color-${(court - 1) % 4}`;
 }
 
-// A team on a round card that cannot be tapped (Manage, printout).
+// A team on a round card that cannot be tapped (Rounds → Edit, printout).
 function teamBox(round, match, n) {
   const team = n === 1 ? match.team1 : match.team2;
   const { winner } = match;
@@ -241,7 +236,7 @@ function scorePage(ctx, t, view) {
   update();
   return [
     h('section', { class: 'card' },
-      closableTitle(`Round ${round} · Court ${court}`, () => closeScore(ctx)),
+      h('h2', { class: 'card-title' }, `Round ${round} · Court ${court}`),
       h('div', { class: 'score-set score-head' }, h('span', {}), h('strong', {}, names(1)), h('span', {}), h('strong', {}, names(2)), h('span', {})),
       rows,
       h('div', { class: 'actions' }, h('button', { class: 'small', onclick: () => { draft.sets.push([null, null]); ctx.render(); } }, 'Add set')),
@@ -308,7 +303,7 @@ function americanoScorePage(ctx, t, view) {
   update();
   return [
     h('section', { class: 'card' },
-      closableTitle(`Round ${round} · Court ${court} · ${total} points`, () => closeScore(ctx)),
+      h('h2', { class: 'card-title' }, `Round ${round} · Court ${court} · ${total} points`),
       h('div', { class: 'score-set score-head' }, h('span', {}), h('strong', {}, names(1)), h('span', {}), h('strong', {}, names(2)), h('span', {})),
       h('div', { class: 'score-set' }, h('span', { class: 'score-set-label' }, 'Points'), pointsInput(0), h('span', { class: 'vs' }, ':'), pointsInput(1), h('span', {})),
       verdict,
@@ -335,10 +330,10 @@ function courtLine(tag, m, showEdge = true) {
     h('span', { class: `gaps edge-tag edge-${level}` }, level === 'even' ? 'Even' : `${EDGE_LABELS[level]}: ${favoured.members.join(' & ')}`));
 }
 
-// Manage asks for this password every time it is opened. It
+// Editing (Info → Edit, Rounds → Edit, finishing) asks for this password every time. It
 // only keeps players from peeking: anyone can read it in the app's source.
 const ALL_ROUNDS_PASSWORD = 'Tenerife';
-// Switched off for now: Manage opens without asking. Set to true to ask again.
+// Switched off for now: editing opens without asking. Set to true to ask again.
 const PASSWORD_REQUIRED = false;
 
 export function isAllRoundsPassword(input) {
@@ -355,17 +350,33 @@ function askPassword(ctx, question) {
   return false;
 }
 
-// The rounds the players see: every complete round and the next one. With `all` (Manage
-// and the printout) every round, read-only; Manage can also swap players there.
-function roundsTab(ctx, t, view, all = false) {
-  if (view.scoring && !all) return scorePage(ctx, t, view);
+// Above the rounds: Edit opens every round of the schedule (password), not once finished.
+function roundsEdit(ctx, t) {
+  if (ctx.state.view.scoring) return null;
+  if (isFinished(t)) return lockedNote('The tournament is finished: results and rounds are locked. Reopen it in the Summary tab to change them.');
+  return h('div', { class: 'actions rounds-edit' }, h('button', {
+    class: 'small',
+    onclick: () => {
+      if (!askPassword(ctx, 'Password to edit the rounds:')) return;
+      Object.assign(ctx.state.view, { editRounds: true, swapPick: null });
+      ctx.state.message = null;
+      ctx.render();
+    },
+  }, 'Edit'));
+}
+
+// The rounds the players see: every complete round and the next one. With `all` (Rounds → Edit)
+// every round, where players can be swapped. `readOnly` (Rounds → Edit and the printout): no
+// result entry.
+function roundsTab(ctx, t, view, all = false, readOnly = all) {
+  if (view.scoring && !readOnly) return scorePage(ctx, t, view);
   const rounds = roundsOverview(t, all);
   const hidden = t.settings.rounds - rounds.length;
   const comingUp = hidden > 0 ? h('p', { class: 'muted no-print' }, hidden === 1 ? '1 more round to come.' : `${hidden} more rounds to come.`) : null;
-  // In Manage (all rounds) players can always be swapped, unless the tournament is finished.
+  // In Rounds → Edit (all rounds) players can always be swapped, unless the tournament is finished.
   const swapping = all && Boolean(view.swapping) && !isFinished(t);
-  // In Manage results are not entered: the round cards are only shown.
-  const team = (r, m, n) => (all ? teamBox(r, m, n) : teamButton(ctx, t, r.round, m, n));
+  // In Rounds → Edit and the printout results are not entered: the round cards are only shown.
+  const team = (r, m, n) => (readOnly ? teamBox(r, m, n) : teamButton(ctx, t, r.round, m, n));
   const { matchMinutes, breakMinutes } = t.settings;
   const timing = `Each round takes ${matchMinutes} min, ${breakMinutes ? `with a ${breakMinutes} min break between rounds` : 'with no break between rounds'}.`;
   return [
@@ -375,11 +386,11 @@ function roundsTab(ctx, t, view, all = false) {
     h('div', { class: 'overview' }, rounds.map((r) => h('section', { class: `overview-round${r.complete ? ' complete' : ''}` },
       h('h3', {}, `Round ${r.round}${r.complete ? ' ✓' : ''}`),
       swapping ? swapRound(ctx, t, view, r) : r.matches.map((m) => h('div', { class: `mini-match ${courtColor(m.court)}` },
-        courtLine('span', m, showsEdges(t)),
+        courtLine('span', m),
         team(r, m, 1),
         h('span', { class: 'vs' }, 'vs'),
         team(r, m, 2),
-        all ? (m.score ? h('div', { class: 'score-line' }, scoreText(m.score)) : null) : scoreLine(ctx, t, r.round, m)))))),
+        readOnly ? (m.score ? h('div', { class: 'score-line' }, scoreText(m.score)) : null) : scoreLine(ctx, t, r.round, m)))))),
     swapping ? null : comingUp,
   ];
 }
@@ -419,7 +430,7 @@ function swapRound(ctx, t, view, round) {
   const matches = r.matches.map((m, k) => {
     const locked = hasResult(t.results, resultKey(round.round, m.court));
     return h('div', { class: `match swap ${courtColor(m.court)}` },
-      courtLine('div', round.matches[k], showsEdges(t)),
+      courtLine('div', round.matches[k]),
       h('div', { class: 'chips' }, m.team1.map((id) => chip(id, locked))),
       h('div', { class: 'vs' }, locked ? 'vs · has a result' : 'vs'),
       h('div', { class: 'chips' }, m.team2.map((id) => chip(id, locked))));
@@ -430,8 +441,8 @@ function swapRound(ctx, t, view, round) {
   ];
 }
 
-// One printout: the standings, then all revealed rounds from a new page, without buttons
-// and controls (see @media print). Shows them, prints, and comes back to Manage.
+// One printout, without buttons and controls (see @media print), for everybody: so it shows
+// only what the players see. Shows it, prints, and comes back to the Info tab.
 // The sections of the printout, in this order, as chosen on the Print page.
 const PRINT_PARTS = [['summary', 'Tournament summary'], ['standings', 'Standings'], ['rounds', 'Rounds'], ['skills', 'Player skills']];
 
@@ -453,12 +464,12 @@ function printout(ctx, t, view) {
   return [
     parts.summary ? [h('h2', { class: 'print-only' }, 'Tournament summary'), summaryCard(t)] : null,
     parts.standings ? standingsTab(t) : null,
-    parts.rounds ? roundsTab(ctx, t, { ...view, swapping: false }, true) : null,
+    parts.rounds ? roundsTab(ctx, t, { ...view, swapping: false }, false, true) : null,
     parts.skills ? [h('h2', { class: 'print-only' }, 'Player skills'), skillsCard(t)] : null,
   ];
 }
 
-// Choose the sections, then print.
+// The Print tab, for everybody: choose the sections, then print.
 function printPage(ctx, t) {
   const parts = (ctx.state.view.printChoice ??= { ...(ctx.state.view.printParts ?? defaultPrintParts()) });
   const available = printableParts(t);
@@ -468,25 +479,24 @@ function printPage(ctx, t) {
       ctx.render();
       return;
     }
-    Object.assign(ctx.state.view, { printParts: { ...parts }, printChoice: null, manage: null });
+    Object.assign(ctx.state.view, { printParts: { ...parts }, printChoice: null });
     printAll(ctx);
   };
-  return subPage(ctx, 'Print', [
-    h('p', { class: 'muted' }, isFinished(t)
-      ? 'Choose what goes into the printout.'
-      : 'Choose what goes into the printout. The tournament summary can be printed once the tournament is finished.'),
+  return h('section', { class: 'card' },
+    h('h2', { class: 'card-title' }, 'Print'),
+    h('p', { class: 'muted' }, `Choose what goes into the printout. The rounds are the ones shown so far${isFinished(t) ? ' (all of them)' : ''}.${isFinished(t) ? '' : ' The tournament summary can be printed once the tournament is finished.'}`),
     h('div', { class: 'options' }, available.map(([key, label]) => h('label', { class: 'option' },
       h('input', { type: 'checkbox', checked: parts[key], onchange: (e) => { parts[key] = e.target.checked; } }),
       h('span', {}, label)))),
-  ], [h('button', { class: 'primary', onclick: start }, 'Print')]);
+    h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: start }, 'Print')));
 }
 
 function printAll(ctx) {
   const view = ctx.state.view;
-  view.tab = 'print';
+  view.tab = 'printout';
   ctx.render();
   const back = () => {
-    view.tab = 'manage';
+    view.tab = 'print';
     ctx.render();
   };
   window.addEventListener('afterprint', back, { once: true });
@@ -504,10 +514,9 @@ function standingsTab(t) {
   const bonus = rows.some((r) => r.bonus);
   // Sets and point difference only appear once a score has been entered.
   const scored = Object.keys(t.scores ?? {}).length > 0;
-  const edges = showsEdges(t);
   const headers = americano
-    ? ['#', 'Player', 'Games', 'W–D–L', bonus ? 'Bonus' : null, 'Points', '+/−', edges ? 'Edge' : null].filter(Boolean)
-    : ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', scored ? 'Sets' : null, scored ? '+/−' : null, edges ? 'Edge' : null].filter(Boolean);
+    ? ['#', 'Player', 'Games', 'W–D–L', bonus ? 'Bonus' : null, 'Points', '+/−', 'Edge'].filter(Boolean)
+    : ['#', 'Player', 'Games', 'Wins', bonus ? 'Bonus' : null, 'Points', scored ? 'Sets' : null, scored ? '+/−' : null, 'Edge'].filter(Boolean);
   return [
     h('h2', { class: 'print-only' }, 'Standings'),
     h('div', { class: 'table-wrap' }, h('table', { class: 'standings' },
@@ -521,7 +530,7 @@ function standingsTab(t) {
         h('td', { class: 'points' }, r.points),
         scored && !americano ? h('td', {}, `${r.setsWon}:${r.setsLost}`) : null,
         scored || americano ? h('td', { class: 'num' }, formatPoints(r.pointsFor - r.pointsAgainst)) : null,
-        !edges ? null : h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge / stepUnit(scale)))))))),
+        h('td', { class: 'num' }, r.edge == null ? '–' : formatSigned(r.edge / stepUnit(scale)))))))),
     h('p', { class: 'muted' },
       'Games count only rounds with all results entered. ',
       bonus ? (americano
@@ -530,7 +539,7 @@ function standingsTab(t) {
       americano ? 'Points: the points the player’s teams scored. On equal points, the point difference (+/−) and then the wins decide. ' : '',
       rows.some((r) => r.withdrawn) ? 'Players who withdrew keep their wins, but get no bonus and no rank. ' : '',
       scored && !americano ? 'On equal points, set difference and then point difference (+/−) decide; matches without a score count 0:0. ' : '',
-      edges ? 'Edge: how much stronger, on average, the team a player played in was than its opponents (team values): + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.' : ''),
+      'Edge: how much stronger, on average, the team a player played in was than its opponents (team values): + = mostly in the stronger team, − = mostly in the weaker one, 0 = balanced.'),
   ];
 }
 
@@ -538,27 +547,7 @@ function fact(label, value) {
   return [h('dt', {}, label), h('dd', {}, String(value))];
 }
 
-// Manage lists everything read-only; changes happen on a sub-page (view.manage) that an
-// Edit button opens, with Save and Cancel. Actions that change nothing stay direct buttons.
-function manageTab(ctx, t) {
-  const pages = { print: printPage, rounds: allRoundsPage };
-  const page = pages[ctx.state.view.manage];
-  return page ? page(ctx, t) : manageOverview(ctx, t);
-}
-
-function openPage(ctx, name) {
-  ctx.state.view.manage = name;
-  ctx.state.message = null;
-  ctx.render();
-}
-
-// Back to the Manage list; edits not saved are dropped.
-function closePage(ctx) {
-  Object.assign(ctx.state.view, { manage: null, printChoice: null });
-  ctx.render();
-}
-
-// One part of Manage: a title, what is set now, and its buttons.
+// A card: a title, its content, and its buttons.
 function section(title, content, buttons = []) {
   const shown = buttons.filter(Boolean);
   return h('section', { class: 'card' },
@@ -567,23 +556,14 @@ function section(title, content, buttons = []) {
     shown.length ? h('div', { class: 'actions' }, shown) : h('div', { style: 'height: 12px' }));
 }
 
-// A sub-page of Manage: a ✕ in the title row, its own buttons (e.g. Save), then Cancel
-// (or Back when nothing is edited).
-function subPage(ctx, title, content, buttons = [], close = 'Cancel') {
-  const shown = buttons.filter(Boolean);
-  return h('section', { class: 'card' },
-    closableTitle(title, () => closePage(ctx)),
-    content,
-    h('div', { class: 'actions' }, shown, h('button', { onclick: () => closePage(ctx) }, shown.length ? close : 'Back')));
-}
-
-// Finishing locks results and the draw and shows the summary to everyone in its own tab.
+// In the Summary tab: finishing locks results and the draw and shows the summary to
+// everyone. Like editing, it can ask for the password.
 function finishSection(ctx, t) {
   if (isFinished(t)) {
-    return section('Finished', h('p', { class: 'muted' }, `Finished on ${new Date(t.finishedAt).toLocaleDateString()}. Results and the draw are locked, and the Summary tab shows the highlights to everyone.`), [
+    return section('Finished', h('p', { class: 'muted' }, `Finished on ${new Date(t.finishedAt).toLocaleDateString()}. Results and the draw are locked. Reopening hides the summary until it is finished again.`), [
       h('button', {
         onclick: () => {
-          if (!confirm('Reopen the tournament? The summary is hidden until it is finished again.')) return;
+          if (!confirm('Reopen the tournament? The summary is hidden until it is finished again.') || !askPassword(ctx, 'Password to reopen:')) return;
           ctx.save(reopenTournament(t));
           ctx.render();
         },
@@ -591,14 +571,15 @@ function finishSection(ctx, t) {
     ]);
   }
   const open = openMatches(t);
-  return section('Finish', h('p', { class: 'muted' }, open
-    ? `Once all rounds are played, finishing locks results and the draw, and shows the tournament summary to everyone in the Summary tab. Still ${open} ${open === 1 ? 'match' : 'matches'} without a result.`
-    : 'All rounds are played: finishing locks results and the draw, and shows the tournament summary to everyone in the Summary tab. It can be reopened.'), [
+  return section('Finish', [
+    h('p', { class: 'muted' }, 'Finishing locks results and the draw and shows the summary here. It can be reopened.'),
+    open ? lockedNote(`Possible once all rounds are played: still ${open} ${open === 1 ? 'match' : 'matches'} without a result.`) : null,
+  ], [
     h('button', {
       class: 'primary',
       disabled: open > 0,
       onclick: () => {
-        if (!confirm('Finish the tournament and show the summary to everyone?')) return;
+        if (!confirm('Finish the tournament and show the summary to everyone?') || !askPassword(ctx, 'Password to finish:')) return;
         ctx.save(finishTournament(t, new Date()));
         ctx.state.view.tab = 'summary';
         ctx.render();
@@ -612,70 +593,27 @@ function finishSection(ctx, t) {
 function allRoundsPage(ctx, t) {
   const view = ctx.state.view;
   view.swapping = true; // ready to swap: tap two players
+  const close = () => {
+    Object.assign(view, { editRounds: false, swapping: false, swapPick: null });
+    ctx.render();
+  };
+  const done = () => h('button', { class: 'primary', onclick: close }, 'Done');
   return [
-    h('div', { class: 'page-head' }, closableTitle('All rounds', () => { Object.assign(view, { swapping: false, swapPick: null }); closePage(ctx); })),
-    roundsTab(ctx, t, view, true),
-  ];
-}
-
-function manageOverview(ctx, t) {
-  const s = t.settings;
-  const view = ctx.state.view;
-  const shown = shownRounds(t);
-  const allRounds = h('button', { class: 'primary', onclick: () => { view.swapPick = null; openPage(ctx, 'rounds'); } }, 'View');
-  const withdrawn = t.players.length - t.players.filter(isActive).length;
-  const finished = isFinished(t);
-  const scale = scaleOf(s);
-  // Once finished, nothing is left to change: only reopening, printing and deleting.
-  const editing = finished ? [] : [
-    section('Rounds', h('p', { class: 'muted' }, shown < s.rounds
-      ? `Players see rounds 1–${shown} of ${s.rounds}; the next appears once a round is complete.`
-      : `Players see all ${s.rounds} rounds.`), [allRounds]),
-    section('Tournament', h('dl', { class: 'facts' }, setupFacts(t, withdrawn, scale)),
-      [h('button', { class: 'primary', onclick: () => editTournament(ctx, t) }, 'View')]),
-    qualitySection(ctx, t),
-  ];
-  return [
-    ...editing,
-    section('View', h('div', { class: 'options' }, h('label', { class: 'option' },
-      h('input', { type: 'checkbox', checked: Boolean(t.showSkills), onchange: (e) => { ctx.save(setShowSkills(t, e.target.checked)); ctx.render(); } }),
-      h('span', {}, 'Show skills in Info (otherwise the players are listed in alphabetical order)')),
-      h('label', { class: 'option' },
-        h('input', { type: 'checkbox', checked: showsEdges(t), onchange: (e) => { ctx.save(setShowEdges(t, e.target.checked)); ctx.render(); } }),
-        h('span', {}, 'Show edges (on the round cards, in the standings and in the summary)')))),
-    section('Print', h('p', { class: 'muted' }, 'The printout can have the summary (once the tournament is finished), the standings, all rounds and the player skills: Print… lets you choose.'), [
-      h('button', { onclick: () => openPage(ctx, 'print') }, 'Print…')]),
-    finishSection(ctx, t),
-    h('div', { class: 'actions' }, h('button', {
-      class: 'danger',
+    h('div', { class: 'actions' }, done(), hasResults(t) ? lockedNote('Redraw schedule: only before the first result.') : h('button', {
       onclick: () => {
-        if (!confirm(`Delete "${t.name}" from this device? Export it first if you want to keep it.`)) return;
-        ctx.store.remove(t.id);
-        ctx.state.tournament = null;
-        ctx.go('home');
+        if (!confirm('Draw a completely new schedule? Until the first result, this replaces it.')) return;
+        ctx.save(redraw(t, newSeed()));
+        ctx.render();
       },
-    }, 'Delete tournament')),
-  ];
-}
-
-// The settings of the tournament, for Manage and its Tournament page.
-function setupFacts(t, withdrawn, scale) {
-  const s = t.settings;
-  return [
-    fact('Name', t.name),
-    fact('Scoring', scoringLabel(s.scoring)),
-    fact('Skill scale', `${scale.min}–${scale.max}, ${scale.best === 'low' ? 'lower' : 'higher'} is better`),
-    fact('Players', `${t.players.length - withdrawn}${withdrawn ? ` (${withdrawn} withdrew)` : ''}`),
-    fact('Courts', s.lastRoundCourts ? `${s.courts} (last round: ${s.lastRoundCourts})` : s.courts),
-    fact('Rounds', s.rounds),
-    fact('Match length', `${s.matchMinutes} min`),
-    fact('Break', s.breakMinutes ? `${s.breakMinutes} min` : 'none'),
+    }, 'Redraw schedule')),
+    roundsTab(ctx, t, view, true),
+    h('div', { class: 'actions' }, done()),
   ];
 }
 
 // Every option of the tournament, on the same page as for a new tournament (the setup).
 function editTournament(ctx, t) {
-  ctx.state.view.manage = null;
+  if (!askPassword(ctx, 'Password to edit the tournament:')) return;
   ctx.state.draft = draftFromTournament(ctx.store.get(t.id) ?? t);
   ctx.go('setup');
 }
@@ -687,21 +625,21 @@ function revealedQuality(t) {
   const scale = scaleOf(t.settings);
   const players = calibratePlayers(t.players, scale);
   const warnings = drawWarnings(scheduleStats(players, t.schedule), stepUnit(scale)).map((w) => h('p', { class: 'warning' }, w));
-  const revealed = t.schedule; // Manage shows every round
+  const revealed = t.schedule.slice(0, shownRounds(t));
   return { warnings, q: revealed.length ? drawQuality(players, revealed) : null, unit: stepUnit(scale) };
 }
 
-// Draw quality, with every figure, in the Manage list; the schedule can be drawn again
-// until the first result.
-function qualitySection(ctx, t) {
+// Draw quality, with every figure, as the last card of Info: over the rounds shown, since
+// repeated pairings would otherwise give away hidden rounds.
+function qualitySection(t) {
   const { warnings, q, unit } = revealedQuality(t);
-  const locked = hasResults(t) || isFinished(t);
+  const shown = shownRounds(t);
   const one = (x) => (Math.round(x * 10) / 10).toString();
   const steps = (x) => formatValue(Math.round((x / unit) * 100) / 100);
   return section('Draw quality', [
     warnings,
     q ? [
-      h('p', { class: 'muted' }, 'Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread), in skill steps.'),
+      h('p', { class: 'muted' }, `${shown === t.settings.rounds ? 'All rounds' : `The rounds shown so far (1–${shown})`}. Edge = how much stronger one team is than the other in a match (team values: sum of skills + ¼ of the spread), in skill steps.`),
       h('dl', { class: 'facts' },
         fact('Average edge', steps(q.avgGap)),
         fact('Biggest edge', q.worst ? `${steps(q.worst.gap)} (round ${q.worst.round}, court ${q.worst.court})` : '–'),
@@ -713,14 +651,7 @@ function qualitySection(ctx, t) {
         q.opponents.most.length ? fact('Most often opponents', q.opponents.most.map((m) => `${m.names.join(' & ')} ${m.times}×`).join(', ')) : null,
         fact('Sitting out twice in a row', q.sitOuts.backToBack ? `${q.sitOuts.backToBack}×, longest ${q.sitOuts.longestRun} rounds` : 'never')),
     ] : h('p', { class: 'muted' }, 'No rounds yet.'),
-    locked ? null : h('p', { class: 'muted' }, 'Until the first result, the schedule can be drawn again: this replaces it with a new one.'),
-  ], [locked ? null : h('button', {
-    onclick: () => {
-      if (!confirm('Draw a completely new schedule?')) return;
-      ctx.save(redraw(t, newSeed()));
-      ctx.render();
-    },
-  }, 'Redraw schedule')]);
+  ]);
 }
 
 // How the players were assessed: one line per skill, like the player list.
@@ -742,12 +673,15 @@ function skillsCard(t) {
 
 // The highlights would give away results nobody should see yet, so the Summary tab only
 // shows them once the tournament is finished.
-function summaryTab(t) {
-  if (isFinished(t)) return summaryCard(t);
-  return h('section', { class: 'card' },
-    h('h2', { class: 'card-title' }, 'Tournament summary'),
-    h('p', { class: 'muted' }, 'Fun highlights of the tournament (champion, underdog of the day, upset of the tournament and more) appear here once the tournament is finished.'),
-    h('div', { style: 'height: 12px' }));
+function summaryTab(ctx, t) {
+  if (isFinished(t)) return [summaryCard(t), finishSection(ctx, t)];
+  return [
+    h('section', { class: 'card' },
+      h('h2', { class: 'card-title' }, 'Tournament summary'),
+      h('p', { class: 'muted' }, 'Fun highlights of the tournament (champion, underdog of the day, upset of the tournament and more) appear here once the tournament is finished.'),
+      h('div', { style: 'height: 12px' })),
+    finishSection(ctx, t),
+  ];
 }
 
 // Fun highlights of the results (the Summary tab and the top of the printout).

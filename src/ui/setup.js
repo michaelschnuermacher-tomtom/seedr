@@ -1,4 +1,4 @@
-import { h, newId } from './dom.js';
+import { h, newId, lockedNote } from './dom.js';
 import { logoDataUrl } from './logo.js';
 import { parsePlayers, createTournament, updateSettings, isActive, hasResults, renameTournament, setSkills, withdrawPlayers, redrawRemaining, firstRedrawableRound } from '../engine/tournament.js';
 import { planMatrix, gamesPerPlayer, describeGames, BREAK_CHOICES, MATRIX_MIN_MATCH_MINUTES } from '../engine/timeplan.js';
@@ -54,6 +54,7 @@ export function draftFromTournament(t) {
     ...newDraft(),
     editingId: t.id,
     started: hasResults(t),
+    finished: Boolean(t.finishedAt),
     name: t.name,
     scaleMin: scale.min,
     scaleMax: scale.max,
@@ -180,8 +181,9 @@ function playersStep(ctx, d, people, canLeave = true) {
   }) : null;
   return [
     h('p', { class: 'muted' }, !started ? `Choose who plays; a new dropdown appears for the next one. ${d.picks.length} chosen.`
-      : canLeave ? `Results are in, so no one can join. ✕ takes out a player who cannot go on: they keep their results and the rounds without results are drawn again without them. ${d.picks.length} playing.`
-        : `All rounds have results, so the players stay as they are. ${d.picks.length} playing.`),
+      : canLeave ? `✕ takes out a player who cannot go on: they keep their results and the rounds without results are drawn again without them. ${d.picks.length} playing.`
+        : `${d.picks.length} ${d.finished ? 'played' : 'playing'}.`),
+    started && !d.finished ? lockedNote(canLeave ? 'Results are in, so no one can join and players cannot be exchanged.' : 'All rounds have results, so the players stay as they are.') : null,
     h('div', { class: 'level-picks' },
       d.picks.map((pick) => h('div', { class: 'level-pick' }, pickSelect(pick),
         canLeave ? h('button', { class: 'small', title: 'Remove', 'aria-label': `Remove ${name(pick.personId)}`, onclick: () => { d.picks.splice(d.picks.indexOf(pick), 1); ctx.render(); } }, '✕') : null)),
@@ -233,7 +235,7 @@ export function setupScreen(ctx) {
   const card = (title, color, ...children) => h('section', { class: `card accent-${color}` }, h('h2', { class: 'card-title' }, title), ...children);
   const nameCard = card('Tournament', 'ao',
     field('Name', h('input', { type: 'text', value: d.name, placeholder: 'Club night', oninput: (e) => { d.name = e.target.value; refresh(); } })),
-    started ? h('p', { class: 'muted' }, 'Results are in: scoring, skill scale, courts and times stay as they are. The name and the skills can change, and players who cannot go on can be taken out.') : null);
+    d.finished ? lockedNote('The tournament is finished, so nothing can change here. Reopen it in the Summary tab to change the name, skills or players.') : null);
   // The scale only takes effect when a field is left (change), so typing keeps the focus.
   const scaleInput = (key, min, max) => {
     const input = numberInput(key, min, max);
@@ -256,13 +258,40 @@ export function setupScreen(ctx) {
       refresh();
     })),
     pointsField);
-  const playersCard = card('Players', 'wim', playersStep(ctx, d, people, !changes || changes.from <= changes.last));
+  const playersCard = card('Players', 'wim', playersStep(ctx, d, people, !d.finished && (!changes || changes.from <= changes.last)));
   const skillsCard = card('Skills', 'ao', ev0.scale ? skillsStep(ctx, d, ev0.scale, people) : null);
   const courtsField = field('Courts', numberInput('courts', 1));
   const timeField = field('Total tournament time (min)', numberInput('totalMinutes', 1));
   const timeCard = started ? card('Courts & time', 'rg', fixedPlan(started.settings)) : card('Courts & time', 'rg', courtsField, timeField, planBox);
   // Once results are in, scoring and skill scale are shown but cannot change.
-  if (started) for (const input of [...scoringCard.querySelectorAll('input, select'), ...scaleCard.querySelectorAll('input, select')]) input.disabled = true;
+  // A 🔒 note right below the title of a card that cannot change.
+  const lock = (cardEl, text) => cardEl.querySelector('.card-title').after(lockedNote(text));
+  if (started) {
+    for (const input of [...scoringCard.querySelectorAll('input, select'), ...scaleCard.querySelectorAll('input, select')]) input.disabled = true;
+    const fixed = d.finished ? 'The tournament is finished.' : 'Fixed once the first result is entered.';
+    lock(scoringCard, fixed);
+    lock(scaleCard, fixed);
+    lock(timeCard, fixed);
+  }
+  if (d.finished) {
+    for (const input of [nameCard, playersCard, skillsCard].flatMap((c) => [...c.querySelectorAll('input, select')])) input.disabled = true;
+    for (const button of playersCard.querySelectorAll('button')) button.hidden = true;
+    lock(playersCard, 'The tournament is finished.');
+    lock(skillsCard, 'The tournament is finished.');
+  }
+  // Deleting the tournament: only here.
+  const deleteCard = d.editingId ? h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Delete'),
+    h('p', { class: 'muted' }, 'Deletes the tournament from this device. Export a backup first (home screen) to keep it.'),
+    h('div', { class: 'actions' }, h('button', {
+      class: 'danger',
+      onclick: () => {
+        if (!confirm(`Delete "${d.name || 'this tournament'}" from this device?`)) return;
+        ctx.store.remove(d.editingId);
+        ctx.state.tournament = null;
+        ctx.state.draft = null;
+        ctx.go('home');
+      },
+    }, 'Delete tournament'))) : null;
   // Shows each step once the ones before are done.
   const refresh = () => {
     if (started) {
@@ -301,7 +330,8 @@ export function setupScreen(ctx) {
         }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
         h('h1', {}, d.editingId ? 'Edit tournament' : 'New tournament'))),
     h('div', { class: 'form' }, nameCard, scoringCard, scaleCard, playersCard, skillsCard, timeCard),
-    preview);
+    preview,
+    deleteCard);
 }
 
 // Rounds × break: each cell is the match length that fits the total time; a tap chooses
@@ -338,6 +368,7 @@ function fixedPlan(s) {
 
 // Below the steps of a started tournament: what saving does, and the buttons.
 function startedPreview(ctx, d, t) {
+  if (d.finished) return [h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => cancelSetup(ctx) }, 'Done'))];
   const c = startedChanges(t, d);
   const scale = scaleOf(t.settings);
   const problems = [];
@@ -388,7 +419,7 @@ function setupPreview(ctx, d, ev, complete) {
     const games = describeGames(ev.players.length, d.courts, ev.plan.rounds, ev.plan.lastRoundCourts);
     out.push(ev.games.even
       ? h('p', { class: 'ok' }, `Even: ${games}.`)
-      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game. Who plays fewer is drawn at random; Manage → Rounds → View can change it later.`));
+      : h('p', { class: 'warning' }, `Uneven: ${games}. Players with fewer games get 0.5 points per missing game. Who plays fewer is drawn at random; Rounds → Edit can change it later.`));
     if (ev.plan.lastRoundCourts) out.push(h('p', { class: 'muted' }, `The last round uses only ${courtsText(ev.plan.lastRoundCourts)}, so the games come out more even.`));
   } else if (d.editingId && ev.problems.length) {
     out.push(h('ul', { class: 'problems' }, ev.problems.map((p) => h('li', {}, p))));

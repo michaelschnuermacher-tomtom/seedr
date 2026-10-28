@@ -41,7 +41,7 @@ name, scoring, skill scale, players, a skill for each player, courts and break, 
 - **Players per skill**: one dropdown per player at each skill level, and an empty one to
   add the next; only players not chosen yet are offered. Scales with up to 11 levels show
   every level; larger ones show the levels in use, and **Add a skill level** adds one.
-  There are no default skills: they are set here, or later in Manage → Tournament → View.
+  There are no default skills: they are set here, or later with Info → **Edit**.
   **Add or edit players…** leads to the Players page and back.
 
 The year of birth is only used for the tournament summary, in words ("the oldest player
@@ -57,11 +57,11 @@ to win a game"); ages and years are never printed.
 | Courts | Up to 4 players per court play each round. With fewer than `4 × courts` players, only as many courts are used as there are full groups of 4. |
 | Total time, break | From these, Seedr works out every number of rounds that fits: match length = total time ÷ rounds − break, rounded down, at least 5 minutes. |
 | Rounds and break | Chosen in a table: one row per number of rounds, one column per break (0–5 minutes); each cell is the match length that fits the total time (only 8 to 60 minutes are offered). Rows where everyone plays the same number of games are green. If leaving courts empty in the last round means fewer players get fewer games, that is a row of its own, e.g. "9 (last: 1 court)". Only the number of rounds affects the draw; match length and break are only used for the time plan. |
-| Rounds shown | The whole schedule is drawn up front. The Rounds tab shows every complete round and the next one: as soon as a round has all its results, the next appears. Manage → Rounds → **View** shows the whole schedule. |
+| Rounds shown | The whole schedule is drawn up front. The Rounds tab shows every complete round and the next one: as soon as a round has all its results, the next appears. Rounds → **Edit** shows the whole schedule. |
 
 ### Steps
 
-1. **How often everyone sits out.** Each round, `players − 4 × courts used` players sit out, and everyone sits out equally often (at most one apart). When the games can't come out even, who gets fewer is drawn at random; **Manage → Rounds → View** can change it later by swapping players (swapping a player on court with one who sits out moves a game from one to the other). These numbers never change during the draw.
+1. **How often everyone sits out.** Each round, `players − 4 × courts used` players sit out, and everyone sits out equally often (at most one apart). When the games can't come out even, who gets fewer is drawn at random; **Rounds → Edit** can change it later by swapping players (swapping a player on court with one who sits out moves a game from one to the other). These numbers never change during the draw.
 2. **Starting draw.** A first rotation decides who sits out in which round, and each round's players are shuffled into teams and matches.
 3. **Improvement.** The draw then repeatedly makes small changes: it swaps two players or two whole teams in a round, or *exchanges sit-outs* between two rounds (Anna plays in round 3 instead of round 6, Ben the other way round, so both keep their number of games). Moving sit-outs lets players meet who would otherwise never be on court in the same round. Each change is scored, and lower scores are better. F is the difference of the two team values in a match:
 
@@ -81,7 +81,7 @@ to win a game"); ages and years are never printed.
    Simulated annealing makes the search: early on, worse changes are sometimes accepted, which helps it get past local dead ends. Over time it accepts fewer of them. The draw uses 100,000 steps in total (200,000 for fewer than 14 players).
 4. **Seed.** All randomness comes from one seed number stored with the tournament. The same seed and settings always give the same schedule on every device. **Redraw schedule** simply uses a new seed.
 
-If partners repeat or matches are unbalanced (team value gap of 3 or more), **Manage → Draw quality** shows a warning. This happens with few players or very different skill levels.
+If partners repeat or matches are unbalanced (team value gap of 3 or more), the **Draw quality** card in Info shows a warning. This happens with few players or very different skill levels.
 
 **Edge.** The same team value gap F also shows up per player in the standings. In every match it counts as an advantage for the stronger team (+F for both its players) and as a disadvantage for the weaker one (−F). A player's edge is the average of these over the games they played, i.e. their team's average head start: + means they mostly played in the stronger team, − mostly in the weaker one. Example: Anna plays one match in a team 0.25 stronger and one in a team 3.5 weaker, so her edge is (0.25 − 3.5) ÷ 2 ≈ −1.63. The draw doesn't optimize the edge directly, but since it keeps every gap F small, everyone's edge stays close to 0.
 
@@ -99,28 +99,26 @@ A win gives each player in the team 1 point. Players with fewer games than the m
 
 ### When a player leaves
 
-If a player can't continue, open **Manage → Tournament → View**, take the players out with ✕ in **Players** and choose **Save and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
+If a player can't continue, open Info → **Edit**, take the players out with ✕ in **Players** and choose **Save and redraw**. All rounds up to the last one with a result stay as they are. All later rounds are drawn again without those players, using the steps above. The new draw takes the rounds already played into account:
 - it avoids partners players already had;
 - it counts the opponents players already met, so they meet others first;
 - whoever has sat out least so far sits out first, and games stay spread out.
 
 Withdrawn players keep their wins in the standings, but get no bonus and no rank. Before the first result, removing a player there simply draws a new schedule without them.
 
-## Manage
+## The tournament tabs
 
-Everything that changes the draw is in **Manage**, which can ask for a password every time it is opened (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The **Info** tab shows the most important facts (status, players, courts, rounds, match length, break, playing time, games and sit-outs per player, skill scale, rounds shown); Rounds and Standings only show the rounds played so far and the next one, results and standings, so the phone can be handed to players. A finished tournament shows **Finished** next to its name. Manage lists everything read-only; changes happen on a page that a **View** button opens, closed with the ✕ in its title row:
+- **Info**: the most important facts (status, players, courts, rounds, match length, break, playing time, games and sit-outs per player, scoring, skill scale, rounds shown), the players by skill, and **Draw quality** last: edges, partners, opponents and sit-outs over the rounds shown so far (hidden rounds would otherwise be given away), with warnings about the whole draw. **Edit** opens the same page as for a new tournament (the setup), filled in. Before the first result everything can change, and saving draws again. Once results are in, scoring, skill scale, courts and times are locked; the name and the skills can still change (**Save**, or **Save and redraw** for the rounds without results), and ✕ next to a player withdraws them (they keep their results; the rounds without results are drawn again). No one can join a started tournament. Once finished, the page only shows the settings (**Done**). **Delete tournament** is at the bottom of this page, the only place where a tournament can be deleted. Names and years of birth are only changed on the Players page.
+- **Rounds**: every complete round and the next one, where results are entered. **Edit** shows the whole schedule, where two players can be swapped (tap one, then the other) in any round without results, and, before the first result, **Redraw schedule**; **Done** goes back. Not once finished.
+- **Standings**: points, games, bonus, scores and edges.
+- **Summary**: the tournament summary once finished; **Finish tournament** and **Reopen** (see below).
+- **Print**: asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, the rounds shown so far (all of them once finished) and the player skills. A section starts on the same page when it still fits.
 
-- **Rounds**: how many rounds the players see; **View** shows the whole schedule, where two players can be swapped (tap one, then the other) in any round without results. Read-only once finished.
-- **Tournament**: all settings; **View** opens the same page as for a new tournament (the setup), filled in. Before the first result everything can change, and saving draws again. Once results are in, scoring, skill scale, courts and times are locked; the name and the skills can still change (**Save**, or **Save and redraw** for the rounds without results), and ✕ next to a player withdraws them (they keep their results; the rounds without results are drawn again). No one can join a started tournament. Names and years of birth are only changed on the Players page.
-- **Draw quality**: all figures (edges, partners, opponents, sit-outs) and, before the first result, **Redraw schedule**.
-- **View**: **Show skills in Info** (off by default); without it, Info lists the players in alphabetical order and leaves out the skill scale, and the summary leaves out highlights that show skills. **Show edges** (on by default); without it, round cards, standings and summary show no edges and no highlights based on them.
-- **Finish** (after Print, right before **Delete tournament**): when the last match is played, **Finish tournament** locks results and the draw and shows the tournament summary to everyone in the **Summary** tab; **Reopen** undoes it. Once finished, Manage only shows View, Print, Finish and Delete.
-- **Print**: **Print…** asks which sections go into the printout, in this order: the tournament summary (once the tournament is finished), standings, all rounds and player skills. A section starts on the same page when it still fits.
-- **Delete tournament**: the only place where a tournament can be deleted. The password only keeps players from peeking: it can be read in the app's source.
+Skills and edges are always shown. Where the tournament's progress locks something (e.g. scoring once results are in, everything once finished), a 🔒 note says so right there. Editing (Info → Edit, Rounds → Edit, finishing and reopening) can ask for a password every time (currently switched off: `PASSWORD_REQUIRED` in `src/ui/tournament-view.js`). The password only keeps players from peeking: it can be read in the app's source. A finished tournament shows **Finished** next to its name.
 
 ### Tournament summary
 
-Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in the **Summary** tab for everyone (until then it says so), and as an option for the printout.
+Fun highlights of the results (champion, underdog of the day, upset of the tournament, rivals, luck of the draw and more), mentioning every player. They would give results away, so they only appear once the tournament is finished: in the **Summary** tab for everyone (until then it says so), and as an option for the printout. The Summary tab also has **Finish tournament**: once every match has a result, it locks results and the draw and shows the summary (it asks for the password when that is switched on); **Reopen** undoes it.
 
 ## Keeping data safe
 
