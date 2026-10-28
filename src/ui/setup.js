@@ -279,19 +279,6 @@ export function setupScreen(ctx) {
     lock(playersCard, 'The tournament is finished.');
     lock(skillsCard, 'The tournament is finished.');
   }
-  // Deleting the tournament: only here.
-  const deleteCard = d.editingId ? h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'Delete'),
-    h('p', { class: 'muted' }, 'Deletes the tournament from this device. Export a backup first (home screen) to keep it.'),
-    h('div', { class: 'actions' }, h('button', {
-      class: 'danger',
-      onclick: () => {
-        if (!confirm(`Delete "${d.name || 'this tournament'}" from this device?`)) return;
-        ctx.store.remove(d.editingId);
-        ctx.state.tournament = null;
-        ctx.state.draft = null;
-        ctx.go('home');
-      },
-    }, 'Delete tournament'))) : null;
   // Shows each step once the ones before are done.
   const refresh = () => {
     if (started) {
@@ -330,8 +317,7 @@ export function setupScreen(ctx) {
         }, h('img', { src: logoDataUrl(), alt: '' }), 'Seedr'),
         h('h1', {}, d.editingId ? 'Edit tournament' : 'New tournament'))),
     h('div', { class: 'form' }, nameCard, scoringCard, scaleCard, playersCard, skillsCard, timeCard),
-    preview,
-    deleteCard);
+    preview);
 }
 
 // Rounds × break: each cell is the match length that fits the total time; a tap chooses

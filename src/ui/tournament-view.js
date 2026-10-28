@@ -84,9 +84,20 @@ function infoTab(t) {
     h('div', { style: 'height: 12px' }));
 }
 
-// Below everything in Info: Edit changes the whole tournament (settings, players, skills).
+// Below everything in Info: Edit changes the whole tournament (settings, players, skills);
+// Delete is the only place where a tournament can be deleted. Both behind the password.
 function infoEdit(ctx, t) {
-  return h('div', { class: 'actions' }, h('button', { class: 'primary', onclick: () => editTournament(ctx, t) }, 'Edit'));
+  return h('div', { class: 'actions' },
+    h('button', { class: 'primary', onclick: () => editTournament(ctx, t) }, 'Edit'),
+    h('button', {
+      class: 'danger',
+      onclick: () => {
+        if (!confirm(`Delete "${t.name}" from this device? Export a backup first (home screen) to keep it.`) || !askPassword(ctx, 'Password to delete:')) return;
+        ctx.store.remove(t.id);
+        ctx.state.tournament = null;
+        ctx.go('home');
+      },
+    }, 'Delete tournament'));
 }
 
 // The players in the Info tab, by skill.
